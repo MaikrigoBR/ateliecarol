@@ -102,6 +102,10 @@ export function Sidebar({ onClose }) {
           <DollarSign size={20} />
           <span>Financeiro</span>
         </Link>
+        <Link to="/financeiro-teste" className={`nav-item ${isActive('/financeiro-teste')}`}>
+          <DollarSign size={20} color="#ea580c" />
+          <span style={{color: '#ea580c', fontWeight: 'bold'}}>Financeiro (Testes)</span>
+        </Link>
         <Link to="/staff" className={`nav-item ${isActive('/staff')}`}>
           <Briefcase size={20} />
           <span>Equipe & Custos</span>

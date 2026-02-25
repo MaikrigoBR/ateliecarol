@@ -12,6 +12,7 @@ import { Products } from './pages/Products';
 import { Customers } from './pages/Customers';
 import { Settings } from './pages/Settings';
 import { FinanceFinal as Finance } from './pages/FinanceFinal';
+import { FinanceV2 } from './pages/FinanceV2';
 import { Inventory } from './pages/Inventory';
 import { Budgets } from './pages/Budgets';
 import { OrderPrint } from './pages/OrderPrint';
@@ -73,6 +74,7 @@ function App() {
                   <Route path="/productivity" element={<ProductivityReport />} />
                   <Route path="/budgets" element={<Budgets />} />
                   <Route path="/finance" element={<Finance />} />
+                  <Route path="/financeiro-teste" element={<FinanceV2 />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/users" element={<Users />} />
