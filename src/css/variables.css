@@ -1,0 +1,71 @@
+:root {
+  /* Colors - Palette: Elegant Slate & Vibrant Accents */
+  --primary: #4f46e5; /* Indigo 600 */
+  --primary-hover: #4338ca; /* Indigo 700 */
+  --secondary: #ec4899; /* Pink 500 - Creative Accent */
+
+  --background: #f8fafc; /* Slate 50 */
+  --surface: #ffffff; /* White */
+  --surface-hover: #f1f5f9; /* Slate 100 */
+
+  --text-main: #0f172a; /* Slate 900 */
+  --text-muted: #64748b; /* Slate 500 */
+  --text-light: #94a3b8; /* Slate 400 */
+
+  --border: #e2e8f0; /* Slate 200 */
+
+  --success: #10b981; /* Emerald 500 */
+  --warning: #f59e0b; /* Amber 500 */
+  --danger: #ef4444; /* Red 500 */
+  --info: #3b82f6; /* Blue 500 */
+
+  /* Typography */
+  --font-heading: "Outfit", sans-serif;
+  --font-body: "Inter", sans-serif;
+
+  /* Spacing */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+
+  /* Shapes */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-full: 9999px;
+
+  /* Shadows - Soft & Modern */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg:
+    0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+}
+
+.dark-mode {
+  /* Colors - Dark Mode Override - HIGH CONTRAST */
+  --background: #020617;    /* Slate 950 - Deepest Blue/Black */
+  --surface: #0f172a;       /* Slate 900 - Dark Surface */
+  --surface-hover: #1e293b; /* Slate 800 - Lighter Surface for Hovers */
+
+  --text-main: #f1f5f9;     /* Slate 100 - Bright Text */
+  --text-muted: #94a3b8;    /* Slate 400 - Readable Grey */
+  --text-light: #64748b;    /* Slate 500 - Subtle Grey */
+
+  --border: #1e293b;        /* Slate 800 - Subtle Borders */
+
+  /* Adjust accents for dark mode contrast */
+  --primary: #818cf8;       /* Indigo 400 - Brighter/Lighter Indigo */
+  --primary-hover: #6366f1; /* Indigo 500 */
+
+  /* Shadows - More intense for dark mode visibility */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+  --shadow-lg:
+    0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+}

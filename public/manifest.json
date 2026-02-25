@@ -1,0 +1,8 @@
+{
+  "name": "Estúdio Criativo Manager",
+  "short_name": "Estúdio",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8b5cf6"
+}
