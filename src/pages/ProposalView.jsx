@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { FileText, CheckCircle, Package, ExternalLink, MessageCircle, Calendar } from 'lucide-react';
+import { FileText, CheckCircle, Package, ExternalLink, MessageCircle, Calendar, X, PlayCircle, Image as ImageIcon } from 'lucide-react';
 import db from '../services/database.js';
 
 export function ProposalView() {
@@ -9,6 +9,10 @@ export function ProposalView() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [companyConfig, setCompanyConfig] = useState({ companyName: 'Estúdio Criativo', logoBase64: null, whatsapp: '' });
+  
+  // Product Modal State
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
     const fetchProposal = async () => {
@@ -20,7 +24,6 @@ export function ProposalView() {
         const allProducts = await db.getAll('products');
         setProducts(allProducts || []);
 
-        // Fetch company branding & contact info
         try {
             const settings = await db.getById('settings', 'global');
             if (settings) {
@@ -60,7 +63,6 @@ export function ProposalView() {
   const handleWhatsAppAction = (actionText) => {
      let phone = companyConfig.whatsapp || '';
      if (!phone) {
-         // Fallback se não tiver WhatsApp na config (vamos tentar pegar do localstorage se houver)
          try {
              const saved = localStorage.getItem('stationery_config');
              if (saved) {
@@ -79,8 +81,108 @@ export function ProposalView() {
      }
   };
 
+  const openProductModal = (registryId) => {
+      const prod = products.find(p => String(p.id) === String(registryId));
+      if (prod) {
+          setSelectedProduct(prod);
+          setActiveImageIndex(0);
+      }
+  };
+
+  const closeModal = () => {
+      setSelectedProduct(null);
+  };
+
+  const renderProductModal = () => {
+      if (!selectedProduct) return null;
+
+      const images = selectedProduct.images && selectedProduct.images.length > 0 
+          ? selectedProduct.images 
+          : (selectedProduct.image ? [selectedProduct.image] : []);
+      
+      const hasMedia = images.length > 0 || selectedProduct.videoUrl;
+
+      return (
+          <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 9999,
+              display: 'flex', justifyContent: 'center', alignItems: 'center',
+              padding: '20px', backdropFilter: 'blur(4px)'
+          }} onClick={closeModal}>
+               <div style={{
+                   backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden',
+                   width: '100%', maxWidth: '500px', maxHeight: '90vh',
+                   display: 'flex', flexDirection: 'column', position: 'relative',
+                   boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+               }} onClick={e => e.stopPropagation()}>
+                    
+                    <button onClick={closeModal} style={{
+                        position: 'absolute', top: '16px', right: '16px', zIndex: 10,
+                        backgroundColor: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%',
+                        width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                    }}>
+                        <X size={18} color="#334155" />
+                    </button>
+
+                    {/* Media Header */}
+                    <div style={{ backgroundColor: '#f1f5f9', position: 'relative' }}>
+                         {images.length > 0 ? (
+                             <img src={images[activeImageIndex]} alt={selectedProduct.name} style={{ width: '100%', height: '300px', objectFit: 'contain', backgroundColor: '#f8fafc' }} />
+                         ) : (
+                             <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                                 <ImageIcon size={64} />
+                             </div>
+                         )}
+                    </div>
+
+                    {/* Media Thumbnails */}
+                    {hasMedia && (
+                        <div style={{ display: 'flex', gap: '8px', padding: '12px 20px', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9', overflowX: 'auto' }}>
+                             {images.map((img, idx) => (
+                                 <div key={idx} onClick={() => setActiveImageIndex(idx)} style={{
+                                     width: '50px', height: '50px', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer',
+                                     border: activeImageIndex === idx ? '2px solid var(--primary)' : '2px solid transparent',
+                                     flexShrink: 0
+                                 }}>
+                                     <img src={img} alt={`thumb-${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                 </div>
+                             ))}
+                             {selectedProduct.videoUrl && (
+                                 <a href={selectedProduct.videoUrl} target="_blank" rel="noopener noreferrer" style={{
+                                     width: '50px', height: '50px', borderRadius: '8px', backgroundColor: '#fef2f2', border: '1px solid #fee2e2',
+                                     display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', textDecoration: 'none',
+                                     flexShrink: 0, title: 'Assistir Vídeo'
+                                 }}>
+                                     <PlayCircle size={24} />
+                                 </a>
+                             )}
+                        </div>
+                    )}
+
+                    {/* Content Body */}
+                    <div style={{ padding: '24px', overflowY: 'auto', flex: 1, backgroundColor: 'white' }}>
+                         <div style={{ display: 'inline-block', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px', borderRadius: '12px', marginBottom: '12px', textTransform: 'uppercase' }}>
+                             {selectedProduct.category}
+                         </div>
+                         <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', lineHeight: '1.2' }}>
+                             {selectedProduct.name}
+                         </h3>
+                         
+                         <p style={{ fontSize: '0.95rem', color: '#475569', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                             {selectedProduct.description || 'Nenhuma descrição detalhada disponível.'}
+                         </p>
+                    </div>
+
+               </div>
+          </div>
+      );
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fdfcfe', display: 'flex', justifyContent: 'center', padding: '40px 20px', fontFamily: 'var(--font-primary)' }}>
+      {renderProductModal()}
+      
       <div style={{ maxWidth: '600px', width: '100%' }}>
         
         {/* Header Block */}
@@ -122,14 +224,29 @@ export function ProposalView() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '30px' }}>
               {budget.items?.map((item, idx) => {
                   const prodRegistry = products.find(p => String(p.id) === String(item.productId));
-                  const imageUrl = prodRegistry?.imageBase64 || null;
+                  
+                  // Use new array logic or fallback
+                  let imageUrl = null;
+                  if (prodRegistry?.images && prodRegistry.images.length > 0) imageUrl = prodRegistry.images[0];
+                  else if (prodRegistry?.image) imageUrl = prodRegistry.image; // fallback legacy
 
                   return (
-                      <div key={idx} style={{ display: 'flex', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                      <div 
+                          key={idx} 
+                          onClick={() => openProductModal(item.productId)}
+                          style={{ 
+                              display: 'flex', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', 
+                              borderRadius: '12px', border: '1px solid #e2e8f0', alignItems: 'center',
+                              cursor: prodRegistry ? 'pointer' : 'default', transition: 'all 0.2s',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                          }}
+                          onMouseOver={(e) => { if(prodRegistry) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.transform = 'translateY(-2px)' }}}
+                          onMouseOut={(e) => { if(prodRegistry) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none' }}}
+                      >
                           {/* Imagem do Produto */}
                           <div style={{ 
-                               width: '70px', height: '70px', borderRadius: '8px', backgroundColor: '#e2e8f0', flexShrink: 0,
-                               display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'
+                               width: '70px', height: '70px', borderRadius: '8px', backgroundColor: 'white', flexShrink: 0,
+                               display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', border: '1px solid #f1f5f9'
                           }}>
                               {imageUrl ? (
                                   <img src={imageUrl} alt={item.productName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -140,9 +257,12 @@ export function ProposalView() {
                           
                           {/* Detalhes do Produto */}
                           <div style={{ flex: 1 }}>
-                              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>{item.productName}</h4>
+                              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {item.productName}
+                              </h4>
                               <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
-                                  Quantidade: {item.quantity} {item.quantity > 1 ? 'unidades' : 'unidade'}
+                                  Quantidade: {item.quantity || item.qty} {item.quantity > 1 ? 'unidades' : 'unidade'}
+                                  {prodRegistry && <span style={{ marginLeft: '6px', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600 }}>(Ver Detalhes)</span>}
                               </p>
                           </div>
                           

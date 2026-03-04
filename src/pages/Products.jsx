@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Image, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Image as ImageIcon, Trash2, Edit2, Tag, PieChart } from 'lucide-react';
 import db from '../services/database.js';
 import { NewProductModal } from '../components/NewProductModal.jsx';
 import AuditService from '../services/AuditService.js';
@@ -71,11 +71,18 @@ export function Products() {
       <div className="product-grid">
         {filteredProducts.map(product => (
           <div key={product.id} className="card">
-            <div className="product-image-container">
-              {product.image ? (
+            <div className="product-image-container relative">
+              {product.campaignActive && (
+                  <div className="absolute top-2 left-2 bg-pink-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm z-10 flex items-center gap-1">
+                      <Tag size={10} /> -{product.campaignDiscount}% OFF
+                  </div>
+              )}
+              {product.images && product.images.length > 0 ? (
+                <img src={product.images[0]} alt={product.name} className="product-image" />
+              ) : product.image ? (
                 <img src={product.image} alt={product.name} className="product-image" />
               ) : (
-                <Image size={48} />
+                <ImageIcon size={48} />
               )}
             </div>
             <div style={{ marginBottom: 'var(--space-sm)' }}>
@@ -114,13 +121,28 @@ export function Products() {
                       {product.description}
                   </p>
               )}
+              {product.totalCost > 0 && product.price > 0 && (
+                <div className="mt-2 flex items-center gap-1 text-[10px] bg-gray-50 border border-gray-100 p-1 w-fit rounded">
+                    <PieChart size={12} className="text-gray-400" />
+                    <span className="text-gray-500">Mg: {( ((product.price - product.totalCost) / product.price) * 100 ).toFixed(0)}%</span>
+                </div>
+              )}
             </div>
             
             <div className="product-card-footer">
-              <span className="product-price">R$ {Number(product.price || 0).toFixed(2).replace('.', ',')}</span>
+              <span className="product-price flex flex-col">
+                  {product.campaignActive ? (
+                      <>
+                          <span className="text-[10px] text-gray-400 line-through font-normal">R$ {Number(product.price || 0).toFixed(2).replace('.', ',')}</span>
+                          <span className="text-pink-600">R$ {(Number(product.price||0) * (1 - (Number(product.campaignDiscount||0)/100))).toFixed(2).replace('.', ',')}</span>
+                      </>
+                  ) : (
+                      <span>R$ {Number(product.price || 0).toFixed(2).replace('.', ',')}</span>
+                  )}
+              </span>
               <div style={{ textAlign: 'right' }}>
                 <div className="product-stock-label">Estoque</div>
-                <span className={`badge ${product.stock < 50 ? 'badge-warning' : 'badge-success'}`}>{product.stock} un.</span>
+                <span className={`badge ${product.stock < 10 ? 'badge-warning' : 'badge-success'}`}>{product.stock} un.</span>
               </div>
             </div>
           </div>
