@@ -14,6 +14,38 @@ import '../css/pages.css';
 import { calculateFinancialStats } from '../components/FinanceHelpers';
 import { CreditCardManagerModal } from '../components/CreditCardManagerModal';
 
+const EXPENSE_CATEGORIES = [
+    'Administrativo / Fixos',
+    'Materiais & Insumos',
+    'Marketing & Vendas',
+    'Impostos & Taxas',
+    'Logística & Frete',
+    'Pessoal & RH',
+    'Equipamentos & Ativos',
+    'Outros'
+];
+
+const INCOME_CATEGORIES = [
+    'Vendas de Produtos',
+    'Serviços Prestados',
+    'Aportes / Rendimentos',
+    'Outros'
+];
+
+const CATEGORY_COLORS = {
+    'Administrativo / Fixos': '#8b5cf6',
+    'Materiais & Insumos': '#f59e0b',
+    'Marketing & Vendas': '#ec4899',
+    'Impostos & Taxas': '#ef4444',
+    'Logística & Frete': '#0ea5e9',
+    'Pessoal & RH': '#10b981',
+    'Equipamentos & Ativos': '#6366f1',
+    'Outros': '#9ca3af',
+    'Vendas de Produtos': '#10b981',
+    'Serviços Prestados': '#3b82f6',
+    'Aportes / Rendimentos': '#8b5cf6'
+};
+
 // --- Components from Dashboard ---
 
 function StatCard({ title, value, icon: Icon, color, subtext, valueColor }) {
@@ -230,6 +262,7 @@ export function FinanceFinal() {
     const [orders, setOrders] = useState([]); // For projections
     const [loading, setLoading] = useState(true);
     const [chartData, setChartData] = useState([]);
+    const [costCenterData, setCostCenterData] = useState([]);
     
     // Global Dash Filter
     const [globalAccFilter, setGlobalAccFilter] = useState('');
@@ -290,6 +323,18 @@ export function FinanceFinal() {
             // Credit Used (only if looking globally or specifically at a credit card)
             const creditUsed = filteredAccounts.filter(a => a.type === 'credit').reduce((sum, a) => sum + Number(a.balance || 0), 0);
 
+            // 3. Cost Center DRE (Current Month Expenses)
+            const expenseMap = {};
+            currentMonthTrans.filter(t => t.type === 'expense').forEach(t => {
+                const cat = t.category || 'Outros';
+                expenseMap[cat] = (expenseMap[cat] || 0) + Number(t.amount);
+            });
+            const costCenterFormat = Object.keys(expenseMap).map(k => ({
+                name: k,
+                value: expenseMap[k],
+                color: CATEGORY_COLORS[k] || '#9ca3af'
+            })).sort((a,b) => b.value - a.value);
+
             setStats({
                 totalBalance: totalBal,
                 monthIncome: income,
@@ -297,6 +342,7 @@ export function FinanceFinal() {
                 result: income - expense,
                 creditDebt: creditUsed
             });
+            setCostCenterData(costCenterFormat);
         }
     }, [transactions, orders, accounts, loading, globalAccFilter]);
 
@@ -375,7 +421,7 @@ export function FinanceFinal() {
              description: t.description,
              amount: t.amount,
              type: t.type,
-             category: t.category || 'Geral',
+             category: t.category || (t.type === 'income' ? 'Vendas de Produtos' : 'Outros'),
              accountId: t.accountId,
              date: t.date || new Date().toISOString().split('T')[0],
              status: t.status || 'paid',
@@ -459,7 +505,7 @@ export function FinanceFinal() {
         // We don't need manual balance updates anymore, fetchData recalculates it cleanly!
         setIsTransModalOpen(false);
         setEditTransId(null);
-        setNewTrans({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
+        setNewTrans({ description: '', amount: '', type: 'expense', category: 'Outros', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
         fetchData();
     };
 
@@ -533,7 +579,7 @@ export function FinanceFinal() {
                     <button 
                         onClick={() => {
                             setEditTransId(null);
-                            setNewTrans({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
+                            setNewTrans({ description: '', amount: '', type: 'expense', category: 'Outros', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
                             setIsTransModalOpen(true);
                         }}
                         className="btn btn-primary btn-sm flex items-center gap-2"
@@ -589,9 +635,9 @@ export function FinanceFinal() {
             </div>
 
             {/* Charts Grid */}
-            <div className="flex flex-col gap-6 mb-6">
+            <div className="flex flex-col lg:flex-row gap-6 mb-6">
                 {/* Main Dynamic Chart */}
-                <div className="chart-card" style={{ overflow: 'hidden' }}>
+                <div className="chart-card flex-1" style={{ overflow: 'hidden' }}>
                     <div className="chart-header" style={{ justifyContent: 'space-between' }}>
                         <div className="flex items-center gap-2">
                              <BarChart2 size={20} color="var(--primary)" /> Fluxo Diário
@@ -605,6 +651,53 @@ export function FinanceFinal() {
                     </div>
                     <div style={{ width: '100%', height: '320px', minWidth: 0, position: 'relative' }}>
                          <FinancialOverviewChart data={chartData} />
+                    </div>
+                </div>
+
+                {/* Cost Center / DRE Chart */}
+                <div className="chart-card lg:w-1/3" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div className="chart-header">
+                        <div className="flex items-center gap-2">
+                             <PieChart size={20} color="var(--primary)" /> Distribuição de Custos
+                        </div>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
+                        {costCenterData.length > 0 ? (
+                            <>
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <PieChart>
+                                        <Pie
+                                            data={costCenterData}
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            {costCenterData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip 
+                                            formatter={(value) => `R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
+                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="w-full px-4 mt-2 space-y-2 max-h-[100px] overflow-y-auto scrollbar-hide">
+                                    {costCenterData.map((d, i) => (
+                                        <div key={i} className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }}></div>
+                                                <span className="text-gray-600 font-medium truncate max-w-[120px]">{d.name}</span>
+                                            </div>
+                                            <span className="font-bold text-gray-800">R$ {d.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-gray-400 text-sm italic">Nenhuma despesa no mês atual.</div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -803,6 +896,7 @@ export function FinanceFinal() {
                         <tr style={{ background: 'var(--surface-hover)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
                             <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left' }}>Data</th>
                             <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left' }}>Descrição</th>
+                            <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left' }}>Centro de Custo</th>
                             <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left' }}>Conta</th>
                             <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right' }}>Valor</th>
                             <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right' }}>Saldo Conta</th>
@@ -836,6 +930,19 @@ export function FinanceFinal() {
                                         <td style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-main)' }}>
                                             {t.description}
                                             {t.installmentsTotal > 1 && <span className="ml-2 text-[10px] text-blue-500 bg-blue-50/20 px-1.5 rounded">{t.installmentNumber}/{t.installmentsTotal}</span>}
+                                        </td>
+                                        <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                            <span style={{ 
+                                                backgroundColor: CATEGORY_COLORS[t.category] ? `${CATEGORY_COLORS[t.category]}15` : '#f3f4f6', 
+                                                color: CATEGORY_COLORS[t.category] || '#4b5563',
+                                                padding: '2px 8px',
+                                                borderRadius: '999px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 600,
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {t.category || 'Outros'}
+                                            </span>
                                         </td>
                                         <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                                             {acc?.name || '-'}
@@ -956,18 +1063,29 @@ export function FinanceFinal() {
                                     </div>
                                     <div className="input-group">
                                         <label className="form-label">Tipo</label>
-                                        <select className="form-input w-full" value={newTrans.type} onChange={e => setNewTrans({...newTrans, type: e.target.value})}>
+                                        <select className="form-input w-full" value={newTrans.type} onChange={e => setNewTrans({...newTrans, type: e.target.value, category: e.target.value === 'income' ? 'Vendas de Produtos' : 'Outros'})}>
                                             <option value="expense">Despesa (-)</option>
                                             <option value="income">Receita (+)</option>
                                         </select>
                                     </div>
                                 </div>
-                                <div className="input-group">
-                                    <label className="form-label">Conta/Cartão</label>
-                                    <select required className="form-input w-full" value={newTrans.accountId} onChange={e => setNewTrans({...newTrans, accountId: e.target.value})}>
-                                        <option value="">Selecione...</option>
-                                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                    </select>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="input-group">
+                                        <label className="form-label">Centro de Custo</label>
+                                        <select required className="form-input w-full" value={newTrans.category} onChange={e => setNewTrans({...newTrans, category: e.target.value})}>
+                                            <option value="">Selecione...</option>
+                                            {(newTrans.type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map(cat => (
+                                                <option key={cat} value={cat}>{cat}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="input-group">
+                                        <label className="form-label">Conta/Cartão</label>
+                                        <select required className="form-input w-full" value={newTrans.accountId} onChange={e => setNewTrans({...newTrans, accountId: e.target.value})}>
+                                            <option value="">Selecione...</option>
+                                            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                                 {accounts.find(a => String(a.id) === String(newTrans.accountId))?.type === 'credit' && newTrans.type === 'expense' && !editTransId && (
                                     <div className="input-group">
