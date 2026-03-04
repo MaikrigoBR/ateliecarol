@@ -54,9 +54,9 @@ export function ProductivityReport() {
 
         orders.forEach(order => {
             // Check SLA if order is completed
-            if (order.status === 'completed' && order.deadline) {
+            if ((order.status === 'completed' || order.status === 'Concluído') && order.deadline) {
                 const deadlineDate = new Date(order.deadline);
-                const completeHistory = order.productionHistory?.find(h => h.step === 'completed' || h.step === 'complete_order');
+                const completeHistory = order.productionHistory?.find(h => h.step === 'completed' || h.step === 'complete_order' || h.step === 'Concluído');
                 // Consider delivered on time if completed before or on the day of deadline
                 if (completeHistory && completeHistory.enteredAt) {
                     const completedDate = new Date(completeHistory.enteredAt);

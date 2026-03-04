@@ -237,7 +237,7 @@ export function Dashboard() {
                                 <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} />
                                 <Tooltip 
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                                    formatter={(value, name) => [name === 'Vendas' ? `R$ ${value.toFixed(2)}` : value, name]}
+                                    formatter={(value, name) => [name === 'Vendas' ? `R$ ${Number(value).toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : value, name]}
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                 

@@ -59,9 +59,11 @@ export function Reports() {
       switch (activeTab) {
           case 'sales':
               result = data.orders.filter(order => {
-                  const orderDate = new Date(order.createdAt);
+                  const orderDateString = order.date || order.createdAt;
+                  if (!orderDateString) return false;
+                  const orderDate = new Date(orderDateString);
                   const dateMatch = orderDate >= start && orderDate <= end;
-                  const statusMatch = order.status !== 'cancelled';
+                  const statusMatch = order.status !== 'cancelled' && order.status !== 'Cancelado';
                   return dateMatch && statusMatch;
               });
               break;
@@ -123,15 +125,14 @@ export function Reports() {
           tableColumn.push("Data", "Cliente", "Status", "Valor (R$)");
           filteredData.forEach(order => {
               tableRows.push([
-                  new Date(order.createdAt).toLocaleDateString(),
+                  new Date(order.date || order.createdAt).toLocaleDateString(),
                   order.customer || order.customerName || 'Cliente Final',
                   order.status,
-                  order.status,
-                  `R$ ${(parseFloat(order.total) || 0).toFixed(2)}`
+                  `R$ ${(parseFloat(order.total) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
               ]);
           });
           const total = filteredData.reduce((acc, curr) => acc + (parseFloat(curr.total) || 0), 0);
-          tableRows.push(['', '', 'TOTAL:', `R$ ${total.toFixed(2)}`]);
+          tableRows.push(['', '', 'TOTAL:', `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`]);
 
       } else if (activeTab === 'inventory') {
           tableColumn.push("Item", "Tipo", "Qtd", "Custo Unit.", "Total");
@@ -154,11 +155,11 @@ export function Reports() {
                   t.category,
                   t.type === 'income' ? 'Receita' : 'Despesa',
                   t.status === 'paid' ? 'Pago' : 'Pendente',
-                  `R$ ${(t.amount || 0).toFixed(2)}`
+                  `R$ ${(t.amount || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
               ]);
           });
            const balance = filteredData.reduce((acc, t) => acc + (t.type === 'income' ? (t.amount||0) : -(t.amount||0)), 0);
-           tableRows.push(['', '', '', '', 'BALANÇO:', `R$ ${balance.toFixed(2)}`]);
+           tableRows.push(['', '', '', '', 'BALANÇO:', `R$ ${balance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`]);
 
       } else if (activeTab === 'customers') {
           tableColumn.push("Nome", "Email", "Tipo", "Documento", "Status");
@@ -283,10 +284,10 @@ export function Reports() {
                   <tbody>
                       {activeTab === 'sales' && filteredData.map(order => (
                           <tr key={order.id}>
-                              <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-                              <td>{order.customer || order.customerName || 'Cliente Final'}</td>
-                              <td><span className={`badge badge-${order.status === 'completed' ? 'success' : 'neutral'}`}>{order.status}</span></td>
-                              <td>R$ {(parseFloat(order.total) || 0).toFixed(2)}</td>
+                              <td>{new Date(order.date || order.createdAt).toLocaleDateString()}</td>
+                              <td style={{ fontWeight: 500 }}>{order.customer || order.customerName || 'Cliente Final'}</td>
+                              <td><span className={`badge badge-${(order.status === 'completed' || order.status === 'Concluído') ? 'success' : 'neutral'}`}>{order.status}</span></td>
+                              <td style={{ fontWeight: 600 }}>R$ {(parseFloat(order.total) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                           </tr>
                       ))}
 
@@ -305,7 +306,7 @@ export function Reports() {
                                       {t.status === 'paid' ? 'Pago' : 'Pendente'}
                                   </span>
                               </td>
-                              <td className="font-bold">R$ {(t.amount || 0).toFixed(2)}</td>
+                              <td className="font-bold">R$ {(t.amount || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                           </tr>
                       ))}
 
@@ -334,7 +335,7 @@ export function Reports() {
                       ))}
 
                       {filteredData.length === 0 && (
-                          <tr><td colSpan="6" className="text-center p-6 text-muted">Nenhum dado encontrado com os filtros selecionados.</td></tr>
+                          <tr><td colSpan="10" className="text-center p-6 text-muted">Nenhum dado encontrado com os filtros selecionados.</td></tr>
                       )}
                   </tbody>
               </table>
