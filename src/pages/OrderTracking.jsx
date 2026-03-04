@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Package, CheckCircle, Clock, Truck, Home, MapPin, Instagram } from 'lucide-react';
 import db from '../services/database.js';
+import { PromoBanner } from '../components/PromoBanner';
 
 export function OrderTracking() {
   const { id } = useParams();
@@ -178,27 +179,7 @@ export function OrderTracking() {
           </div>
         </div>
         
-        {companyConfig.instagram && (
-            <div 
-                onClick={() => window.open(`https://instagram.com/${companyConfig.instagram.replace('@', '')}`, '_blank')}
-                style={{ 
-                    marginTop: '20px', padding: '16px 20px', borderRadius: '12px', background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)', 
-                    color: 'white', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(220, 39, 67, 0.2)', transition: 'transform 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-            >
-                <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '10px', borderRadius: '50%', display: 'flex' }}>
-                    <Instagram size={24} />
-                </div>
-                <div>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Acompanhe nossa Mágica!</h4>
-                    <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.9, marginTop: '2px', lineHeight: '1.3' }}>
-                        Enquanto espera, siga <strong>@{companyConfig.instagram.replace('@', '')}</strong> no Instagram e marque-nos quando seu pedido chegar!
-                    </p>
-                </div>
-            </div>
-        )}
+        <PromoBanner promoConfig={companyConfig?.promoBanner} companyConfig={companyConfig} />
 
         <div style={{ textAlign: 'center', marginTop: '30px', color: '#94a3b8', fontSize: '0.8rem' }}>
             Atualizado automaticamente em tempo real.<br/>

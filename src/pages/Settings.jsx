@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
-import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays } from 'lucide-react';
+import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays, Palette } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
+import { PromoBannerModal } from '../components/PromoBannerModal';
 
 /* --- SUB-COMPONENTS --- */
 
@@ -546,6 +546,7 @@ function SystemSettings() {
         currency: 'BRL',
         theme: 'light'
     });
+    const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
 
     useEffect(() => {
         const saved = localStorage.getItem('stationery_config');
@@ -556,6 +557,7 @@ function SystemSettings() {
                 companyName: 'Estúdio Criativo',
                 whatsapp: '',
                 instagram: '',
+                promoBanner: {},
                 document: '',
                 currency: 'BRL',
                 theme: 'light'
@@ -703,133 +705,165 @@ function SystemSettings() {
     };
 
     return (
-        <div className="card animate-fade-in">
-            <div className="card-header">
-                <h3 className="card-title flex items-center gap-sm"><Globe size={20} /> Preferências do Sistema</h3>
-                <p className="text-muted text-sm">Personalize a identidade da sua loja e opções gerais.</p>
-            </div>
+        <>
+            <div className="card animate-fade-in">
+                <div className="card-header">
+                    <h3 className="card-title flex items-center gap-sm"><Globe size={20} /> Preferências do Sistema</h3>
+                    <p className="text-muted text-sm">Personalize a identidade da sua loja e opções gerais.</p>
+                </div>
 
-            <form onSubmit={handleSave} className="space-y-6 container p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                        <h4 className="font-semibold text-gray-700 border-b pb-2">Identidade</h4>
-                        <div className="input-group">
-                            <label className="form-label">Nome da Empresa / Estúdio</label>
-                            <input 
-                                className="form-input" 
-                                value={config.companyName || ''}
-                                onChange={e => setConfig({...config, companyName: e.target.value})}
-                                placeholder="Ex: Meu Estúdio Criativo"
-                            />
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">WhatsApp de Atendimento (Para Notificações)</label>
-                            <input 
-                                className="form-input" 
-                                value={config.whatsapp || ''}
-                                onChange={e => setConfig({...config, whatsapp: e.target.value})}
-                                placeholder="Ex: DD 90000-0000"
-                            />
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">Perfil do Instagram (Opcional)</label>
-                            <input 
-                                className="form-input" 
-                                value={config.instagram || ''}
-                                onChange={e => setConfig({...config, instagram: e.target.value})}
-                                placeholder="Ex: ateliecarol"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Preencha sem o "@". Isso ativará banners na proposta e rastreamento!</p>
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">Logo da Empresa (PNG Sem Fundo Recomedado)</label>
-                            <div className="flex items-center gap-4">
-                                {config.logoBase64 ? (
-                                    <div className="relative">
-                                        <img src={config.logoBase64} alt="Preview Logo" style={{ width: '60px', height: '60px', objectFit: 'contain', background: 'var(--surface-hover)', borderRadius: '8px', border: '1px solid var(--border)' }} />
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setConfig({...config, logoBase64: null})} 
-                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center border-2 border-white"
-                                            title="Remover Logo"
-                                        >
-                                            <X size={12} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ width: '60px', height: '60px', borderRadius: '8px', border: '2px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                                        <Globe size={24} />
-                                    </div>
-                                )}
+                <form onSubmit={handleSave} className="space-y-6 container p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-700 border-b pb-2">Identidade</h4>
+                            <div className="input-group">
+                                <label className="form-label">Nome da Empresa / Estúdio</label>
                                 <input 
-                                    type="file"
-                                    accept="image/png, image/jpeg, image/svg+xml"
-                                    onChange={handleLogoUpload}
-                                    className="form-input flex-1 p-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:bg-opacity-10 file:text-primary hover:file:bg-opacity-20 cursor-pointer"
+                                    className="form-input" 
+                                    value={config.companyName || ''}
+                                    onChange={e => setConfig({...config, companyName: e.target.value})}
+                                    placeholder="Ex: Meu Estúdio Criativo"
+                                />
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">WhatsApp de Atendimento (Para Notificações)</label>
+                                <input 
+                                    className="form-input" 
+                                    value={config.whatsapp || ''}
+                                    onChange={e => setConfig({...config, whatsapp: e.target.value})}
+                                    placeholder="Ex: DD 90000-0000"
+                                />
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Perfil do Instagram (Opcional)</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        className="form-input flex-1" 
+                                        value={config.instagram || ''}
+                                        onChange={e => setConfig({...config, instagram: e.target.value})}
+                                        placeholder="Ex: ateliecarol"
+                                    />
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsBannerModalOpen(true)}
+                                        className="btn btn-secondary flex items-center gap-1 text-xs px-3"
+                                        title="Editar Visual do Banner Promocional"
+                                    >
+                                        <Palette size={14} /> Banner
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Preencha sem o "@". Isso ativará banners na proposta e rastreamento!</p>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Logo da Empresa (PNG Sem Fundo Recomedado)</label>
+                                <div className="flex items-center gap-4">
+                                    {config.logoBase64 ? (
+                                        <div className="relative">
+                                            <img src={config.logoBase64} alt="Preview Logo" style={{ width: '60px', height: '60px', objectFit: 'contain', background: 'var(--surface-hover)', borderRadius: '8px', border: '1px solid var(--border)' }} />
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setConfig({...config, logoBase64: null})} 
+                                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center border-2 border-white"
+                                                title="Remover Logo"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ width: '60px', height: '60px', borderRadius: '8px', border: '2px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                            <Globe size={24} />
+                                        </div>
+                                    )}
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 flex-1 justify-center whitespace-nowrap overflow-hidden text-ellipsis"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        {config.logoBase64 ? 'Trocar Imagem...' : 'Fazer Upload do Logo...'}
+                                    </button>
+                                    <input 
+                                        type="file" 
+                                        accept="image/png, image/jpeg, image/webp" 
+                                        ref={fileInputRef} 
+                                        style={{ display: 'none' }} 
+                                        onChange={handleLogoUpload} 
+                                    />
+                                </div>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">CNPJ / CPF do titular</label>
+                                <input 
+                                    className="form-input" 
+                                    value={config.document || ''}
+                                    onChange={e => setConfig({...config, document: e.target.value})}
+                                    placeholder="00.000.000/0000-00"
                                 />
                             </div>
                         </div>
-                        <div className="input-group">
-                            <label className="form-label">CNPJ / CPF</label>
+
+                        <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-700 border-b pb-2">Aparência e Região</h4>
+                            <div className="input-group">
+                                <label className="form-label">Moeda Padrão</label>
+                                <select 
+                                    className="form-input"
+                                    value={config.currency}
+                                    onChange={e => setConfig({...config, currency: e.target.value})}
+                                >
+                                    <option value="BRL">Real Brasileiro (R$)</option>
+                                    <option value="USD">Dólar Americano ($)</option>
+                                    <option value="EUR">Euro (€)</option>
+                                </select>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Tema</label>
+                                <select 
+                                    className="form-input"
+                                    value={config.theme}
+                                    onChange={e => setConfig({...config, theme: e.target.value})}
+                                >
+                                    <option value="light">Claro (Padrão)</option>
+                                    <option value="dark">Escuro</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-100 flex justify-between items-center mt-4">
+                        <div className="flex gap-2">
+                            <button type="button" onClick={handleExportData} className="btn btn-outline border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center gap-2">
+                                <Save size={16} /> Backup (JSON)
+                            </button>
                             <input 
-                                className="form-input" 
-                                value={config.document}
-                                onChange={e => setConfig({...config, document: e.target.value})}
-                                placeholder="00.000.000/0000-00"
+                                type="file" 
+                                ref={fileInputRef} 
+                                style={{ display: 'none' }} 
+                                accept=".json" 
+                                onChange={handleFileChange} 
                             />
+                            <button type="button" onClick={handleImportClick} className="btn btn-outline border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center gap-2">
+                                <FileText size={16} /> Restaurar Backup
+                            </button>
                         </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <h4 className="font-semibold text-gray-700 border-b pb-2">Aparência e Região</h4>
-                        <div className="input-group">
-                            <label className="form-label">Moeda Padrão</label>
-                            <select 
-                                className="form-input"
-                                value={config.currency}
-                                onChange={e => setConfig({...config, currency: e.target.value})}
-                            >
-                                <option value="BRL">Real Brasileiro (R$)</option>
-                                <option value="USD">Dólar Americano ($)</option>
-                                <option value="EUR">Euro (€)</option>
-                            </select>
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">Tema</label>
-                            <select 
-                                className="form-input"
-                                value={config.theme}
-                                onChange={e => setConfig({...config, theme: e.target.value})}
-                            >
-                                <option value="light">Claro (Padrão)</option>
-                                <option value="dark">Escuro</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="pt-6 border-t border-gray-100 flex justify-between items-center mt-4">
-                    <div className="flex gap-2">
-                        <button type="button" onClick={handleExportData} className="btn btn-outline border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                            <Save size={16} /> Backup (JSON)
-                        </button>
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            style={{ display: 'none' }} 
-                            accept=".json" 
-                            onChange={handleFileChange} 
-                        />
-                        <button type="button" onClick={handleImportClick} className="btn btn-outline border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                            <FileText size={16} /> Restaurar Backup
+                        <button type="submit" className="btn btn-primary px-8">
+                            Salvar Configurações
                         </button>
                     </div>
-                    <button type="submit" className="btn btn-primary px-8">
-                        Salvar Configurações
-                    </button>
-                </div>
-            </form>
-        </div>
+                </form>
+            </div>
+            
+            <PromoBannerModal 
+                isOpen={isBannerModalOpen}
+                onClose={() => setIsBannerModalOpen(false)}
+                bannerConfig={config.promoBanner || {}}
+                companyConfig={config}
+                onSave={async (newBannerConfig) => {
+                    const newConfig = { ...config, promoBanner: newBannerConfig };
+                    setConfig(newConfig);
+                    await db.update('settings', 'global', newConfig);
+                }}
+            />
+        </>
     );
 }
 
