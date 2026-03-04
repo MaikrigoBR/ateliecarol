@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText } from 'lucide-react';
+import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 
@@ -38,6 +38,99 @@ function ProfileSettings({ user, setUser, onSave }) {
                     <button type="submit" className="btn btn-primary"><Save size={16} /> Salvar Alterações</button>
                 </div>
              </form>
+        </div>
+    );
+}
+
+function BusinessHoursSettings() {
+    // Parâmetros universais de tempo produtivo
+    const [hours, setHours] = useState({
+        mon: { active: true, start: '08:00', end: '18:00', lunchStart: '12:00', lunchEnd: '13:00' },
+        tue: { active: true, start: '08:00', end: '18:00', lunchStart: '12:00', lunchEnd: '13:00' },
+        wed: { active: true, start: '08:00', end: '18:00', lunchStart: '12:00', lunchEnd: '13:00' },
+        thu: { active: true, start: '08:00', end: '18:00', lunchStart: '12:00', lunchEnd: '13:00' },
+        fri: { active: true, start: '08:00', end: '18:00', lunchStart: '12:00', lunchEnd: '13:00' },
+        sat: { active: false, start: '08:00', end: '12:00', lunchStart: '', lunchEnd: '' },
+        sun: { active: false, start: '', end: '', lunchStart: '', lunchEnd: '' }
+    });
+    
+    useEffect(() => {
+        const load = async () => {
+            const data = await db.getById('settings', 'business_hours');
+            if (data && data.hours) setHours(data.hours);
+        };
+        load();
+    }, []);
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        await db.set('settings', 'business_hours', { hours });
+        AuditService.log({ name: 'Admin' }, 'UPDATE', 'Settings', 'business_hours', 'Atualizou os horários de expediente e fuso organizacional.');
+        alert('Parâmetros de Expediente salvos com sucesso!');
+    };
+
+    const daysMap = {
+        mon: 'Segunda-feira', tue: 'Terça-feira', wed: 'Quarta-feira',
+        thu: 'Quinta-feira', fri: 'Sexta-feira', sat: 'Sábado', sun: 'Domingo'
+    };
+
+    return (
+        <div className="card animate-fade-in">
+             <div className="card-header">
+                <div>
+                     <h3 className="card-title flex items-center gap-sm"><CalendarDays size={20} /> Controle Cronológico e Expediente</h3>
+                     <p className="text-muted text-sm border-b pb-4 mb-2">Configure os dias e horários laborais/produtivos. Estes parâmetros afetam cálculos de gargalo produtivo (prazos/ociosidade) e permissões de acesso ao sistema (fora de hora).</p>
+                </div>
+            </div>
+            
+            <form onSubmit={handleSave} className="p-4 pt-2">
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                            <tr>
+                                <th className="px-4 py-3">Dia da Semana</th>
+                                <th className="px-4 py-3 text-center">Expediente</th>
+                                <th className="px-4 py-3">Entrada (Hora)</th>
+                                <th className="px-4 py-3">Saída Almoço</th>
+                                <th className="px-4 py-3">Volta Almoço</th>
+                                <th className="px-4 py-3">Saída (Fim)</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                            {Object.entries(hours).map(([key, dayData]) => (
+                                <tr key={key} className={`transition-colors ${!dayData.active ? 'bg-gray-50/70 opacity-60 grayscale-[0.5]' : 'hover:bg-blue-50/30'}`}>
+                                    <td className="px-4 py-3 font-semibold text-gray-700">{daysMap[key]}</td>
+                                    <td className="px-4 py-3 text-center">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={dayData.active}
+                                            onChange={e => setHours({...hours, [key]: {...dayData, active: e.target.checked}})}
+                                            style={{ transform: 'scale(1.2)' }}
+                                            className="accent-primary cursor-pointer border-gray-300 rounded shadow-sm"
+                                        />
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        <input type="time" className="form-input text-sm p-1.5 w-full bg-white border-gray-200 focus:ring-primary shadow-sm rounded" value={dayData.start} disabled={!dayData.active} onChange={e => setHours({...hours, [key]: {...dayData, start: e.target.value}})} />
+                                    </td>
+                                     <td className="px-4 py-2">
+                                        <input type="time" className="form-input text-sm p-1.5 w-full bg-white border-gray-200 focus:ring-primary shadow-sm rounded" value={dayData.lunchStart} disabled={!dayData.active} onChange={e => setHours({...hours, [key]: {...dayData, lunchStart: e.target.value}})} />
+                                    </td>
+                                     <td className="px-4 py-2">
+                                        <input type="time" className="form-input text-sm p-1.5 w-full bg-white border-gray-200 focus:ring-primary shadow-sm rounded" value={dayData.lunchEnd} disabled={!dayData.active} onChange={e => setHours({...hours, [key]: {...dayData, lunchEnd: e.target.value}})} />
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        <input type="time" className="form-input text-sm p-1.5 w-full bg-white border-gray-200 focus:ring-primary shadow-sm rounded" value={dayData.end} disabled={!dayData.active} onChange={e => setHours({...hours, [key]: {...dayData, end: e.target.value}})} />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div className="mt-6 pt-4 flex justify-end">
+                    <button type="submit" className="btn btn-primary shadow-md hover:-translate-y-0.5 transition-all"><Save size={16} /> Salvar Parâmetros Cronológicos</button>
+                </div>
+            </form>
         </div>
     );
 }
@@ -655,6 +748,12 @@ export function Settings() {
             <Users size={16} className="inline mr-2" /> Cargos & Equipe
         </button>
         <button 
+            className={`tab-item ${activeTab === 'business_hours' ? 'active' : ''}`}
+            onClick={() => setActiveTab('business_hours')}
+        >
+            <CalendarDays size={16} className="inline mr-2" /> Expediente / Tempos
+        </button>
+        <button 
             className={`tab-item ${activeTab === 'categories' ? 'active' : ''}`}
             onClick={() => setActiveTab('categories')}
         >
@@ -683,6 +782,7 @@ export function Settings() {
       {/* CONTENT */}
       {activeTab === 'profile' && <ProfileSettings user={user} setUser={setUser} onSave={handleSaveProfile} />}
       {activeTab === 'roles' && <RolesSettings />}
+      {activeTab === 'business_hours' && <BusinessHoursSettings />}
       {activeTab === 'categories' && <CategoriesSettings />}
       {activeTab === 'accounts' && <AccountsSettings />}
       {activeTab === 'logs' && <AuditLogViewer />}
