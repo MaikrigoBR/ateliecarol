@@ -565,15 +565,23 @@ function SystemSettings() {
 
     const handleSave = async (e) => {
         e.preventDefault();
-        localStorage.setItem('stationery_config', JSON.stringify(config));
+        
+        try {
+            localStorage.setItem('stationery_config', JSON.stringify(config));
+        } catch (err) {
+            console.error("Erro no LocalStorage:", err);
+            alert("Erro: O tamanho das configurações (talvez da Logo) excedeu o limite do navegador.");
+            return;
+        }
         
         try {
             await db.set('settings', 'global', config);
         } catch(e) {
             console.error("Erro ao salvar config no firebase", e);
+            alert("Aviso: As configurações foram salvas no seu computador, mas houve um erro ao sincronizar em Nuvem para a Página Pública.");
         }
 
-        alert('Configurações do sistema salvas!');
+        alert('Configurações do sistema salvas com sucesso!');
         
         if (config.theme === 'dark') {
             document.body.classList.add('dark-theme');
@@ -613,9 +621,40 @@ function SystemSettings() {
     const handleLogoUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        
         const reader = new FileReader();
         reader.onload = (ev) => {
-            setConfig({ ...config, logoBase64: ev.target.result });
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const MAX_DIMENSION = 300;
+
+                if (width > height && width > MAX_DIMENSION) {
+                    height *= MAX_DIMENSION / width;
+                    width = MAX_DIMENSION;
+                } else if (height > MAX_DIMENSION) {
+                    width *= MAX_DIMENSION / height;
+                    height = MAX_DIMENSION;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // PNG to preserve transparency
+                const dataUrl = canvas.toDataURL('image/png');
+                
+                // Firestore limit is ~1MB. Warn if it's too big (roughly 1MB string)
+                if (dataUrl.length > 950000) {
+                     alert("Atenção: A imagem escolhida não pôde ser comprimida o suficiente e pode causar falhas.");
+                }
+                
+                setConfig({ ...config, logoBase64: dataUrl });
+            };
+            img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     };
