@@ -19,8 +19,20 @@ export function Customers() {
 
   const fetchCustomers = async () => {
     const allCustomers = await db.getAll('customers') || [];
-    setCustomers(allCustomers);
-    setFilteredCustomers(allCustomers);
+    const allOrders = await db.getAll('orders') || [];
+
+    const enrichedCustomers = allCustomers.map(customer => {
+        const cOrders = allOrders.filter(o => o.customer === customer.name);
+        const cTotalSpent = cOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+        return {
+            ...customer,
+            computedOrders: cOrders.length,
+            computedSpent: cTotalSpent
+        };
+    });
+
+    setCustomers(enrichedCustomers);
+    setFilteredCustomers(enrichedCustomers);
   };
 
   useEffect(() => {
@@ -138,10 +150,10 @@ export function Customers() {
                     <td>
                       <div className="badge badge-neutral" style={{ marginBottom: '4px' }}>
                         <ShoppingBag size={12} style={{ marginRight: '4px' }} />
-                        {customer.totalOrders} pedidos
+                        {customer.computedOrders || 0} pedidos
                       </div>
                       <div style={{ fontWeight: 600, color: 'var(--success)', fontSize: '0.85rem' }}>
-                        LTV: R$ {Number(customer.totalSpent || 0).toFixed(2).replace('.', ',')}
+                        LTV: R$ {Number(customer.computedSpent || 0).toFixed(2).replace('.', ',')}
                       </div>
                     </td>
                     <td>

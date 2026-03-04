@@ -167,37 +167,54 @@ export function Orders() {
   };
 
   const handleSendToProduction = async (order) => {
-      // 1. Find Product and Check/Deduct Stock
-      if (order.productId) {
-          const product = await db.getById('products', order.productId);
-          if (product && product.materials) {
-              const inventory = await db.getAll('inventory');
-              
-              const missingMaterials = [];
-              product.materials.forEach(mat => {
-                 const stockItem = inventory.find(i => i.id == mat.id);
-                 const requiredQty = mat.qty * order.items;
-                 if (!stockItem || stockItem.quantity < requiredQty) {
-                     missingMaterials.push(`${mat.name} (Necessário: ${requiredQty}, Disponível: ${stockItem?.quantity || 0})`);
-                 }
-              });
+      // 1. Find Product(s) and Check/Deduct Stock
+      let itemsToCheck = [];
+      if (order.cartItems && order.cartItems.length > 0) {
+          itemsToCheck = order.cartItems.map(item => ({ productId: item.productId, qty: parseInt(item.quantity) || 1 }));
+      } else if (order.productId) {
+          itemsToCheck = [{ productId: order.productId, qty: parseInt(order.items) || 1 }];
+      }
 
-              if (missingMaterials.length > 0) {
-                  alert(`Não é possível iniciar produção. Falta material em estoque:\n- ${missingMaterials.join('\n- ')}`);
-                  return;
+      if (itemsToCheck.length > 0) {
+          const inventory = await db.getAll('inventory');
+          const missingMaterials = [];
+          const deductions = {}; // { materialId: totalQtyToDeduct }
+
+          for (const item of itemsToCheck) {
+              if (!item.productId) continue;
+              const product = await db.getById('products', item.productId);
+              if (product && product.materials) {
+                  product.materials.forEach(mat => {
+                      const requiredQty = parseFloat(mat.qty) * item.qty;
+                      if (deductions[mat.id]) deductions[mat.id] += requiredQty;
+                      else deductions[mat.id] = requiredQty;
+                  });
               }
-
-              // Deduct Stock
-              // Using Promise.all for parallel updates
-              await Promise.all(product.materials.map(async (mat) => {
-                  const stockItem = inventory.find(i => i.id == mat.id);
-                  if (stockItem) {
-                      await db.update('inventory', stockItem.id, {
-                          quantity: stockItem.quantity - (mat.qty * order.items)
-                      });
-                  }
-              }));
           }
+
+          // Check Availability
+          Object.keys(deductions).forEach(matId => {
+              const stockItem = inventory.find(i => String(i.id) === String(matId));
+              const requiredTotal = deductions[matId];
+              if (!stockItem || parseFloat(stockItem.quantity) < requiredTotal) {
+                  missingMaterials.push(`${stockItem?.name || 'Material ID '+matId} (Necessário: ${requiredTotal.toFixed(2)}, Disponível: ${stockItem ? parseFloat(stockItem.quantity).toFixed(2) : 0})`);
+              }
+           });
+
+          if (missingMaterials.length > 0) {
+              alert(`Não é possível iniciar produção. Faltam insumos no estoque para este(s) produto(s):\n- ${missingMaterials.join('\n- ')}`);
+              return;
+          }
+
+          // Deduct Stock
+          await Promise.all(Object.keys(deductions).map(async (matId) => {
+              const stockItem = inventory.find(i => String(i.id) === String(matId));
+              if (stockItem) {
+                  await db.update('inventory', stockItem.id, {
+                      quantity: parseFloat(stockItem.quantity) - deductions[matId]
+                  });
+              }
+          }));
       }
 
       // 2. Update Status
