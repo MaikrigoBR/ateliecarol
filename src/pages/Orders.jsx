@@ -291,7 +291,7 @@ export function Orders() {
         </button>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ overflowX: 'auto' }}>
         <div className="table-container">
           <table className="table">
             <thead>
@@ -334,64 +334,66 @@ export function Orders() {
                   <td>{order.items}</td>
                   <td style={{ fontWeight: 600 }}>R$ {((order.total || 0)).toFixed(2).replace('.', ',')}</td>
                   <td>
-                    <button 
-                      className="btn btn-icon" 
-                      title="Excluir"
-                      onClick={() => handleDelete(order.id)}
-                      style={{ color: 'var(--danger)' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                    <button 
-                      className="btn btn-icon" 
-                      title="Editar"
-                      onClick={() => { setOrderToEdit(order); setIsModalOpen(true); }}
-                      style={{ color: 'var(--primary)' }}
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button 
-                      className="btn btn-icon"
-                      title="Enviar Link de Rastreio (WhatsApp)"
-                      onClick={() => {
-                          const link = window.location.origin + window.location.pathname + "#/status/" + order.id;
-                          const text = encodeURIComponent(`Olá ${order.customer.split(' ')[0]}!\n✨ Acompanhe em tempo real a mágica acontecendo no seu pedido do Ateliê pelo Link abaixo:\n\n${link}`);
-                          window.open(`https://wa.me/?text=${text}`, '_blank');
-                      }}
-                      style={{ color: '#E1306C' }}
-                    >
-                        <Share2 size={16} />
-                    </button>
-                    <button 
-                      className="btn btn-icon"
-                      title="Imprimir Ordem de Produção"
-                      onClick={() => {
-                          setOrderForProduction(order);
-                          setIsProductionModalOpen(true);
-                      }}
-                    >
-                        <Printer size={16} />
-                    </button>
-                    {order.status === 'Novo' && (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', alignItems: 'center' }}>
                         <button 
-                            className="btn btn-icon" 
-                            title="Iniciar Produção"
-                            onClick={() => handleSendToProduction(order)}
-                            style={{ color: 'var(--warning)' }}
+                          className="btn btn-icon" 
+                          title="Excluir"
+                          onClick={() => handleDelete(order.id)}
+                          style={{ color: 'var(--danger)' }}
                         >
-                            <Play size={16} />
+                          <Trash2 size={16} />
                         </button>
-                    )}
-                    {order.status !== 'Concluído' && (
                         <button 
-                            className="btn btn-icon" 
-                            title="Finalizar e Receber"
-                            onClick={() => handleCompleteOrder(order)}
-                            style={{ color: 'var(--success)' }}
+                          className="btn btn-icon" 
+                          title="Editar"
+                          onClick={() => { setOrderToEdit(order); setIsModalOpen(true); }}
+                          style={{ color: 'var(--primary)' }}
                         >
-                            <CheckCircle size={16} />
+                          <Edit size={16} />
                         </button>
-                    )}
+                        <button 
+                          className="btn btn-icon"
+                          title="Enviar Link de Rastreio (WhatsApp)"
+                          onClick={() => {
+                              const link = window.location.origin + window.location.pathname + "#/status/" + order.id;
+                              const text = encodeURIComponent(`Olá ${order.customer.split(' ')[0]}!\n✨ Acompanhe em tempo real a mágica acontecendo no seu pedido do Ateliê pelo Link abaixo:\n\n${link}`);
+                              window.open(`https://wa.me/?text=${text}`, '_blank');
+                          }}
+                          style={{ color: '#E1306C' }}
+                        >
+                            <Share2 size={16} />
+                        </button>
+                        <button 
+                          className="btn btn-icon"
+                          title="Imprimir Ordem de Produção"
+                          onClick={() => {
+                              setOrderForProduction(order);
+                              setIsProductionModalOpen(true);
+                          }}
+                        >
+                            <Printer size={16} />
+                        </button>
+                        {order.status === 'Novo' && (
+                            <button 
+                                className="btn btn-icon" 
+                                title="Iniciar Produção"
+                                onClick={() => handleSendToProduction(order)}
+                                style={{ color: 'var(--warning)' }}
+                            >
+                                <Play size={16} />
+                            </button>
+                        )}
+                        {order.status !== 'Concluído' && (
+                            <button 
+                                className="btn btn-icon" 
+                                title="Finalizar e Receber"
+                                onClick={() => handleCompleteOrder(order)}
+                                style={{ color: 'var(--success)' }}
+                            >
+                                <CheckCircle size={16} />
+                            </button>
+                        )}
+                    </div>
                   </td>
                 </tr>
               ))}
