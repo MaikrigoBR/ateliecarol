@@ -14,6 +14,17 @@ export function Orders() {
   const [statusFilter, setStatusFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [orderToEdit, setOrderToEdit] = useState(null);
+  const [companyConfig, setCompanyConfig] = useState({ companyName: 'Estúdio Criativo', logoBase64: null });
+
+  useEffect(() => {
+    try {
+        const saved = localStorage.getItem('stationery_config');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.companyName || parsed.logoBase64) setCompanyConfig(parsed);
+        }
+    } catch(e){}
+  }, []);
   
   // Payment Confirmation State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -359,9 +370,9 @@ export function Orders() {
                           className="btn btn-icon"
                           title="Enviar Link de Rastreio (WhatsApp)"
                           onClick={() => {
-                              const link = window.location.origin + window.location.pathname + "#/status/" + order.id;
-                              const text = encodeURIComponent(`Olá ${order.customer.split(' ')[0]}!\n✨ Acompanhe em tempo real a mágica acontecendo no seu pedido do Ateliê pelo Link abaixo:\n\n${link}`);
-                              window.open(`https://wa.me/?text=${text}`, '_blank');
+                          const link = window.location.origin + window.location.pathname + "#/status/" + order.id;
+                          const text = encodeURIComponent(`Olá ${order.customer.split(' ')[0]}!\n✨ Acompanhe em tempo real a mágica acontecendo no seu pedido com a ${companyConfig.companyName || 'nossa equipe'} pelo Link abaixo:\n\n${link}`);
+                          window.open(`https://wa.me/?text=${text}`, '_blank');
                           }}
                           style={{ color: '#E1306C' }}
                         >

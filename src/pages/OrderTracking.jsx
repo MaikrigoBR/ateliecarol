@@ -7,6 +7,7 @@ export function OrderTracking() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [companyConfig, setCompanyConfig] = useState({ companyName: 'Estúdio Criativo', logoBase64: null });
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -15,6 +16,14 @@ export function OrderTracking() {
         // Handle string/int matching
         const found = allOrders.find(o => String(o.id) === String(id));
         setOrder(found || null);
+
+        // Fetch company branding
+        try {
+            const settings = await db.getById('settings', 'global');
+            if (settings) {
+                setCompanyConfig(settings);
+            }
+        } catch(e) { console.error("Could not fetch settings", e); }
       } catch (error) {
         console.error("Error fetching order for tracking:", error);
       } finally {
@@ -67,7 +76,12 @@ export function OrderTracking() {
         
         {/* Header Block */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>Ateliê Estúdio Criativo</h1>
+            {companyConfig.logoBase64 && (
+                <img src={companyConfig.logoBase64} alt="Company Logo" style={{ maxWidth: '120px', maxHeight: '120px', margin: '0 auto 16px', display: 'block', objectFit: 'contain' }} />
+            )}
+            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
+                {companyConfig.companyName || 'Ateliê Estúdio Criativo'}
+            </h1>
             <p style={{ color: '#64748b' }}>Acompanhamento Mágico do seu Pedido</p>
         </div>
 
@@ -135,7 +149,7 @@ export function OrderTracking() {
 
         <div style={{ textAlign: 'center', marginTop: '30px', color: '#94a3b8', fontSize: '0.8rem' }}>
             Atualizado automaticamente em tempo real.<br/>
-            &copy; 2026 Estúdio Criativo
+            &copy; {new Date().getFullYear()} {companyConfig.companyName || 'Estúdio Criativo'}
         </div>
 
       </div>

@@ -73,6 +73,19 @@ export const database = {
         }
     },
 
+    // 3.5 SET (Upsert)
+    async set(collectionName, id, data) {
+        try {
+            if (!db) return null;
+            const docRef = doc(db, collectionName, id);
+            await setDoc(docRef, data);
+            return { id, ...data };
+        } catch (error) {
+            console.error(`Error setting in ${collectionName}:`, error);
+            throw error;
+        }
+    },
+
     // 4. UPDATE
     async update(collectionName, id, updates) {
         try {

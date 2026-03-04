@@ -563,9 +563,16 @@ function SystemSettings() {
 
     const fileInputRef = React.useRef(null);
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
         localStorage.setItem('stationery_config', JSON.stringify(config));
+        
+        try {
+            await db.set('settings', 'global', config);
+        } catch(e) {
+            console.error("Erro ao salvar config no firebase", e);
+        }
+
         alert('Configurações do sistema salvas!');
         
         if (config.theme === 'dark') {
