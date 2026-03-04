@@ -137,7 +137,7 @@ function BusinessHoursSettings() {
 
 function RolesSettings() {
     const [roles, setRoles] = useState([]);
-    const [newRole, setNewRole] = useState({ name: '', baseSalary: '' });
+    const [newRole, setNewRole] = useState({ name: '', baseSalary: '', enforceWorkingHours: false });
 
     useEffect(() => { loadRoles(); }, []);
     
@@ -161,9 +161,10 @@ function RolesSettings() {
 
         await db.create('roles', { 
             name: newRole.name, 
-            baseSalary: parseFloat(newRole.baseSalary) || 0 
+            baseSalary: parseFloat(newRole.baseSalary) || 0,
+            enforceWorkingHours: newRole.enforceWorkingHours 
         });
-        setNewRole({ name: '', baseSalary: '' });
+        setNewRole({ name: '', baseSalary: '', enforceWorkingHours: false });
         loadRoles();
     };
 
@@ -183,8 +184,8 @@ function RolesSettings() {
                 </div>
             </div>
             
-            <form onSubmit={handleAdd} className="flex gap-2 items-end mb-6 p-4 bg-surface-hover rounded-md">
-                <div className="flex-1">
+            <form onSubmit={handleAdd} className="flex gap-4 items-center mb-6 p-4 bg-surface-hover rounded-md flex-wrap">
+                <div className="flex-1 min-w-[200px]">
                     <label className="form-label text-xs">Nome do Cargo</label>
                     <input className="form-input" placeholder="Ex: Designer Pleno" value={newRole.name} onChange={e => setNewRole({...newRole, name: e.target.value})} required />
                 </div>
@@ -192,21 +193,40 @@ function RolesSettings() {
                     <label className="form-label text-xs">Salário Base (R$)</label>
                     <input type="number" step="0.01" className="form-input" placeholder="0.00" value={newRole.baseSalary} onChange={e => setNewRole({...newRole, baseSalary: e.target.value})} />
                 </div>
-                <button type="submit" className="btn btn-primary"><Plus size={16} /></button>
+                <div className="flex items-center gap-2 mt-4">
+                    <input 
+                        type="checkbox" 
+                        id="chk-enforce" 
+                        checked={newRole.enforceWorkingHours} 
+                        onChange={e => setNewRole({...newRole, enforceWorkingHours: e.target.checked})}
+                        className="accent-primary"
+                    />
+                    <label htmlFor="chk-enforce" className="text-xs text-gray-700 cursor-pointer">
+                        Restringir Acesso Fora do Expediente
+                    </label>
+                </div>
+                <button type="submit" className="btn btn-primary mt-4"><Plus size={16} /> Adicionar</button>
             </form>
 
             <div className="table-container">
                 <table className="table">
-                    <thead><tr><th>Cargo</th><th>Salário Base (Sugerido)</th><th>Ações</th></tr></thead>
+                    <thead><tr><th>Cargo</th><th>Salário Base (Sugerido)</th><th>Restrição de Horário</th><th>Ações</th></tr></thead>
                     <tbody>
                         {roles.map(r => (
                             <tr key={r.id}>
-                                <td>{r.name}</td>
+                                <td className="font-medium text-gray-800">{r.name}</td>
                                 <td>R$ {r.baseSalary?.toFixed(2)}</td>
+                                <td>
+                                    {r.enforceWorkingHours ? (
+                                        <span className="badge badge-warning text-[10px] py-0.5">Sim</span>
+                                    ) : (
+                                        <span className="text-muted text-xs">Não</span>
+                                    )}
+                                </td>
                                 <td><button onClick={() => handleDelete(r.id)} className="text-danger p-1"><Trash2 size={16} /></button></td>
                             </tr>
                         ))}
-                        {roles.length === 0 && <tr><td colSpan="3" className="text-center text-muted">Nenhum cargo definido.</td></tr>}
+                        {roles.length === 0 && <tr><td colSpan="4" className="text-center text-muted py-4">Nenhum cargo definido.</td></tr>}
                     </tbody>
                 </table>
             </div>

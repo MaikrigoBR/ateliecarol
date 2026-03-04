@@ -28,6 +28,7 @@ import { DataProvider } from './contexts/DataContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import AutomationService from './services/AutomationService';
 import { useEffect } from 'react';
+import { TimeGateGuard } from './components/TimeGateGuard';
 // 🔒 Protected Route Component
 function PrivateRoute({ children }) {
   const { currentUser } = useAuth();
@@ -38,7 +39,11 @@ function PrivateRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return children;
+  return (
+    <TimeGateGuard>
+      {children}
+    </TimeGateGuard>
+  );
 }
 
 
