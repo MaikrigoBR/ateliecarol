@@ -211,13 +211,49 @@ export function Production() {
         setQcTargetStep(null);
     };
 
-    const triggerAutomation = (order, stepId) => {
+    const triggerAutomation = async (order, stepId, task = null) => {
         const cName = order.customerName || order.customer;
         const customerObj = customers.find(c => c.name === cName);
         if (customerObj && customerObj.phone) {
             const num = customerObj.phone.replace(/\D/g, '');
             if (num.length >= 10) {
                 const stepName = COLUMNS.find(c => c.id === stepId)?.label || 'Concluído';
+                
+                // --- Disparo pela API de WhatsApp Oculta ---
+                let companyName = 'nossa equipe';
+                try {
+                    const saved = localStorage.getItem('stationery_config');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (parsed.companyName) companyName = parsed.companyName;
+                    }
+                } catch(e) {}
+
+                const baseUrl = window.location.href.split('#')[0];
+                const trackingLink = `${baseUrl}#/status/${order.id}`;
+                const firstName = customerObj.name.split(' ')[0];
+                let msgText = '';
+
+                if (task && task._isItem) {
+                     msgText = `Olá ${firstName}!\n✨ Temos novidades na produção! O item *${task.itemQty}x ${task.itemName}* (Pedido #${order.id.toString().substring(0,8)}) avançou para a fase de *[${stepName}]*.\n\nAcompanhe a mágica acontecendo em tempo real com a ${companyName} pelo Link abaixo:\n\n${trackingLink}`;
+                } else {
+                     msgText = `Olá ${firstName}!\n✨ Temos novidades na produção! Seu pedido #${order.id.toString().substring(0,8)} acaba de avançar para a fase de *[${stepName}]*.\n\nAcompanhe a mágica acontecendo em tempo real com a ${companyName} pelo Link abaixo:\n\n${trackingLink}`;
+                }
+
+                try {
+                    const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
+                    fetch(`${apiUrl}/api/campaign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            targets: [{ phone: num, message: msgText }]
+                        })
+                    }).then(res => {
+                         if(!res.ok) console.warn("WhatsApp API returned error on automation code: " + res.status);
+                    }).catch(e => console.warn("Background auto-send WhatsApp Error:", e));
+                } catch(e) {
+                    console.warn("Automation background fetch syntax failed:", e);
+                }
                 
                 // Show Automation Toast
                 const toast = document.createElement('div');
@@ -228,7 +264,7 @@ export function Production() {
                     </div>
                     <div>
                         <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">Automação de Rastreio (CRM)</div>
-                        <div style="color: #64748b; font-size: 0.75rem;">Status WhatsApp atualizado p/ <strong>${customerObj.name.split(' ')[0]}</strong></div>
+                        <div style="color: #64748b; font-size: 0.75rem;">Status enviado via API p/ <strong>${customerObj.name.split(' ')[0]}</strong></div>
                     </div>
                 `;
                 document.body.appendChild(toast);
@@ -282,14 +318,14 @@ export function Production() {
                     updatedOrder.status = 'Pronto para Retirada';
                     updatedOrder.productionStep = 'completed';
                     AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Todos os itens concluídos. Pedido finalizado.`);
-                    triggerAutomation(updatedOrder, 'completed');
+                    triggerAutomation(updatedOrder, 'completed', task);
                 }
             } else {
                 updatedOrder.status = 'Pronto para Retirada';
                 updatedOrder.productionStep = 'completed';
                 updatedOrder.productionHistory = history;
                 AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Produção finalizada. Aguardando retirada/envio.`);
-                triggerAutomation(updatedOrder, 'completed');
+                triggerAutomation(updatedOrder, 'completed', task);
             }
         } else {
             history.push({
@@ -316,7 +352,7 @@ export function Production() {
             
             const stepLabel = COLUMNS.find(c => c.id === nextStep)?.label || nextStep;
             AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Moveu item para etapa: ${stepLabel}`);
-            triggerAutomation(updatedOrder, nextStep);
+            triggerAutomation(updatedOrder, nextStep, task);
         }
 
         await db.update('orders', order.id, updatedOrder);
