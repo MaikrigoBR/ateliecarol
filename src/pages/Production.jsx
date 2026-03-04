@@ -133,13 +133,17 @@ export function Production() {
             
             const baseUrl = window.location.href.split('#')[0];
             const trackingLink = `${baseUrl}#/status/${task.id}`;
-            let text = '';
+            
+            let companyName = 'nossa equipe';
+            try {
+                const saved = localStorage.getItem('stationery_config');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.companyName) companyName = parsed.companyName;
+                }
+            } catch(e) {}
 
-            if (task._isItem) {
-                 text = encodeURIComponent(`Olá ${customerObj.name.split(' ')[0]}, tudo bem?\n\nTemos novidades na produção do seu pedido! O item *${task.itemQty}x ${task.itemName}* (Pedido #${task.id.toString().substring(0,8)}) acaba de avançar para a fase de *[${stepName}]*.\n\nAcompanhe a mágica acontecer em tempo real pelo link abaixo:\n${trackingLink}`);
-            } else {
-                 text = encodeURIComponent(`Olá ${customerObj.name.split(' ')[0]}, tudo bem?\n\nTemos novidades na produção do seu pedido! Seu pedido #${task.id.toString().substring(0,8)} acaba de avançar para a fase de *[${stepName}]*.\n\nAcompanhe a mágica acontecer em tempo real pelo link abaixo:\n${trackingLink}`);
-            }
+            const text = encodeURIComponent(`Olá ${customerObj.name.split(' ')[0]}!\n✨ Acompanhe em tempo real a mágica acontecendo no seu pedido com a ${companyName} pelo Link abaixo:\n\n${trackingLink}`);
 
             window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
         } else {
