@@ -176,33 +176,47 @@ export function CreditCards() {
         e.preventDefault();
         if (!paymentAccId) return;
 
+        // Calcula a chave do mês com base na variável global ou de targetDate
+        const base = new Date();
+        const targetDate = new Date(base.getFullYear(), base.getMonth() + selectedMonthOffset, 1);
+        const monthKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+
         // Saída de dinheiro da conta corrente
         const expensePayload = {
-            description: `Pagamento Fatura ${selectedCard.name}`,
+            description: `Pagamento Fatura ${selectedCard.name} (${monthKey})`,
             amount: invoiceBalance,
             type: 'expense',
             category: 'Cartão de Crédito',
             accountId: paymentAccId,
             date: new Date().toISOString().split('T')[0],
             status: 'paid',
-            installments: 1
+            installments: 1,
+            createdAt: new Date().toISOString()
         };
 
         // Entrada de dinheiro no cartão (restaurando balance negativo / liberando limite)
         const incomePayload = {
-            description: `Pagamento Fatura ${selectedCard.name}`,
+            description: `Pagamento Fatura ${selectedCard.name} (${monthKey})`,
             amount: invoiceBalance,
             type: 'income',
             category: 'Cartão de Crédito',
             accountId: selectedCard.id,
             date: new Date().toISOString().split('T')[0],
             status: 'paid',
-            installments: 1
+            installments: 1,
+            createdAt: new Date().toISOString()
         };
+
+        const currentPaid = selectedCard.paidInvoices || [];
+        const accountUpdatePromise = currentPaid.includes(monthKey) ? null : db.update('accounts', selectedCard.id, {
+            ...selectedCard,
+            paidInvoices: [...currentPaid, monthKey]
+        });
 
         await Promise.all([
             db.create('transactions', expensePayload),
-            db.create('transactions', incomePayload)
+            db.create('transactions', incomePayload),
+            ...(accountUpdatePromise ? [accountUpdatePromise] : [])
         ]);
 
         setIsPaymentModalOpen(false);

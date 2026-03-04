@@ -518,13 +518,14 @@ export function FinanceFinal() {
                 const promises = [];
                 const installmentAmount = amount / installments;
                 const parentId = `group_${Date.now()}`;
-                const [y, m, d] = payload.date.split('-');
                 
                 for(let i = 0; i < installments; i++) {
-                    // Avança 1 mês para cada nova parcela
-                    const targetDate = new Date(Number(y), Number(m) - 1 + i, Number(d));
-                    // Handle timezone inconsistencies by formatting manually or using UTC string part
-                    const isoDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}`;
+                    const [y, m, d] = payload.date.split('-');
+                    const baseDate = new Date(Number(y), Number(m) - 1 + i, 1);
+                    const maxDays = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0).getDate();
+                    baseDate.setDate(Math.min(Number(d), maxDays));
+                    
+                    const isoDate = `${baseDate.getFullYear()}-${String(baseDate.getMonth()+1).padStart(2,'0')}-${String(baseDate.getDate()).padStart(2,'0')}`;
 
                     const transPayload = {
                         ...payload,
@@ -543,11 +544,14 @@ export function FinanceFinal() {
                 if (newTrans.isRecurring && newTrans.recurrenceMonths > 1) {
                     const promises = [];
                     const parentId = `rec_${Date.now()}`;
-                    const [y, m, d] = payload.date.split('-');
                     
                     for(let i = 0; i < newTrans.recurrenceMonths; i++) {
-                        const targetDate = new Date(Number(y), Number(m) - 1 + i, Number(d));
-                        const isoDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}`;
+                        const [y, m, d] = payload.date.split('-');
+                        const baseDate = new Date(Number(y), Number(m) - 1 + i, 1);
+                        const maxDays = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0).getDate();
+                        baseDate.setDate(Math.min(Number(d), maxDays));
+                        
+                        const isoDate = `${baseDate.getFullYear()}-${String(baseDate.getMonth()+1).padStart(2,'0')}-${String(baseDate.getDate()).padStart(2,'0')}`;
                         
                         const transPayload = {
                             ...payload,

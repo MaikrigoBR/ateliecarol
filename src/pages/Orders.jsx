@@ -122,7 +122,7 @@ export function Orders() {
           description: `Recebimento Pedido #${order.id.toString().substring(0,8)}... - ${order.customer} (${transactionData.condition === 'installment' ? `${transactionData.installments}x` : 'À vista'})`,
           amount: amountReceived,
           type: 'income',
-          category: 'Vendas',
+          category: 'Vendas de Produtos',
           date: new Date().toISOString().split('T')[0],
           status: 'paid',
           paymentMethod: transactionData.method,
