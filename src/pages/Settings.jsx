@@ -603,6 +603,16 @@ function SystemSettings() {
         downloadAnchorNode.remove();
     };
 
+    const handleLogoUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            setConfig({ ...config, logoBase64: ev.target.result });
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleImportClick = () => fileInputRef.current.click();
 
     const handleFileChange = async (e) => {
@@ -659,10 +669,38 @@ function SystemSettings() {
                             <label className="form-label">Nome da Empresa / Estúdio</label>
                             <input 
                                 className="form-input" 
-                                value={config.companyName}
+                                value={config.companyName || ''}
                                 onChange={e => setConfig({...config, companyName: e.target.value})}
                                 placeholder="Ex: Meu Estúdio Criativo"
                             />
+                        </div>
+                        <div className="input-group">
+                            <label className="form-label">Logo da Empresa (PNG Sem Fundo Recomedado)</label>
+                            <div className="flex items-center gap-4">
+                                {config.logoBase64 ? (
+                                    <div className="relative">
+                                        <img src={config.logoBase64} alt="Preview Logo" style={{ width: '60px', height: '60px', objectFit: 'contain', background: 'var(--surface-hover)', borderRadius: '8px', border: '1px solid var(--border)' }} />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setConfig({...config, logoBase64: null})} 
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center border-2 border-white"
+                                            title="Remover Logo"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div style={{ width: '60px', height: '60px', borderRadius: '8px', border: '2px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                        <Globe size={24} />
+                                    </div>
+                                )}
+                                <input 
+                                    type="file"
+                                    accept="image/png, image/jpeg, image/svg+xml"
+                                    onChange={handleLogoUpload}
+                                    className="form-input flex-1 p-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:bg-opacity-10 file:text-primary hover:file:bg-opacity-20 cursor-pointer"
+                                />
+                            </div>
                         </div>
                         <div className="input-group">
                             <label className="form-label">CNPJ / CPF</label>

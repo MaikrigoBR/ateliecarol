@@ -10,8 +10,19 @@ export function Login() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [companyConfig, setCompanyConfig] = useState({ companyName: 'Estúdio Criativo', logoBase64: null });
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    try {
+        const saved = localStorage.getItem('stationery_config');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.companyName || parsed.logoBase64) setCompanyConfig(parsed);
+        }
+    } catch(e){}
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -52,18 +63,22 @@ export function Login() {
                 <div style={{ 
                     width: '64px', 
                     height: '64px', 
-                    background: 'var(--primary)', 
+                    background: companyConfig.logoBase64 ? 'transparent' : 'var(--primary)', 
                     borderRadius: '16px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     margin: '0 auto 16px',
                     color: 'white',
-                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)'
+                    boxShadow: companyConfig.logoBase64 ? 'none' : '0 4px 12px rgba(139, 92, 246, 0.4)'
                 }}>
-                   <Lock size={32} />
+                   {companyConfig.logoBase64 ? (
+                       <img src={companyConfig.logoBase64} alt="Company Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                   ) : (
+                       <Lock size={32} />
+                   )}
                 </div>
-                <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>Estúdio Criativo</h2>
+                <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>{companyConfig.companyName || 'Estúdio Criativo'}</h2>
                 <p style={{ color: '#6b7280' }}>Faça login para gerenciar seu atelier</p>
             </div>
 

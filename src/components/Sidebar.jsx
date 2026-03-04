@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp, CreditCard } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,12 +34,30 @@ export function Sidebar({ onClose }) {
     return currentPath.startsWith(path) ? 'active' : '';
   };
 
+  const [companyConfig, setCompanyConfig] = useState({ companyName: 'Estúdio Criativo', logoBase64: null });
+  
+  useEffect(() => {
+    try {
+        const saved = localStorage.getItem('stationery_config');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.companyName || parsed.logoBase64) setCompanyConfig(parsed);
+        }
+    } catch(e){}
+  }, []);
+
   return (
     <aside id="sidebar" className="sidebar">
       <div className="sidebar-header">
-        <div className="brand-logo">
-          <PenTool size={24} />
-          <span>Estúdio Criativo</span>
+        <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+          {companyConfig.logoBase64 ? (
+             <img src={companyConfig.logoBase64} alt="Logo" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+          ) : (
+             <PenTool size={24} />
+          )}
+          <span style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+             {companyConfig.companyName || 'Estúdio Criativo'}
+          </span>
         </div>
         <button 
             className="btn btn-icon d-lg-none ml-auto" 
