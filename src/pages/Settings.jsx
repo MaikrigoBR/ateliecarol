@@ -554,6 +554,7 @@ function SystemSettings() {
         } else {
             setConfig({
                 companyName: 'Estúdio Criativo',
+                whatsapp: '',
                 document: '',
                 currency: 'BRL',
                 theme: 'light'
@@ -718,6 +719,15 @@ function SystemSettings() {
                                 value={config.companyName || ''}
                                 onChange={e => setConfig({...config, companyName: e.target.value})}
                                 placeholder="Ex: Meu Estúdio Criativo"
+                            />
+                        </div>
+                        <div className="input-group">
+                            <label className="form-label">WhatsApp de Atendimento (Para Notificações)</label>
+                            <input 
+                                className="form-input" 
+                                value={config.whatsapp || ''}
+                                onChange={e => setConfig({...config, whatsapp: e.target.value})}
+                                placeholder="Ex: DD 90000-0000"
                             />
                         </div>
                         <div className="input-group">
