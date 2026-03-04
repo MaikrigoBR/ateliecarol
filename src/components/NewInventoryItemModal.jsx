@@ -17,6 +17,10 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
     quantity: '',
     unit: 'un', // un, kg, m, l, cx
     minStock: '',
+    description: '',
+    model: '',
+    color: '',
+    manufacturer: ''
   });
 
   const [createFinance, setCreateFinance] = useState(false);
@@ -37,7 +41,11 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
                   value: itemToEdit.value || '',
                   quantity: itemToEdit.quantity || '',
                   unit: itemToEdit.unit || 'un',
-                  minStock: itemToEdit.minStock || ''
+                  minStock: itemToEdit.minStock || '',
+                  description: itemToEdit.description || '',
+                  model: itemToEdit.model || '',
+                  color: itemToEdit.color || '',
+                  manufacturer: itemToEdit.manufacturer || ''
               });
           } else {
               setFormData({
@@ -50,6 +58,10 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
                  quantity: '',
                  unit: 'un',
                  minStock: '',
+                 description: '',
+                 model: '',
+                 color: '',
+                 manufacturer: ''
               });
           }
           db.getAll('accounts').then(res => setAccounts(res || []));
@@ -80,6 +92,11 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
       unit: formData.type === 'material' ? formData.unit : null,
       minStock: formData.type === 'material' ? (parseFloat(formData.minStock) || 0) : null,
       
+      description: formData.description,
+      model: formData.model,
+      color: formData.color,
+      manufacturer: formData.manufacturer,
+
       updatedAt: new Date().toISOString(),
       updatedBy: currentUser?.email || 'Sistema'
     };
@@ -164,6 +181,17 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
               />
             </div>
 
+            <div className="input-group">
+                <label className="form-label">Descrição (Opcional)</label>
+                <textarea 
+                    className="form-input" 
+                    placeholder="Detalhes adicionais sobre o item..."
+                    value={formData.description}
+                    onChange={e => setFormData({...formData, description: e.target.value})}
+                    rows={2}
+                />
+            </div>
+
             {/* Conditional Fields based on Type */}
             {formData.type === 'equipment' ? (
                 <>
@@ -199,6 +227,29 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
                             value={formData.serial}
                             onChange={e => setFormData({...formData, serial: e.target.value})}
                         />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+                        <div className="input-group">
+                            <label className="form-label">Modelo</label>
+                            <input 
+                                type="text" 
+                                className="form-input" 
+                                placeholder="Opcional"
+                                value={formData.model}
+                                onChange={e => setFormData({...formData, model: e.target.value})}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <label className="form-label">Fabricante</label>
+                            <input 
+                                type="text" 
+                                className="form-input" 
+                                placeholder="Opcional"
+                                value={formData.manufacturer}
+                                onChange={e => setFormData({...formData, manufacturer: e.target.value})}
+                            />
+                        </div>
                     </div>
                 </>
             ) : (
@@ -254,6 +305,39 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
                                 placeholder="Avisar quando atingir..."
                                 value={formData.minStock}
                                 onChange={e => setFormData({...formData, minStock: e.target.value})}
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-md)' }}>
+                        <div className="input-group">
+                            <label className="form-label">Modelo</label>
+                            <input 
+                                type="text" 
+                                className="form-input" 
+                                placeholder="Opcional"
+                                value={formData.model}
+                                onChange={e => setFormData({...formData, model: e.target.value})}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <label className="form-label">Cor</label>
+                            <input 
+                                type="text" 
+                                className="form-input" 
+                                placeholder="Opcional"
+                                value={formData.color}
+                                onChange={e => setFormData({...formData, color: e.target.value})}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <label className="form-label">Fabricante</label>
+                            <input 
+                                type="text" 
+                                className="form-input" 
+                                placeholder="Opcional"
+                                value={formData.manufacturer}
+                                onChange={e => setFormData({...formData, manufacturer: e.target.value})}
                             />
                         </div>
                     </div>

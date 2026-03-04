@@ -37,7 +37,15 @@ export function Inventory() {
 
   const filteredItems = items.filter(item => {
       const matchesTab = item.type === activeTab;
-      const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = 
+          item.name?.toLowerCase().includes(term) ||
+          item.description?.toLowerCase().includes(term) ||
+          item.model?.toLowerCase().includes(term) ||
+          item.manufacturer?.toLowerCase().includes(term) ||
+          item.color?.toLowerCase().includes(term) ||
+          item.serial?.toLowerCase().includes(term);
+          
       return matchesTab && matchesSearch;
   });
 
@@ -115,7 +123,15 @@ export function Inventory() {
                     <tbody>
                         {filteredItems.map(item => (
                             <tr key={item.id}>
-                                <td style={{ fontWeight: 500 }}>{item.name}</td>
+                                <td>
+                                    <div style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{item.name}</div>
+                                    <div className="flex gap-2 flex-wrap mt-1">
+                                        {item.manufacturer && <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200">Fab: {item.manufacturer}</span>}
+                                        {item.model && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">Mod: {item.model}</span>}
+                                        {item.color && <span className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100">Cor: {item.color}</span>}
+                                    </div>
+                                    {item.description && <div className="text-[11px] text-gray-400 mt-1 truncate max-w-xs" title={item.description}>{item.description}</div>}
+                                </td>
                                 {activeTab === 'equipment' ? (
                                     <>
                                         <td className="text-muted">{item.serial || '-'}</td>

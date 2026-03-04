@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, Plus, Trash2 } from 'lucide-react';
 import db from '../services/database.js';
 
 export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) {
@@ -8,14 +8,18 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
   const [customers, setCustomers] = useState([]);
   const [formData, setFormData] = useState({
     customer: '',
-    productId: '',
-    quantity: 1,
     paymentMethod: 'pix',
     paymentCondition: 'spot', // 'spot' (a vista) or 'installment' (parcelado)
     installments: 1,
     amountPaid: 0,
-    balanceDue: 0
+    balanceDue: 0,
+    date: new Date().toISOString().split('T')[0],
+    deadline: ''
   });
+  
+  const [cartItems, setCartItems] = useState([]);
+  const [currentProductId, setCurrentProductId] = useState('');
+  const [currentQuantity, setCurrentQuantity] = useState(1);
 
   const paymentMethods = [
     { value: 'pix', label: 'Pix' },
@@ -38,26 +42,43 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
                 setFormData({
                     // Customer name stored directly in order.customer
                     customer: orderToEdit.customer || '', 
-                    productId: orderToEdit.productId || '',
-                    quantity: orderToEdit.items || 1,
                     paymentMethod: orderToEdit.paymentMethod || 'pix',
                     paymentCondition: orderToEdit.paymentCondition || 'spot',
                     installments: orderToEdit.installments || 1,
                     amountPaid: orderToEdit.amountPaid || 0,
-                    balanceDue: orderToEdit.balanceDue ?? (orderToEdit.total || 0)
+                    balanceDue: orderToEdit.balanceDue ?? (orderToEdit.total || 0),
+                    date: orderToEdit.date || new Date().toISOString().split('T')[0],
+                    deadline: orderToEdit.deadline || ''
                 });
+
+                if (orderToEdit.cartItems && orderToEdit.cartItems.length > 0) {
+                    setCartItems(orderToEdit.cartItems);
+                } else if (orderToEdit.productId) {
+                    const p = allProducts.find(p => p.id === orderToEdit.productId) || { name: 'Produto Cadastrado', price: (orderToEdit.total || 0) / (orderToEdit.items || 1) };
+                    setCartItems([{
+                        productId: orderToEdit.productId,
+                        name: p.name,
+                        price: Number(p.price || 0),
+                        quantity: orderToEdit.items || 1
+                    }]);
+                } else {
+                    setCartItems([]);
+                }
             } else {
                 // Reset form on open for new
                 setFormData({
                     customer: '',
-                    productId: '',
-                    quantity: 1,
                     paymentMethod: 'pix',
                     paymentCondition: 'spot',
                     installments: 1,
                     amountPaid: 0,
-                    balanceDue: 0
+                    balanceDue: 0,
+                    date: new Date().toISOString().split('T')[0],
+                    deadline: ''
                 });
+                setCartItems([]);
+                setCurrentProductId('');
+                setCurrentQuantity(1);
             }
         }
     };
@@ -66,20 +87,47 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
 
   if (!isOpen) return null;
 
-  const selectedProduct = products.find(p => p.id == formData.productId);
-  const total = selectedProduct ? (selectedProduct.price * formData.quantity) : 0;
+  const total = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const totalItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+
+  const handleAddToCart = () => {
+      const selectedProduct = products.find(p => p.id == currentProductId);
+      if (!selectedProduct) return;
+      
+      const newItem = {
+          productId: selectedProduct.id,
+          name: selectedProduct.name,
+          price: Number(selectedProduct.price || 0),
+          quantity: Number(currentQuantity)
+      };
+      
+      setCartItems([...cartItems, newItem]);
+      setCurrentProductId('');
+      setCurrentQuantity(1);
+  };
+
+  const handleRemoveFromCart = (index) => {
+      const newItems = [...cartItems];
+      newItems.splice(index, 1);
+      setCartItems(newItems);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.customer || !formData.productId) return;
+    if (!formData.customer || cartItems.length === 0) {
+        alert('Selecione um cliente e adicione pelo menos 1 produto ao pedido.');
+        return;
+    }
 
     const newOrder = {
       customer: formData.customer,
-      date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+      date: formData.date || new Date().toISOString().split('T')[0],
+      deadline: formData.deadline || null,
       status: 'Novo',
-      items: parseInt(formData.quantity),
+      items: totalItems,
       total: total,
-      productId: formData.productId, // Use original ID (likely string from Firestore)
+      productId: cartItems[0].productId, // Backwards compatible Fallback
+      cartItems: cartItems, // New List Format
       paymentMethod: formData.paymentMethod,
       paymentCondition: formData.paymentCondition,
       installments: parseInt(formData.installments)
@@ -109,11 +157,14 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
     } else {
         await db.create('orders', newOrder);
         
-        // Update stock only on creation (optional, good for realism)
-        if (selectedProduct) {
-            await db.update('products', selectedProduct.id, { 
-                stock: selectedProduct.stock - parseInt(formData.quantity) 
-            });
+        // Update stock only on creation for all items
+        for (const item of cartItems) {
+            const productRef = products.find(p => p.id == item.productId);
+            if (productRef && productRef.stock !== undefined) {
+                await db.update('products', productRef.id, { 
+                    stock: productRef.stock - item.quantity 
+                });
+            }
         }
     }
 
@@ -150,33 +201,101 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
               </select>
             </div>
 
-            <div className="input-group">
-              <label className="form-label">Produto</label>
-              <select 
-                className="form-input"
-                value={formData.productId}
-                onChange={e => setFormData({...formData, productId: e.target.value})}
-                required
-              >
-                <option value="">Selecione um produto...</option>
-                {products.map(product => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} (R$ {Number(product.price || 0).toFixed(2)})
-                  </option>
-                ))}
-              </select>
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mt-4 mb-4">
+                <h4 className="text-sm font-bold text-gray-700 mb-2">Produtos do Pedido</h4>
+                
+                <div className="flex gap-2 items-end mb-4">
+                    <div className="flex-1">
+                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Produto</label>
+                        <select 
+                            className="form-input text-sm"
+                            value={currentProductId}
+                            onChange={e => setCurrentProductId(e.target.value)}
+                        >
+                            <option value="">Selecione um produto...</option>
+                            {products.map(product => (
+                            <option key={product.id} value={product.id}>
+                                {product.name} (R$ {Number(product.price || 0).toFixed(2)})
+                            </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="w-24">
+                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Qtd</label>
+                        <input 
+                            type="number" 
+                            className="form-input text-sm" 
+                            min="1"
+                            value={currentQuantity}
+                            onChange={e => setCurrentQuantity(e.target.value)}
+                        />
+                    </div>
+                    <button 
+                        type="button" 
+                        onClick={handleAddToCart}
+                        disabled={!currentProductId}
+                        className="btn btn-primary h-[38px] px-3 flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <Plus size={16} /> Adicionar
+                    </button>
+                </div>
+
+                {cartItems.length > 0 && (
+                    <div className="bg-white rounded border border-gray-200 overflow-hidden text-sm">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 text-gray-500 text-[11px] uppercase border-b border-gray-200">
+                                <tr>
+                                    <th className="px-3 py-2">Item</th>
+                                    <th className="px-3 py-2">Qtd x Valor</th>
+                                    <th className="px-3 py-2 text-right">Subtotal</th>
+                                    <th className="px-3 py-2 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {cartItems.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50">
+                                        <td className="px-3 py-2 font-medium text-gray-700">{item.name}</td>
+                                        <td className="px-3 py-2 text-gray-500 text-[12px]">{item.quantity} un x R$ {item.price.toFixed(2)}</td>
+                                        <td className="px-3 py-2 text-right font-bold text-gray-800">
+                                            R$ {(item.quantity * item.price).toFixed(2)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleRemoveFromCart(idx)}
+                                                className="text-red-400 hover:text-red-600 transition-colors"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
-            <div className="input-group">
-              <label className="form-label">Quantidade</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                min="1"
-                value={formData.quantity}
-                onChange={e => setFormData({...formData, quantity: e.target.value})}
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+                <div className="input-group">
+                    <label className="form-label text-blue-600 font-semibold mb-1">Data do Pedido</label>
+                    <input 
+                        type="date"
+                        className="form-input w-full border-blue-200 focus:ring-blue-500"
+                        value={formData.date}
+                        onChange={e => setFormData({...formData, date: e.target.value})}
+                        required
+                    />
+                </div>
+                <div className="input-group">
+                    <label className="form-label text-rose-600 font-semibold mb-1">Prazo de Entrega (Deadline)</label>
+                    <input 
+                        type="date"
+                        className="form-input w-full border-rose-200 focus:ring-rose-500"
+                        value={formData.deadline}
+                        onChange={e => setFormData({...formData, deadline: e.target.value})}
+                    />
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

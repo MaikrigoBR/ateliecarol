@@ -298,7 +298,8 @@ export function Orders() {
               <tr>
                 <th>ID</th>
                 <th>Cliente</th>
-                <th>Data</th>
+                <th>Data Pedido</th>
+                <th>Prazo (Deadline)</th>
                 <th>Status</th>
                 <th>Financeiro</th>
                 <th>Itens</th>
@@ -311,7 +312,23 @@ export function Orders() {
                 <tr key={order.id}>
                   <td className="text-muted">#{order.id}</td>
                   <td style={{ fontWeight: 500 }}>{order.customer}</td>
-                  <td className="text-muted">{order.date}</td>
+                  <td className="text-muted">{order.date ? new Date(order.date).toLocaleDateString() : '--'}</td>
+                  <td>
+                    {order.deadline ? (
+                        <span style={{ 
+                            fontSize: '0.8rem', 
+                            padding: '2px 8px', 
+                            borderRadius: '12px', 
+                            backgroundColor: new Date(order.deadline) < new Date() ? '#FEE2E2' : '#EFF6FF',
+                            color: new Date(order.deadline) < new Date() ? '#DC2626' : '#2563EB',
+                            fontWeight: 600
+                        }}>
+                            {new Date(order.deadline).toLocaleDateString()}
+                        </span>
+                    ) : (
+                        <span className="text-muted">--</span>
+                    )}
+                  </td>
                   <td>{getStatusBadge(order.status)}</td>
                   <td>{getFinancialStatus(order)}</td>
                   <td>{order.items}</td>
