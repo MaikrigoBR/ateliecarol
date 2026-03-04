@@ -23,6 +23,7 @@ import { Production } from './pages/Production';
 import { ProductivityReport } from './pages/ProductivityReport';
 import { DesignLibrary } from './pages/DesignLibrary';
 import { OrderTracking } from './pages/OrderTracking';
+import { ProposalView } from './pages/ProposalView';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { DataProvider } from './contexts/DataContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -63,6 +64,7 @@ function App() {
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/status/:id" element={<OrderTracking />} />
+                <Route path="/proposal/:id" element={<ProposalView />} />
 
                 {/* Protected Routes (Wrapped in Layout) */}
                 <Route element={
