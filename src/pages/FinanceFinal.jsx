@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import '../css/pages.css';
 import { calculateFinancialStats } from '../components/FinanceHelpers';
+import { CreditCardManagerModal } from '../components/CreditCardManagerModal';
 
 // --- Components from Dashboard ---
 
@@ -254,6 +255,7 @@ export function FinanceFinal() {
     const [editTransId, setEditTransId] = useState(null);
     const [newAccount, setNewAccount] = useState({ name: '', type: 'checking', balance: 0, limit: 0, dueDay: 10, color: '#3b82f6' });
     const [newTrans, setNewTrans] = useState({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1 });
+    const [selectedCreditCard, setSelectedCreditCard] = useState(null);
 
 
     // Calculations
@@ -667,13 +669,14 @@ export function FinanceFinal() {
                                         accounts.filter(a => a.type === 'credit').map(acc => {
                                             const balance = Number(acc.balance || 0);
                                             const limit = Number(acc.limit || 0);
-                                            const percent = limit > 0 ? (balance / limit) * 100 : 0;
+                                            const debt = balance < 0 ? -balance : 0;
+                                            const percent = limit > 0 ? (debt / limit) * 100 : 0;
                                             const dueDay = acc.dueDay || 10;
                                             let bestDay = dueDay - 7;
                                             if (bestDay <= 0) bestDay += 30; // Approximation for best day
 
                                             return (
-                                                <tr key={acc.id} className="group transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/20 border-t" style={{ borderColor: 'var(--border)' }}>
+                                                <tr key={acc.id} onClick={() => setSelectedCreditCard(acc)} className="group transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/20 border-t cursor-pointer" style={{ borderColor: 'var(--border)' }}>
                                                     <td style={{ padding: '1rem 1.5rem' }}>
                                                         <div className="flex items-center gap-4">
                                                             <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 text-purple-600 shrink-0">
@@ -698,7 +701,7 @@ export function FinanceFinal() {
                                                         <div className="flex flex-col gap-1.5 w-full">
                                                             <div className="flex justify-between text-[11px] text-gray-500 font-medium">
                                                                 <span>{percent.toFixed(1)}% Usado</span>
-                                                                <span className="font-bold text-gray-400">Livre: R$ {Math.max(0, limit - balance).toLocaleString('pt-BR')}</span>
+                                                                <span className="font-bold text-gray-400">Livre: R$ {Math.max(0, limit - debt).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                             </div>
                                                             <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden" style={{ backgroundColor: 'var(--surface-hover)' }}>
                                                                 <div 
@@ -715,8 +718,8 @@ export function FinanceFinal() {
                                                     </td>
                                                     <td style={{ padding: '1rem 1.5rem' }}>
                                                         <div className="flex flex-row items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => openEditAccount(acc)} className="p-2 bg-white outline outline-1 outline-gray-200 dark:bg-gray-800 dark:outline-gray-700 rounded-lg text-gray-400 hover:text-blue-500 transition-colors shadow-sm flex justify-center" title="Editar Conta"><Edit2 size={16} /></button>
-                                                            <button onClick={() => handleDeleteAccount(acc.id)} className="p-2 bg-white outline outline-1 outline-gray-200 dark:bg-gray-800 dark:outline-gray-700 rounded-lg text-gray-400 hover:text-red-500 transition-colors shadow-sm flex justify-center" title="Excluir Conta"><Trash2 size={16} /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); openEditAccount(acc); }} className="p-2 bg-white outline outline-1 outline-gray-200 dark:bg-gray-800 dark:outline-gray-700 rounded-lg text-gray-400 hover:text-blue-500 transition-colors shadow-sm flex justify-center" title="Editar Conta"><Edit2 size={16} /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteAccount(acc.id); }} className="p-2 bg-white outline outline-1 outline-gray-200 dark:bg-gray-800 dark:outline-gray-700 rounded-lg text-gray-400 hover:text-red-500 transition-colors shadow-sm flex justify-center" title="Excluir Conta"><Trash2 size={16} /></button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -835,6 +838,15 @@ export function FinanceFinal() {
             </div>
 
             {/* Modals */}
+            <CreditCardManagerModal
+                isOpen={!!selectedCreditCard}
+                onClose={() => setSelectedCreditCard(null)}
+                account={selectedCreditCard}
+                accounts={accounts}
+                transactions={transactions}
+                onUpdate={fetchData}
+            />
+
             {isAccModalOpen && (
                 <div className="modal-overlay" style={{ zIndex: 1000 }}>
                     <div className="modal-content" style={{ maxWidth: '450px', width: '100%' }} onClick={e => e.stopPropagation()}>
@@ -920,9 +932,12 @@ export function FinanceFinal() {
                                         <label className="form-label">Parcelas no Cartão</label>
                                         <select className="form-input w-full" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})}>
                                             {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                                                <option key={n} value={n}>{n === 1 ? '1x (À vista)' : `${n}x sem juros (R$ ${(Number(newTrans.amount || 0)/n).toLocaleString('pt-BR', {minimumFractionDigits: 2})})`}</option>
+                                                <option key={n} value={n}>{n === 1 ? '1x (À vista)' : `${n}x de (R$ ${(Number(newTrans.amount || 0)/n).toLocaleString('pt-BR', {minimumFractionDigits: 2})})`}</option>
                                             ))}
                                         </select>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                            Dica: Se houver acréscimos/juros na maquininha, digite o Valor <b>Total final</b> acima.
+                                        </div>
                                     </div>
                                 )}
                                 <div className="grid grid-cols-2 gap-4">
