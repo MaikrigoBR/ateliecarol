@@ -14,6 +14,9 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   async function login(email, password, remember = true) {
+    if (!auth) {
+        throw new Error("Conexão com Banco de Dados falhou: As credenciais de Ambiente (VITE_FIREBASE) estão faltando na configuração da Vercel.");
+    }
     await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
     return signInWithEmailAndPassword(auth, email, password);
   }
