@@ -24,7 +24,7 @@ export function Login() {
       navigate('/');
     } catch (err) {
       console.error(err);
-      setError('Falha ao entrar: Email ou senha incorretos.');
+      setError(`Falha ao entrar: ${err.message || err.code || 'Verifique seus dados'}`);
     } // finally { setLoading(false) } -> We navigate away, so no need to set false usually, but safe to do so.
       setLoading(false);
   }
