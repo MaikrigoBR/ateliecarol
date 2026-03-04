@@ -812,6 +812,12 @@ export function FinanceFinal() {
                         <tbody>
                             {transactionsWithBalance
                                 .filter(t => {
+                                    const acc = accounts.find(a => a.id === t.accountId);
+                                    // Esconde lançamentos de cartão da visão geral
+                                    if (acc?.type === 'credit' && transAccFilter === '' && globalAccFilter === '') {
+                                        return false;
+                                    }
+
                                     const search = transSearchTerm.toLowerCase();
                                     const matchesSearch = t.description?.toLowerCase().includes(search);
                                     const matchesType = transTypeFilter === '' || t.type === transTypeFilter;
