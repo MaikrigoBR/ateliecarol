@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Clock, TrendingUp, Users, AlertTriangle } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Clock, TrendingUp, Users, AlertTriangle, CalendarCheck, Coffee } from 'lucide-react';
 import db from '../services/database';
 import '../css/pages.css';
 
@@ -42,15 +42,33 @@ export function ProductivityReport() {
         return true;
     };
 
-    // Calculate Metrics
     const processMetrics = () => {
         let totalCompletedTasks = 0;
         let totalTimeHours = 0;
+        let totalIdleHours = 0;
+        let onTimeDeliveries = 0;
+        let lateDeliveries = 0;
         const stepStats = {};
         const staffStats = {};
         let bottlenecks = 0;
 
         orders.forEach(order => {
+            // Check SLA if order is completed
+            if (order.status === 'completed' && order.deadline) {
+                const deadlineDate = new Date(order.deadline);
+                const completeHistory = order.productionHistory?.find(h => h.step === 'completed' || h.step === 'complete_order');
+                // Consider delivered on time if completed before or on the day of deadline
+                if (completeHistory && completeHistory.enteredAt) {
+                    const completedDate = new Date(completeHistory.enteredAt);
+                    deadlineDate.setHours(23, 59, 59, 999);
+                    if (completedDate <= deadlineDate) {
+                        onTimeDeliveries++;
+                    } else {
+                        lateDeliveries++;
+                    }
+                }
+            }
+
             order.productionHistory.forEach(h => {
                 if (!isInPeriod(h.enteredAt)) return;
 
@@ -71,21 +89,26 @@ export function ProductivityReport() {
                     const durationH = (new Date(h.exitedAt) - new Date(h.enteredAt)) / (1000 * 60 * 60);
                     stepStats[stepName].count += 1;
                     stepStats[stepName].totalHours += durationH;
-                    totalCompletedTasks += 1;
-                    totalTimeHours += durationH;
+                    
+                    if (stepName === 'pending') {
+                        totalIdleHours += durationH;
+                    } else {
+                        totalCompletedTasks += 1;
+                        totalTimeHours += durationH;
+                    }
 
                     if (assigneeId !== 'unassigned') {
                         staffStats[assigneeId].count += 1;
                     }
 
                     // Soft SLA check for bottlenecks indicator (e.g. > 24h is a bottleneck)
-                    if (durationH > 24) bottlenecks++;
+                    if (durationH > 24 && stepName !== 'pending') bottlenecks++;
                 }
             });
         });
 
         const stepChartData = Object.keys(stepStats).map(key => ({
-            name: key === 'pending' ? 'Fila' : key === 'design' ? 'Design' : key === 'printing' ? 'Impressão' : key === 'finishing' ? 'Acabamento' : key,
+            name: key === 'pending' ? 'Fila (Ociosidade)' : key === 'design' ? 'Design' : key === 'printing' ? 'Impressão' : key === 'finishing' ? 'Acabamento' : key,
             'Horas Médias': stepStats[key].count > 0 ? parseFloat((stepStats[key].totalHours / stepStats[key].count).toFixed(2)) : 0
         })).filter(d => d.name !== 'complete_order' && d.name !== 'completed');
 
@@ -97,7 +120,10 @@ export function ProductivityReport() {
         return {
             totalTasks: totalCompletedTasks,
             avgTime: totalCompletedTasks > 0 ? (totalTimeHours / totalCompletedTasks).toFixed(1) : 0,
+            idleTime: totalIdleHours.toFixed(1),
             bottlenecks,
+            onTime: onTimeDeliveries,
+            late: lateDeliveries,
             stepChartData,
             staffChartData
         };
@@ -144,32 +170,38 @@ export function ProductivityReport() {
                     <div className="absolute top-0 right-0 p-4 opacity-10 transition-opacity">
                         <Clock size={64} className="text-blue-500" />
                     </div>
-                    <h3 style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tempo Médio p/ Etapa</h3>
+                    <h3 style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tempo Médio Produtivo</h3>
                     <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)' }}>{metrics.avgTime}h</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Por Etapa Executada</p>
                 </div>
 
                 <div className="stat-card relative overflow-hidden group" style={{ borderLeftColor: '#f59e0b' }}>
                      <div className="absolute top-0 right-0 p-4 opacity-10 transition-opacity">
-                        <AlertTriangle size={64} className="text-orange-500" />
+                        <Coffee size={64} className="text-orange-500" />
                     </div>
-                    <h3 style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Movimentos c/ Gargalo</h3>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ea580c' }}>{metrics.bottlenecks}</p>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>&gt; 24h na etapa</p>
+                    <h3 style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Índice de Ociosidade</h3>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ea580c' }}>{metrics.idleTime}h</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Tempo total parados na Fila</p>
                 </div>
 
                 <div className="stat-card relative overflow-hidden group" style={{ borderLeftColor: '#8b5cf6' }}>
                     <div className="absolute top-0 right-0 p-4 opacity-10 transition-opacity">
-                        <Users size={64} className="text-purple-500" />
+                        <CalendarCheck size={64} className="text-purple-500" />
                     </div>
-                    <h3 style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Membros Ativos</h3>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)' }}>{metrics.staffChartData.length}</p>
+                    <h3 style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Performance SLA (Prazos)</h3>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        <span style={{ color: '#10b981' }}>{metrics.onTime}</span> 
+                        <span style={{ fontSize: '1rem', color: '#94a3b8', margin: '0 4px' }}>/</span> 
+                        <span style={{ color: '#ef4444' }}>{metrics.late}</span>
+                    </p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Dentro do Prazo vs Atrasos</p>
                 </div>
             </div>
 
-            <div className="charts-layout">
+            <div className="charts-layout" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', marginTop: '32px' }}>
                 <div className="chart-card">
                     <div className="chart-header">
-                        <TrendingUp size={20} color="var(--primary)" /> Gargalos: Tempo Médio por Etapa (Horas)
+                        <TrendingUp size={20} color="var(--primary)" /> Produção vs Ociosidade (Horas)
                     </div>
                     <div style={{ height: '300px' }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -178,15 +210,56 @@ export function ProductivityReport() {
                                 <XAxis dataKey="name" />
                                 <YAxis />
                                 <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                <Bar dataKey="Horas Médias" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40} />
+                                <Bar dataKey="Horas Médias" fill="#8b5cf6">
+                                  {metrics.stepChartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.name.includes('Ociosidade') ? '#fca5a5' : '#8b5cf6'} />
+                                  ))}
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
                 <div className="chart-card">
+                    <div className="chart-header flex justify-between">
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <CalendarCheck size={20} color="#10b981" /> Histórico de Eficiência (SLA)
+                        </div>
+                    </div>
+                    <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                         {(metrics.onTime > 0 || metrics.late > 0) ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={[
+                                            { name: 'Dentro do Prazo', value: metrics.onTime },
+                                            { name: 'Atrasados', value: metrics.late }
+                                        ]}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={80}
+                                        outerRadius={100}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        <Cell fill="#10b981" />
+                                        <Cell fill="#ef4444" />
+                                    </Pie>
+                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                    <Legend verticalAlign="bottom" height={36}/>
+                                </PieChart>
+                            </ResponsiveContainer>
+                         ) : (
+                             <div className="text-center text-muted italic">
+                                 Nenhum pedido concluído com prazo definido neste período.
+                             </div>
+                         )}
+                    </div>
+                </div>
+                
+                <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
                     <div className="chart-header">
-                        <Users size={20} color="#3b82f6" /> Ranking: Tarefas Concluídas por Staff
+                        <Users size={20} color="#3b82f6" /> Ranking de Produção (Tarefas Concluídas)
                     </div>
                     <div style={{ height: '300px' }}>
                         <ResponsiveContainer width="100%" height="100%">

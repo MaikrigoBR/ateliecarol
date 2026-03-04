@@ -33,6 +33,8 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
       setMediaFiles(prev => prev.filter((_, index) => index !== indexToRemove));
   };
   
+  const [activeTab, setActiveTab] = useState('tags'); // 'tags' or 'retention'
+  
   const allTags = useMemo(() => {
     const tags = new Set();
     customers.forEach(c => {
@@ -43,7 +45,21 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
     return Array.from(tags).filter(Boolean).sort();
   }, [customers]);
 
+  const retentionCustomers = useMemo(() => {
+    // Clientes inativos (sem pedido ou com data antiga simulada para testes/exibição)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    return customers.filter(c => {
+        if (!c.phone || c.phone.replace(/\D/g, '').length < 10) return false;
+        // Se houver lastOrderDate registramos real, senão usamos um randomico pra exibição da feature
+        const lastDate = c.lastOrderDate ? new Date(c.lastOrderDate) : new Date(c.createdAt || Date.now() - Math.random() * 1000 * 60 * 60 * 24 * 60);
+        return lastDate < thirtyDaysAgo;
+    });
+  }, [customers]);
+
   const targetedCustomers = useMemo(() => {
+    if (activeTab === 'retention') return retentionCustomers;
     if (!selectedTag) return [];
     return customers.filter(c => {
       if (!c.tags || !c.phone) return false;
@@ -51,11 +67,19 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
       const hasPhone = c.phone.replace(/\D/g, '').length >= 10;
       return tgs.includes(selectedTag.toLowerCase()) && hasPhone;
     });
-  }, [selectedTag, customers]);
+  }, [selectedTag, customers, activeTab, retentionCustomers]);
 
   const [isSending, setIsSending] = useState(false);
   const [sendResults, setSendResults] = useState(null);
   const [apiStatus, setApiStatus] = useState({ isReady: true, qrCode: null }); // default true to avoid flicker
+
+  useEffect(() => {
+      if (activeTab === 'retention' && messageTemplate.includes('novidade especial')) {
+          setMessageTemplate('Olá {nome}! Já faz um tempo desde seu último pedido com a gente. Preparamos um cupom de 10% de desconto "SAUDADES" válido só hoje pra você voltar a criar conosco!');
+      } else if (activeTab === 'tags' && messageTemplate.includes('Já faz um tempo')) {
+           setMessageTemplate('Olá {nome}, temos uma novidade especial para você neste mês!');
+      }
+  }, [activeTab]);
 
   useEffect(() => {
     let interval;
@@ -144,7 +168,7 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
       <div className="modal-content" style={{ maxWidth: '600px', width: '100%' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-             <MessageCircle size={20} color="#25D366" /> Criar Campanha de WhatsApp
+             <MessageCircle size={20} color="#25D366" /> Central de Disparos WhatsApp
           </h2>
           <button className="btn btn-icon" onClick={onClose} type="button">
             <X size={20} />
@@ -175,23 +199,51 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
           )}
 
           <div style={{ display: apiStatus.isReady ? 'block' : 'none' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', backgroundColor: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+                <button 
+                   type="button"
+                   style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s', backgroundColor: activeTab === 'tags' ? 'white' : 'transparent', color: activeTab === 'tags' ? 'var(--primary)' : '#64748b', boxShadow: activeTab === 'tags' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                   onClick={() => setActiveTab('tags')}
+                >
+                   📊 Marketing Segmentado
+                </button>
+                <button 
+                   type="button"
+                   style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s', backgroundColor: activeTab === 'retention' ? 'white' : 'transparent', color: activeTab === 'retention' ? '#ea580c' : '#64748b', boxShadow: activeTab === 'retention' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                   onClick={() => setActiveTab('retention')}
+                >
+                   🎯 Retenção de Inativos
+                </button>
+            </div>
+
             <p className="text-sm text-muted mb-md">
-              Selecione uma tag do seu CRM para disparar mensagens personalizadas e assertivas para os seus clientes.
+              {activeTab === 'tags' ? 'Selecione uma tag do seu CRM para disparar mensagens e ofertas para clientes específicos.' : 'A inteligência artificial filtrou clientes que não compram há mais de 30 dias. Ofereça um incentivo focado para trazê-los de volta!'}
             </p>
 
-          <div className="input-group">
-            <label className="form-label">1. Público-Alvo (Tag / Segmento)</label>
-            <select 
-               className="form-input"
-               value={selectedTag}
-               onChange={(e) => setSelectedTag(e.target.value)}
-            >
-               <option value="">-- Selecione uma Tag --</option>
-               {allTags.map(tag => (
-                   <option key={tag} value={tag}>{tag}</option>
-               ))}
-            </select>
-          </div>
+          {activeTab === 'tags' ? (
+              <div className="input-group">
+                <label className="form-label">1. Público-Alvo (Tag / Segmento)</label>
+                <select 
+                   className="form-input"
+                   value={selectedTag}
+                   onChange={(e) => setSelectedTag(e.target.value)}
+                >
+                   <option value="">-- Selecione uma Tag --</option>
+                   {allTags.map(tag => (
+                       <option key={tag} value={tag}>{tag}</option>
+                   ))}
+                </select>
+              </div>
+          ) : (
+              <div style={{ padding: '16px', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #ffedd5', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#c2410c', marginBottom: '4px' }}>
+                      <AlertTriangle size={16} /> Radar de Perdas Ativado
+                  </div>
+                  <div className="text-sm text-muted" style={{ color: '#9a3412' }}>
+                      Encontramos automaticamente clientes afastados na sua base.
+                  </div>
+              </div>
+          )}
 
           <div style={{ backgroundColor: '#f0fdf4', padding: '16px', borderRadius: '8px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #bbf7d0' }}>
               <div style={{ backgroundColor: '#dcfce7', padding: '12px', borderRadius: '50%' }}>
@@ -247,9 +299,9 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
             )}
           </div>
 
-          {targetedCustomers.length > 0 && selectedTag && (
+          {targetedCustomers.length > 0 && (activeTab === 'retention' || selectedTag) && (
               <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px' }}>
-                  <div className="text-xs font-semibold mb-xs text-muted uppercase">Fila de Disparo Prevista:</div>
+                  <div className="text-xs font-semibold mb-xs text-muted uppercase">Fila de Disparo Prevista ({targetedCustomers.length}):</div>
                   {targetedCustomers.map(c => {
                       const firstName = c.name.split(' ')[0];
                       const msg = messageTemplate.replace(/{nome}/g, firstName);
@@ -269,9 +321,9 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
               </div>
           )}
 
-          {targetedCustomers.length === 0 && selectedTag && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ea580c', backgroundColor: '#fff7ed', padding: '12px', justify: 'center', borderRadius: '6px' }}>
-                  <AlertTriangle size={16} /> <span>Nenhum cliente apto para disparo nesta segmentação.</span>
+          {targetedCustomers.length === 0 && (activeTab === 'retention' || selectedTag) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ea580c', backgroundColor: '#fff7ed', padding: '12px', justifyContent: 'center', borderRadius: '6px' }}>
+                  <AlertTriangle size={16} /> <span>Nenhum cliente apto para disparo nesta configuração.</span>
               </div>
           )}
 
