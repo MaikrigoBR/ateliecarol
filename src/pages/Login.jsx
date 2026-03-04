@@ -29,6 +29,8 @@ export function Login() {
       setLoading(false);
   }
 
+  const hasEnvVars = !!import.meta.env.VITE_FIREBASE_API_KEY;
+
   return (
     <div style={{
         display: 'flex',
@@ -80,6 +82,27 @@ export function Login() {
                 }}>
                     <AlertCircle size={16} />
                     {error}
+                </div>
+            )}
+
+            {!hasEnvVars && (
+                <div style={{
+                    background: '#fffbeb',
+                    border: '1px solid #fef3c7',
+                    color: '#b45309',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    marginBottom: '24px',
+                    fontSize: '13px',
+                    lineHeight: '1.4'
+                }}>
+                    <strong><AlertCircle size={14} className="inline mr-1" />Atenção: A Vercel não injetou as Configurações (Env)!</strong><br/>
+                    As chaves foram salvas, mas o último Redeploy reciclou o cache anterior vazio.
+                    <br/><br/>
+                    <strong>Como corrigir agora:</strong><br/>
+                    1. Vá na Vercel {'>'} Deployments<br/>
+                    2. Nos 3 pontinhos do último deploy clique em <strong>Redeploy</strong>.<br/>
+                    3. Na janelinha que abrir, <strong>DESMARQUE</strong> a caixinha "Use existing Build Cache" e mande implantar.
                 </div>
             )}
 
