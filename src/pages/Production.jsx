@@ -72,6 +72,50 @@ export function Production() {
         fetchOrders();
     }, []);
 
+    // Calcula Tarefas Individuais Baseado nos Itens do Carrinho
+    const productionTasks = React.useMemo(() => {
+        let tasks = [];
+        orders.forEach(order => {
+            if (order.cartItems && order.cartItems.length > 0) {
+                order.cartItems.forEach((item, index) => {
+                    const currentStep = item.productionStep || order.productionStep || 'pending';
+                    if (currentStep !== 'completed') {
+                        tasks.push({
+                            ...order,
+                            _isItem: true,
+                            _itemIndex: index,
+                            _taskId: `${order.id}-${index}`,
+                            itemName: item.name,
+                            itemQty: item.quantity,
+                            productionStep: currentStep,
+                            productionHistory: item.productionHistory || order.productionHistory || [],
+                            assigneeId: item.assigneeId || order.assigneeId || null,
+                            lastStepUpdatedAt: item.lastStepUpdatedAt || order.lastStepUpdatedAt || order.date
+                        });
+                    }
+                });
+            } else {
+                if (order.productionStep !== 'completed') {
+                    tasks.push({
+                        ...order,
+                        _isItem: false,
+                        _taskId: String(order.id),
+                        itemName: (() => {
+                            const product = products.find(p => p.id == order.productId);
+                            return product?.name || order.productName || 'Produto Único';
+                        })(),
+                        itemQty: order.items || 1,
+                        productionStep: order.productionStep || 'pending',
+                        productionHistory: order.productionHistory || [],
+                        assigneeId: order.assigneeId || null,
+                        lastStepUpdatedAt: order.lastStepUpdatedAt || order.date
+                    });
+                }
+            }
+        });
+        return tasks;
+    }, [orders, products]);
+
     // Helper: Formats the phone for WA
     const formatWaPhone = (phoneStr) => {
         if (!phoneStr) return '';
@@ -93,12 +137,12 @@ export function Production() {
         }
     };
 
-    const handleAssign = async (orderId, staffId) => {
-        const order = orders.find(o => o.id === orderId);
+    const handleAssign = async (task, staffId) => {
+        const order = orders.find(o => o.id === task.id);
         if (!order) return;
         
-        const history = order.productionHistory || [];
-        const currentStep = order.productionStep || 'pending';
+        const history = [...(task.productionHistory || [])];
+        const currentStep = task.productionStep || 'pending';
         
         const lastEntryIndex = history.findIndex(h => h.step === currentStep && !h.exitedAt);
         if (lastEntryIndex !== -1) {
@@ -107,29 +151,37 @@ export function Production() {
             history.push({ step: 'pending', enteredAt: order.date || new Date().toISOString(), assigneeId: staffId });
         }
 
-        await db.update('orders', orderId, { 
-            assigneeId: staffId,
-            productionHistory: history
-        });
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, assigneeId: staffId, productionHistory: history } : o));
+        let updatedOrder = { ...order };
+        if (task._isItem) {
+            if (!updatedOrder.cartItems) updatedOrder.cartItems = [];
+            updatedOrder.cartItems[task._itemIndex] = {
+                ...updatedOrder.cartItems[task._itemIndex],
+                assigneeId: staffId,
+                productionHistory: history
+            };
+        } else {
+            updatedOrder.assigneeId = staffId;
+            updatedOrder.productionHistory = history;
+        }
+
+        await db.update('orders', order.id, updatedOrder);
+        setOrders(prev => prev.map(o => o.id === order.id ? updatedOrder : o));
     };
 
     // --- QC & Move Flow ---
-    const handleMoveRequest = (order, nextStep) => {
-        // If there's a checklist to enter nextStep, prompt QC Modal
+    const handleMoveRequest = (task, nextStep) => {
         const checklist = QC_CHECKLISTS[nextStep];
         if (checklist && checklist.length > 0) {
-            setQcOrderPending(order);
+            setQcOrderPending(task);
             setQcTargetStep(nextStep);
             
-            // setup check state
             const initialChecks = {};
             checklist.forEach((_, i) => initialChecks[i] = false);
             setQcChecks(initialChecks);
             
             setQcModalOpen(true);
         } else {
-            finalizeMove(order, nextStep);
+            finalizeMove(task, nextStep);
         }
     };
 
@@ -183,48 +235,78 @@ export function Production() {
         }
     };
 
-    const finalizeMove = async (order, nextStep) => {
+    const finalizeMove = async (task, nextStep) => {
+        const order = orders.find(o => o.id === task.id);
+        if (!order) return;
+
         const nowIso = new Date().toISOString();
-        const history = order.productionHistory || [];
-        const currentStep = order.productionStep || 'pending';
+        const history = [...(task.productionHistory || [])];
+        const currentStep = task.productionStep || 'pending';
         
         const lastEntryIndex = history.findIndex(h => h.step === currentStep && !h.exitedAt);
         if (lastEntryIndex !== -1) {
             history[lastEntryIndex].exitedAt = nowIso;
         } else if (currentStep === 'pending' && history.length === 0) {
-            history.push({ step: 'pending', enteredAt: order.date || nowIso, exitedAt: nowIso, assigneeId: order.assigneeId || null });
+            history.push({ step: 'pending', enteredAt: order.date || nowIso, exitedAt: nowIso, assigneeId: task.assigneeId || null });
         }
+
+        let updatedOrder = { ...order };
 
         if (nextStep === 'complete_order') {
-            await db.update('orders', order.id, { 
-                status: 'Pronto para Retirada', 
-                productionStep: 'completed',
-                productionHistory: history
+            if (task._isItem) {
+                if (!updatedOrder.cartItems) updatedOrder.cartItems = [];
+                updatedOrder.cartItems[task._itemIndex] = {
+                    ...updatedOrder.cartItems[task._itemIndex],
+                    productionStep: 'completed',
+                    productionHistory: history,
+                    lastStepUpdatedAt: nowIso
+                };
+                
+                // Verifica se TODOS os itens do pedido já estão 'completed'
+                const allDone = updatedOrder.cartItems.every(i => i.productionStep === 'completed');
+                if (allDone) {
+                    updatedOrder.status = 'Pronto para Retirada';
+                    updatedOrder.productionStep = 'completed';
+                    AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Todos os itens concluídos. Pedido finalizado.`);
+                    triggerAutomation(updatedOrder, 'completed');
+                }
+            } else {
+                updatedOrder.status = 'Pronto para Retirada';
+                updatedOrder.productionStep = 'completed';
+                updatedOrder.productionHistory = history;
+                AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Produção finalizada. Aguardando retirada/envio.`);
+                triggerAutomation(updatedOrder, 'completed');
+            }
+        } else {
+            history.push({
+                step: nextStep,
+                enteredAt: nowIso,
+                assigneeId: task.assigneeId || null
             });
-            setOrders(prev => prev.filter(o => o.id !== order.id)); // Remove da fila Kanban visualmente
-            AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Produção finalizada. Aguardando retirada/envio.`);
-            triggerAutomation(order, 'completed');
-            return;
+
+            if (task._isItem) {
+                if (!updatedOrder.cartItems) updatedOrder.cartItems = [];
+                updatedOrder.cartItems[task._itemIndex] = {
+                    ...updatedOrder.cartItems[task._itemIndex],
+                    productionStep: nextStep,
+                    productionHistory: history,
+                    lastStepUpdatedAt: nowIso
+                };
+                updatedOrder.status = 'processing';
+            } else {
+                updatedOrder.productionStep = nextStep;
+                updatedOrder.status = 'processing';
+                updatedOrder.lastStepUpdatedAt = nowIso;
+                updatedOrder.productionHistory = history;
+            }
+            
+            const stepLabel = COLUMNS.find(c => c.id === nextStep)?.label || nextStep;
+            AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Moveu item para etapa: ${stepLabel}`);
+            triggerAutomation(updatedOrder, nextStep);
         }
 
-        history.push({
-            step: nextStep,
-            enteredAt: nowIso,
-            assigneeId: order.assigneeId || null
-        });
-
-        await db.update('orders', order.id, { 
-            productionStep: nextStep,
-            status: 'processing',
-            lastStepUpdatedAt: nowIso,
-            productionHistory: history
-        });
-        
-        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, productionStep: nextStep, lastStepUpdatedAt: nowIso, productionHistory: history } : o));
-        
-        const stepLabel = COLUMNS.find(c => c.id === nextStep)?.label || nextStep;
-        AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Moveu para etapa: ${stepLabel}`);
-        triggerAutomation(order, nextStep);
+        await db.update('orders', order.id, updatedOrder);
+        setOrders(prev => prev.map(o => o.id === order.id ? updatedOrder : o));
     };
 
 
@@ -255,10 +337,7 @@ export function Production() {
 
     // Helpers
     const getOrdersByStep = (stepId) => {
-        const filtered = orders.filter(o => {
-            const currentStep = o.productionStep || 'pending';
-            return currentStep === stepId;
-        });
+        const filtered = productionTasks.filter(t => t.productionStep === stepId);
 
         // Forced Sort by Deadline (ASC - closest/overdue first)
         return filtered.sort((a, b) => {
@@ -295,9 +374,9 @@ export function Production() {
     };
 
     // SLA display logic
-    const getSlaInfo = (order, stepId) => {
-        if (!order.lastStepUpdatedAt) return { hours: 0, overtime: false };
-        const msSince = new Date() - new Date(order.lastStepUpdatedAt);
+    const getSlaInfo = (task, stepId) => {
+        if (!task.lastStepUpdatedAt) return { hours: 0, overtime: false };
+        const msSince = new Date() - new Date(task.lastStepUpdatedAt);
         const hours = msSince / (1000 * 60 * 60);
         const limit = SLA_HOURS[stepId] || 24;
         return { 
@@ -358,28 +437,28 @@ export function Production() {
                                         {isDragOver ? 'Solte aqui' : 'Vazio'}
                                     </div>
                                 )}
-                                {colOrders.map(order => {
-                                    const sla = getSlaInfo(order, col.id);
-                                    const deadlineBadge = getDeadlineInfo(order.deadline);
+                                {colOrders.map(task => {
+                                    const sla = getSlaInfo(task, col.id);
+                                    const deadlineBadge = getDeadlineInfo(task.deadline);
                                     const isGargalo = sla.overtime;
                                     
                                     return (
                                     <div 
-                                        key={order.id} 
+                                        key={task._taskId} 
                                         className={`kanban-card cursor-grab active:cursor-grabbing hover:shadow-md transition-all ${isGargalo ? 'ring-2 ring-red-400 bg-red-50' : ''}`}
                                         draggable="true"
-                                        onDragStart={(e) => onDragStart(e, order)}
+                                        onDragStart={(e) => onDragStart(e, task)}
                                         style={{ 
                                             backgroundColor: isGargalo ? '#fff5f5' : 'var(--surface)', 
                                             padding: 'var(--space-md)', 
                                             borderRadius: 'var(--radius-md)', 
                                             boxShadow: 'var(--shadow-sm)',
                                             borderLeft: `4px solid ${isGargalo ? '#ef4444' : col.color}`,
-                                            opacity: draggedOrder?.id === order.id ? 0.5 : 1
+                                            opacity: draggedOrder?._taskId === task._taskId ? 0.5 : 1
                                         }}
                                     >
                                         <div className="flex justify-between items-start mb-xs">
-                                            <span className="font-bold text-sm">#{order.id?.toString().substring(0,8)}</span>
+                                            <span className="font-bold text-sm">#{task.id?.toString().substring(0,8)}</span>
                                             {isGargalo ? (
                                                 <span className="badge" style={{ backgroundColor: '#fee2e2', color: '#b91c1c' }} title={`Ultrapassou o limite de SLA de ${sla.limit}h`}>
                                                     <AlertCircle size={10} className="mr-1 inline" />Gargalo
@@ -392,7 +471,7 @@ export function Production() {
                                             )}
                                         </div>
                                         
-                                        <div className="text-sm font-medium mb-1 truncate">{order.customerName || order.customer || 'Cliente sem nome'}</div>
+                                        <div className="text-sm font-medium mb-1 truncate">{task.customerName || task.customer || 'Cliente sem nome'}</div>
                                         
                                         {/* NEW: Deadline Visual Indicator */}
                                         {deadlineBadge && (
@@ -403,11 +482,8 @@ export function Production() {
                                             </div>
                                         )}
 
-                                        <div className="text-xs text-muted mb-sm line-clamp-2">
-                                            {(() => {
-                                                const product = products.find(p => p.id == order.productId);
-                                                return `${order.items || 1}x ${product?.name || order.productName || 'Produto Personalizado'}`;
-                                            })()}
+                                        <div className="text-xs font-semibold text-gray-700 mb-sm bg-gray-50 p-1.5 rounded border border-gray-100 line-clamp-2">
+                                            {`${task.itemQty}x ${task.itemName}`}
                                         </div>
 
                                         {/* Assignee Selection */}
@@ -415,8 +491,8 @@ export function Production() {
                                             <User size={12} className="text-muted" />
                                             <select 
                                                 className="bg-transparent text-xs p-1 rounded hover:bg-black/5 outline-none border-none cursor-pointer flex-1 text-gray-700"
-                                                value={order.assigneeId || ''}
-                                                onChange={(e) => handleAssign(order.id, e.target.value)}
+                                                value={task.assigneeId || ''}
+                                                onChange={(e) => handleAssign(task, e.target.value)}
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <option value="">Não atribuído...</option>
@@ -431,7 +507,7 @@ export function Production() {
                                             <button 
                                                 className="btn btn-icon p-1 hover:text-green-600 transition-colors" 
                                                 title="Notificar Cliente (WhatsApp)"
-                                                onClick={() => handleWhatsApp(order)}
+                                                onClick={() => handleWhatsApp(task)}
                                                 style={{ color: '#25D366' }}
                                             >
                                                 <MessageCircle size={16} />
@@ -440,9 +516,9 @@ export function Production() {
                                             {isLastCol ? (
                                                 <button 
                                                     className="btn btn-xs flex items-center justify-center gap-1 text-white ml-auto" 
-                                                    onClick={() => handleMoveRequest(order, 'complete_order')}
+                                                    onClick={() => handleMoveRequest(task, 'complete_order')}
                                                     style={{ backgroundColor: 'var(--success)', borderColor: 'var(--success)', padding: '4px 8px' }}
-                                                    title="Finalizar Pedido"
+                                                    title={task._isItem ? "Finalizar Item" : "Finalizar Pedido"}
                                                 >
                                                     Concluir <CheckCheck size={12} />
                                                 </button>
