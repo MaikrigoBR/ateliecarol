@@ -386,7 +386,7 @@ export function FinanceFinal() {
     const handleSaveTrans = async (e) => {
         e.preventDefault();
         const amount = Number(newTrans.amount);
-        const account = accounts.find(a => a.id === newTrans.accountId);
+        const account = accounts.find(a => String(a.id) === String(newTrans.accountId));
         const isCredit = account?.type === 'credit';
         // Se estiver editando, mantemos como está. O parcelamento entra na criação.
         const installments = editTransId ? 1 : (Number(newTrans.installments) || 1);
@@ -915,7 +915,7 @@ export function FinanceFinal() {
                                         {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>
                                 </div>
-                                {accounts.find(a => a.id === newTrans.accountId)?.type === 'credit' && newTrans.type === 'expense' && !editTransId && (
+                                {accounts.find(a => String(a.id) === String(newTrans.accountId))?.type === 'credit' && newTrans.type === 'expense' && !editTransId && (
                                     <div className="input-group">
                                         <label className="form-label">Parcelas no Cartão</label>
                                         <select className="form-input w-full" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})}>
