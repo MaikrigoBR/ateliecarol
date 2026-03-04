@@ -53,9 +53,6 @@ export function OrderTracking() {
     );
   }
 
-  // Determine active steps based on Kanban step or generic status
-  const currentStep = order.productionStep || 'Novo';
-  
   const steps = [
     { id: 'Novo', icon: <Clock size={24} />, label: 'Na Fila', desc: 'Aguardando início' },
     { id: 'pending', icon: <Palette size={24} />, label: 'Arte & Design', desc: 'Em diagramação ou análise' },
@@ -63,12 +60,32 @@ export function OrderTracking() {
     { id: 'completed', icon: <Award size={24} />, label: 'Pronto!', desc: 'Finalizado com amor' }
   ];
 
-  // Logic to calculate progress
-  let activeIndex = 0;
-  if (order.status === 'Novo') activeIndex = 0;
-  if (currentStep === 'pending' || currentStep === 'design' || order.status === 'processing') activeIndex = 1;
-  if (currentStep === 'printing' || currentStep === 'finishing' || currentStep === 'cutting') activeIndex = 2;
-  if (currentStep === 'completed' || order.status === 'Concluído') activeIndex = 3;
+  const getActiveIndex = (currentStep, itemStatus) => {
+      let index = 0;
+      if (itemStatus === 'Novo') index = 0;
+      if (currentStep === 'pending' || currentStep === 'design' || itemStatus === 'processing') index = 1;
+      if (currentStep === 'printing' || currentStep === 'finishing' || currentStep === 'cutting') index = 2;
+      if (currentStep === 'completed' || itemStatus === 'Concluído' || itemStatus === 'Pronto para Retirada') index = 3;
+      return index;
+  };
+
+  const itemsToTrack = (order.cartItems && order.cartItems.length > 0) 
+      ? order.cartItems.map((item, idx) => ({
+          id: idx,
+          name: item.name || 'Produto Base',
+          quantity: item.quantity || 1,
+          productionStep: item.productionStep || order.productionStep || 'Novo',
+          status: item.productionStep === 'completed' ? 'Concluído' : order.status
+      }))
+      : [{
+          id: 0,
+          name: order.productName || 'Itens do Pedido',
+          quantity: order.items || 1,
+          productionStep: order.productionStep || 'Novo',
+          status: order.status
+      }];
+
+  const isAllCompleted = itemsToTrack.every(i => getActiveIndex(i.productionStep, i.status) === 3);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fdfcfe', display: 'flex', justifyContent: 'center', padding: '40px 20px', fontFamily: 'var(--font-primary)' }}>
@@ -90,59 +107,73 @@ export function OrderTracking() {
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px dashed #e2e8f0' }}>
              <div>
-                <p style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>Pedido #{order.id}</p>
+                <p style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>Pedido #{order.id?.toString().substring(0,8)}</p>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#334155', marginTop: '4px' }}>
-                    Olá, {order.customer.split(' ')[0]}!
+                    Olá, {order.customer?.split(' ')[0]}!
                 </h2>
              </div>
              <div style={{ backgroundColor: '#f0fdf4', padding: '8px 12px', borderRadius: '8px', color: '#16a34a', fontWeight: 600, fontSize: '0.85rem' }}>
-                {activeIndex === 3 ? 'Finalizado' : 'Tudo Certo'}
+                {isAllCompleted ? 'Finalizado' : 'Em Andamento'}
              </div>
           </div>
 
           <p style={{ color: '#475569', fontSize: '0.95rem', marginBottom: '30px', lineHeight: '1.6' }}>
-             Seu pedido contendo <strong>{order.items} iten(s)</strong> está passando pela nossa linha de produção carinhosa. Veja o status atualizado agora mesmo:
+             Seu pedido contendo <strong>{order.items} iten(s)</strong> está passando pela nossa linha de produção carinhosa. Veja o status de cada item abaixo:
           </p>
 
-          {/* Vertical Timeline */}
-          <div style={{ position: 'relative' }}>
-             {/* Background Line */}
-             <div style={{ position: 'absolute', left: '20px', top: '24px', bottom: '24px', width: '2px', backgroundColor: '#e2e8f0', zIndex: 0 }}></div>
-             
-             {/* Active Line Progress */}
-             <div style={{ 
-                 position: 'absolute', left: '20px', top: '24px', width: '2px', 
-                 backgroundColor: 'var(--primary)', zIndex: 1,
-                 height: `${(activeIndex / (steps.length - 1)) * 100}%`,
-                 transition: 'height 1s ease-in-out'
-             }}></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+              {itemsToTrack.map((item) => {
+                  const activeIndex = getActiveIndex(item.productionStep, item.status);
+                  
+                  return (
+                      <div key={item.id} style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#334155', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Package size={18} style={{ color: 'var(--primary)' }} /> {item.quantity}x {item.name}
+                          </h3>
+                          
+                          {/* Vertical Timeline */}
+                          <div style={{ position: 'relative' }}>
+                             {/* Background Line */}
+                             <div style={{ position: 'absolute', left: '20px', top: '24px', bottom: '24px', width: '2px', backgroundColor: '#e2e8f0', zIndex: 0 }}></div>
+                             
+                             {/* Active Line Progress */}
+                             <div style={{ 
+                                 position: 'absolute', left: '20px', top: '24px', width: '2px', 
+                                 backgroundColor: 'var(--primary)', zIndex: 1,
+                                 height: `${(activeIndex / (steps.length - 1)) * 100}%`,
+                                 transition: 'height 1s ease-in-out'
+                             }}></div>
 
-             {steps.map((step, index) => {
-                 const isCompleted = index <= activeIndex;
-                 const isActive = index === activeIndex;
-                 return (
-                     <div key={step.id} style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', marginBottom: index === steps.length - 1 ? '0' : '40px', position: 'relative', zIndex: 2 }}>
-                         <div style={{ 
-                             width: '42px', height: '42px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0,
-                             backgroundColor: isActive ? 'var(--primary)' : (isCompleted ? '#f1f5f9' : 'white'),
-                             color: isActive ? 'white' : (isCompleted ? 'var(--primary)' : '#cbd5e1'),
-                             border: `2px solid ${isCompleted ? 'var(--primary)' : '#e2e8f0'}`,
-                             transition: 'all 0.5s ease',
-                             boxShadow: isActive ? '0 0 0 4px rgba(99, 102, 241, 0.2)' : 'none'
-                         }}>
-                             {isCompleted && !isActive ? <CheckCircle size={20} /> : step.icon}
-                         </div>
-                         <div style={{ paddingTop: '8px' }}>
-                             <h3 style={{ fontSize: '1.05rem', fontWeight: isActive ? 700 : 600, color: isActive ? '#1e293b' : (isCompleted ? '#334155' : '#94a3b8') }}>
-                                 {step.label}
-                             </h3>
-                             <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
-                                 {step.desc}
-                             </p>
-                         </div>
-                     </div>
-                 );
-             })}
+                             {steps.map((step, index) => {
+                                 const isCompleted = index <= activeIndex;
+                                 const isActive = index === activeIndex;
+                                 return (
+                                     <div key={step.id} style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', marginBottom: index === steps.length - 1 ? '0' : '24px', position: 'relative', zIndex: 2 }}>
+                                         <div style={{ 
+                                             width: '42px', height: '42px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+                                             backgroundColor: isActive ? 'var(--primary)' : (isCompleted ? '#e0e7ff' : 'white'),
+                                             color: isActive ? 'white' : (isCompleted ? 'var(--primary)' : '#cbd5e1'),
+                                             border: `2px solid ${isCompleted ? 'var(--primary)' : '#e2e8f0'}`,
+                                             transition: 'all 0.5s ease',
+                                             boxShadow: isActive ? '0 0 0 4px rgba(99, 102, 241, 0.2)' : 'none'
+                                         }}>
+                                             {isCompleted && !isActive ? <CheckCircle size={20} /> : step.icon}
+                                         </div>
+                                         <div style={{ paddingTop: '8px' }}>
+                                             <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: isActive ? 700 : 600, color: isActive ? '#1e293b' : (isCompleted ? '#334155' : '#94a3b8') }}>
+                                                 {step.label}
+                                             </h4>
+                                             <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
+                                                 {step.desc}
+                                             </p>
+                                         </div>
+                                     </div>
+                                 );
+                             })}
+                          </div>
+                      </div>
+                  );
+              })}
           </div>
 
         </div>
