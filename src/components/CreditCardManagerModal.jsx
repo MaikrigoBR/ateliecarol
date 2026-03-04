@@ -114,9 +114,20 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
 
     if (!isOpen || !account) return null;
 
+    const currentDebt = useMemo(() => {
+        if (!account || !transactions) return 0;
+        let bal = Number(account.initialBalance || 0);
+        transactions.forEach(t => {
+            if (t.accountId === account.id && t.status === 'paid') {
+                const amt = Number(t.amount || 0);
+                if (t.type === 'income') bal += amt;
+                else bal -= amt;
+            }
+        });
+        return bal < 0 ? Math.abs(bal) : 0;
+    }, [account, transactions]);
+
     const limit = Number(account.limit || 0);
-    const balance = Number(account.balance || 0);
-    const currentDebt = balance < 0 ? Math.abs(balance) : 0;
     const availableLimit = Math.max(0, limit - currentDebt);
     const percentUsed = limit > 0 ? (currentDebt / limit) * 100 : 0;
 

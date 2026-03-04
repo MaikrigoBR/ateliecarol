@@ -248,7 +248,21 @@ export function CreditCards() {
         statusColor = '#8b5cf6';
     }
 
-    const used = selectedCard ? Math.abs(Number(selectedCard.balance || 0)) : 0;
+    // Calculate balances dynamically
+    const accBalances = useMemo(() => {
+        const balances = {};
+        allAccounts.forEach(a => balances[a.id] = Number(a.initialBalance || 0));
+        transactions.forEach(t => {
+            if (t.status === 'paid') {
+                const amt = Number(t.amount || 0);
+                if (t.type === 'income') balances[t.accountId] += amt;
+                else balances[t.accountId] -= amt;
+            }
+        });
+        return balances;
+    }, [allAccounts, transactions]);
+
+    const used = selectedCard ? (accBalances[selectedCard.id] < 0 ? Math.abs(accBalances[selectedCard.id]) : 0) : 0;
     const limit = selectedCard ? Number(selectedCard.limit || 0) : 0;
     const available = selectedCard ? Math.max(0, limit - used) : 0;
 
@@ -300,7 +314,8 @@ export function CreditCards() {
             <div className="dashboard-grid" style={{ marginBottom: '1.5rem' }}>
                 {accounts.map(card => {
                     const isActive = selectedCardId === card.id;
-                    const cardUsed = Math.abs(Number(card.balance || 0));
+                    const cardBal = accBalances[card.id] || 0;
+                    const cardUsed = cardBal < 0 ? Math.abs(cardBal) : 0;
                     const cardLimit = Number(card.limit || 0);
 
                     return (
@@ -623,7 +638,7 @@ export function CreditCards() {
                                 <select required style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} value={paymentAccId} onChange={e => setPaymentAccId(e.target.value)}>
                                     <option value="">Selecione uma conta...</option>
                                     {allAccounts.filter(a => a.type !== 'credit').map(a => (
-                                        <option key={a.id} value={a.id}>{a.name} (Saldo: R$ {Number(a.balance || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})})</option>
+                                        <option key={a.id} value={a.id}>{a.name} (Saldo: R$ {(accBalances[a.id] || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})})</option>
                                     ))}
                                 </select>
                             </div>
