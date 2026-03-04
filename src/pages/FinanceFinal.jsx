@@ -1140,18 +1140,18 @@ export function FinanceFinal() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="input-group">
-                                        <label className="form-label flex justify-between items-center w-full">
-                                            <span>Centro de Custo</span>
-                                            <button type="button" onClick={() => setIsCategoryModalOpen(true)} className="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition flex items-center gap-1" title="Gerenciar Categorias">
-                                                <Settings size={12} /> Editar
+                                        <label className="form-label">Centro de Custo</label>
+                                        <div className="flex gap-2">
+                                            <select required className="form-input flex-1" value={newTrans.category} onChange={e => setNewTrans({...newTrans, category: e.target.value})}>
+                                                <option value="">Selecione...</option>
+                                                {(newTrans.type === 'expense' ? expenseCategories : incomeCategories).map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                            <button type="button" onClick={() => setIsCategoryModalOpen(true)} className="btn btn-secondary border-gray-200 p-2 shrink-0 bg-gray-50 flex items-center justify-center" style={{ width: '42px', height: '42px' }} title="Gerenciar Categorias">
+                                                <Settings size={18} className="text-gray-500" />
                                             </button>
-                                        </label>
-                                        <select required className="form-input w-full" value={newTrans.category} onChange={e => setNewTrans({...newTrans, category: e.target.value})}>
-                                            <option value="">Selecione...</option>
-                                            {(newTrans.type === 'expense' ? expenseCategories : incomeCategories).map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                        </select>
+                                        </div>
                                     </div>
                                     <div className="input-group">
                                         <label className="form-label">Conta/Cartão</label>
@@ -1161,47 +1161,71 @@ export function FinanceFinal() {
                                         </select>
                                     </div>
                                 </div>
-                                {accounts.find(a => String(a.id) === String(newTrans.accountId))?.type === 'credit' && newTrans.type === 'expense' && !editTransId && (
-                                    <div className="input-group">
-                                        <label className="form-label">Parcelas no Cartão</label>
-                                        <select className="form-input w-full" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})}>
-                                            {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                                                <option key={n} value={n}>{n === 1 ? '1x (À vista)' : `${n}x de (R$ ${(Number(newTrans.amount || 0)/n).toLocaleString('pt-BR', {minimumFractionDigits: 2})})`}</option>
-                                            ))}
-                                        </select>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                            Dica: Se houver acréscimos/juros na maquininha, digite o Valor <b>Total final</b> acima.
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="input-group">
-                                        <label className="form-label">Data</label>
-                                        <input type="date" required className="form-input w-full" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} />
-                                    </div>
-                                    <div className="input-group">
-                                        <label className="form-label">Situação</label>
-                                        <select required className="form-input w-full" value={newTrans.status} onChange={e => setNewTrans({...newTrans, status: e.target.value})}>
-                                            <option value="paid">{newTrans.type === 'income' ? 'Recebido' : 'Pago'}</option>
-                                            <option value="pending">{newTrans.type === 'income' ? 'A Receber' : 'A Pagar'}</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                {!editTransId && accounts.find(a => String(a.id) === String(newTrans.accountId))?.type !== 'credit' && (
-                                    <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 mt-4">
-                                        <label className="flex items-center gap-2 cursor-pointer mb-2">
-                                            <input type="checkbox" checked={newTrans.isRecurring} onChange={e => setNewTrans({...newTrans, isRecurring: e.target.checked})} className="rounded text-blue-500" />
-                                            <span className="text-sm font-bold text-gray-700">Comportamento Fixo / Recorrente</span>
-                                        </label>
-                                        {newTrans.isRecurring && (
-                                            <div className="pl-6 flex items-center gap-3">
-                                                <span className="text-sm text-gray-500">Repetir mensalmente por</span>
-                                                <input type="number" min="2" max="60" className="form-input w-24" value={newTrans.recurrenceMonths} onChange={e => setNewTrans({...newTrans, recurrenceMonths: e.target.value})} />
-                                                <span className="text-sm text-gray-500">meses</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                
+                                {(() => {
+                                    const isCredit = accounts.find(a => String(a.id) === String(newTrans.accountId))?.type === 'credit';
+                                    
+                                    return (
+                                        <>
+                                            {/* Se for Crédito e Despesa */}
+                                            {isCredit && newTrans.type === 'expense' && !editTransId && (
+                                                <div className="input-group p-4 bg-purple-50 rounded-xl border border-purple-100">
+                                                    <label className="form-label text-purple-900 flex items-center gap-2 mb-3">
+                                                        <CreditCard size={16} /> Condição de Pagamento (Cartão)
+                                                    </label>
+                                                    <select className="form-input w-full bg-white border-purple-200 focus:border-purple-500 focus:ring-purple-500" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})}>
+                                                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
+                                                            <option key={n} value={n}>{n === 1 ? '1x (À vista na próxima fatura)' : `${n}x de R$ ${(Number(newTrans.amount || 0)/n).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}</option>
+                                                        ))}
+                                                    </select>
+                                                    <div className="text-[11px] text-purple-600/70 mt-3 flex items-start gap-1">
+                                                        <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                                                        Dica: A data da transação será agrupada e cobrada diretamente nas faturas de acordo com o dia de fechamento deste cartão. Jogue o Valor Total da compra acima.
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Dados Genéricos de Data se não for crédito (ou se já estiver sendo editado) */}
+                                            {(!isCredit || editTransId || newTrans.type === 'income') && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="input-group">
+                                                        <label className="form-label flex items-center gap-1.5"><Calendar size={14} className="text-gray-400" /> Data de Competência</label>
+                                                        <input type="date" required className="form-input w-full" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} />
+                                                    </div>
+                                                    <div className="input-group">
+                                                        <label className="form-label">Situação</label>
+                                                        <select required className="form-input w-full" value={newTrans.status} onChange={e => setNewTrans({...newTrans, status: e.target.value})}>
+                                                            <option value="paid">{newTrans.type === 'income' ? 'Recebido (+)' : 'Pago (-)'}</option>
+                                                            <option value="pending">{newTrans.type === 'income' ? 'A Receber' : 'A Pagar / Agendado'}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Recorrência Conta Corrente */}
+                                            {!editTransId && !isCredit && (
+                                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-2 transition-all hover:border-blue-200">
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={newTrans.isRecurring} 
+                                                            onChange={e => setNewTrans({...newTrans, isRecurring: e.target.checked})} 
+                                                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" 
+                                                        />
+                                                        <span className="text-sm font-bold text-gray-700">Lançamento Controlado Automático</span>
+                                                    </label>
+                                                    {newTrans.isRecurring && (
+                                                        <div className="mt-3 pl-6 flex items-center gap-3 animate-fade-in">
+                                                            <span className="text-sm text-gray-500 font-medium">Repetir por</span>
+                                                            <input type="number" min="2" max="60" className="form-input w-20 text-center py-1.5" value={newTrans.recurrenceMonths} onChange={e => setNewTrans({...newTrans, recurrenceMonths: e.target.value})} />
+                                                            <span className="text-sm text-gray-500 font-medium">meses todo dia {newTrans.date.split('-')[2] || '01'}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                                 <div className="modal-footer" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                                     <button type="button" onClick={() => setIsTransModalOpen(false)} className="btn btn-secondary">Cancelar</button>
                                     <button type="submit" className="btn btn-primary">Salvar Lançamento</button>
