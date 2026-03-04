@@ -121,14 +121,14 @@ export function OrderTracking() {
              Seu pedido contendo <strong>{order.items} iten(s)</strong> está passando pela nossa linha de produção carinhosa. Veja o status de cada item abaixo:
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-              {itemsToTrack.map((item) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+              {itemsToTrack.map((item, idx) => {
                   const activeIndex = getActiveIndex(item.productionStep, item.status);
                   
                   return (
-                      <div key={item.id} style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#334155', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Package size={18} style={{ color: 'var(--primary)' }} /> {item.quantity}x {item.name}
+                      <div key={item.id} style={{ paddingTop: idx > 0 ? '40px' : '0', borderTop: idx > 0 ? '1px dashed #e2e8f0' : 'none' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#334155', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <Package size={20} style={{ color: 'var(--primary)' }} /> {item.quantity}x {item.name}
                           </h3>
                           
                           {/* Vertical Timeline */}
@@ -148,10 +148,10 @@ export function OrderTracking() {
                                  const isCompleted = index <= activeIndex;
                                  const isActive = index === activeIndex;
                                  return (
-                                     <div key={step.id} style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', marginBottom: index === steps.length - 1 ? '0' : '24px', position: 'relative', zIndex: 2 }}>
+                                     <div key={step.id} style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', marginBottom: index === steps.length - 1 ? '0' : '40px', position: 'relative', zIndex: 2 }}>
                                          <div style={{ 
                                              width: '42px', height: '42px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0,
-                                             backgroundColor: isActive ? 'var(--primary)' : (isCompleted ? '#e0e7ff' : 'white'),
+                                             backgroundColor: isActive ? 'var(--primary)' : (isCompleted ? '#f1f5f9' : 'white'),
                                              color: isActive ? 'white' : (isCompleted ? 'var(--primary)' : '#cbd5e1'),
                                              border: `2px solid ${isCompleted ? 'var(--primary)' : '#e2e8f0'}`,
                                              transition: 'all 0.5s ease',
@@ -160,7 +160,7 @@ export function OrderTracking() {
                                              {isCompleted && !isActive ? <CheckCircle size={20} /> : step.icon}
                                          </div>
                                          <div style={{ paddingTop: '8px' }}>
-                                             <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: isActive ? 700 : 600, color: isActive ? '#1e293b' : (isCompleted ? '#334155' : '#94a3b8') }}>
+                                             <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: isActive ? 700 : 600, color: isActive ? '#1e293b' : (isCompleted ? '#334155' : '#94a3b8') }}>
                                                  {step.label}
                                              </h4>
                                              <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
