@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, DollarSign, Package, TrendingUp, Users, Filter, Briefcase } from 'lucide-react';
 import db from '../services/database.js';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
@@ -184,13 +184,31 @@ export function Reports() {
               return String(cell);
           }));
 
-          autoTable(doc, {
-              head: [tableColumn],
-              body: safeTableRows,
-              startY: 40
-          });
+          // Use autoTable directly if doc.autoTable fails, mas em ambos usamos safeTableRows
+          if (typeof doc.autoTable === 'function') {
+              doc.autoTable({
+                  head: [tableColumn],
+                  body: safeTableRows,
+                  startY: 40
+              });
+          } else {
+              autoTable(doc, {
+                  head: [tableColumn],
+                  body: safeTableRows,
+                  startY: 40
+              });
+          }
           
-          doc.save(`relatorio_${activeTab}_export.pdf`);
+          const pdfBlob = doc.output('blob');
+          const finalUrl = URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = finalUrl;
+          link.download = `relatorio_${activeTab}_${Date.now()}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(finalUrl), 1000);
+          
       } catch (err) {
           console.error("Erro na exportação de PDF", err);
           alert("Ops! Ocorreu um erro ao gerar este PDF. Os dados podem estar inconsistentes. Detalhes: " + err.message);
