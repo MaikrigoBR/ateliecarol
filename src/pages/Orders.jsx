@@ -296,7 +296,7 @@ export function Orders() {
           <table className="table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th style={{ width: '80px' }}>ID</th>
                 <th>Cliente</th>
                 <th>Data Pedido</th>
                 <th>Prazo (Deadline)</th>
@@ -310,7 +310,11 @@ export function Orders() {
             <tbody>
               {filteredOrders.map(order => (
                 <tr key={order.id}>
-                  <td className="text-muted">#{order.id}</td>
+                  <td className="text-muted" title={order.id}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', backgroundColor: 'var(--surface-hover)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                          #{String(order.id).slice(-6).toUpperCase()}
+                      </span>
+                  </td>
                   <td style={{ fontWeight: 500 }}>{order.customer}</td>
                   <td className="text-muted">{order.date ? new Date(order.date).toLocaleDateString() : '--'}</td>
                   <td>
