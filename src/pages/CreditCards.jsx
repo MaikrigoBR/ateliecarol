@@ -9,6 +9,7 @@ import '../css/pages.css';
 export function CreditCards() {
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [allAccounts, setAllAccounts] = useState([]);
     const [selectedCardId, setSelectedCardId] = useState(null);
     const [selectedMonthOffset, setSelectedMonthOffset] = useState(0);
 
@@ -22,6 +23,7 @@ export function CreditCards() {
         const accs = await db.getAll('accounts');
         const trans = await db.getAll('transactions');
         const cards = accs.filter(a => a.type === 'credit');
+        setAllAccounts(accs);
         setAccounts(cards);
         setTransactions(trans);
         
@@ -453,8 +455,8 @@ export function CreditCards() {
                                 <PieChart>
                                     <Pie
                                         data={[
-                                            { name: 'Usado', value: used, fill: '#10b981' }, // Emerald 500
-                                            { name: 'Livre', value: available, fill: '#f3f4f6' } // Gray 100
+                                            { name: 'Usado', value: used, fill: '#ef4444' }, // Red for Used
+                                            { name: 'Livre', value: available, fill: '#e5e7eb' } // Gray for Available
                                         ]}
                                         cx="50%"
                                         cy="50%"
@@ -464,6 +466,7 @@ export function CreditCards() {
                                         endAngle={-270}
                                         dataKey="value"
                                         stroke="none"
+                                        paddingAngle={2}
                                         animationDuration={1500}
                                     />
                                     <Tooltip 
@@ -473,7 +476,7 @@ export function CreditCards() {
                                 </PieChart>
                             </ResponsiveContainer>
                             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                                <span style={{ fontSize: '0.70rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Limite Total</span>
+                                <span style={{ fontSize: '0.70rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{limit > 0 ? `${((used/limit)*100).toFixed(0)}% Usado` : 'Limite'}</span>
                                 <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
                                     R$ {limit.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                                 </span>
@@ -481,11 +484,11 @@ export function CreditCards() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '0.5rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }}></div>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }}></div>
                                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Usado: R$ {used.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb' }}></div>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#e5e7eb', border: '1px solid #d1d5db' }}></div>
                                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Livre: R$ {available.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                             </div>
                         </div>
@@ -619,7 +622,7 @@ export function CreditCards() {
                                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>De onde o dinheiro vai sair? <span style={{color: '#ef4444'}}>*</span></label>
                                 <select required style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} value={paymentAccId} onChange={e => setPaymentAccId(e.target.value)}>
                                     <option value="">Selecione uma conta...</option>
-                                    {accounts.filter(a => a.type !== 'credit').map(a => (
+                                    {allAccounts.filter(a => a.type !== 'credit').map(a => (
                                         <option key={a.id} value={a.id}>{a.name} (Saldo: R$ {Number(a.balance || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})})</option>
                                     ))}
                                 </select>
