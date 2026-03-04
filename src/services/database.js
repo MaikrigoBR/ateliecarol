@@ -37,7 +37,7 @@ export const database = {
              const docSnap = await getDoc(docRef);
              
              if (docSnap.exists()) {
-                 return { id: docSnap.id, ...docSnap.data() };
+                 return { ...docSnap.data(), id: docSnap.id };
              } else {
                  return null;
              }
@@ -65,7 +65,7 @@ export const database = {
                 createdAt: new Date().toISOString()
             });
             
-            return { id: docRef.id, ...data };
+            return { ...data, id: docRef.id };
         } catch (error) {
             console.error(`Error creating in ${collectionName}:`, error);
             alert("Erro ao salvar no banco de dados. Verifique sua conexão ou configuração.");

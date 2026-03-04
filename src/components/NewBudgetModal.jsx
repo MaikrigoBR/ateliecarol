@@ -98,7 +98,9 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
         status: 'Rascunho' // Starts as Draft
     };
 
-    await db.create('budgets', newBudget);
+    // Usamos db.set com o custom ID para amarrá-lo ao Firestore doc id
+    await db.set('budgets', newBudget.id, newBudget);
+    
     if (onBudgetCreated) onBudgetCreated();
     onClose();
   };

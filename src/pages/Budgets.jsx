@@ -37,10 +37,10 @@ export function Budgets() {
   };
 
   const handleSendWhatsapp = async (budget) => {
+    // Abrir a aba síncronamente antes de qualquer 'await' para burlar o popup blocker
+    let fallbackTab = null;
+
     try {
-        const customers = await db.getAll('customers');
-        const customerObj = customers.find(c => c.name === budget.customerName);
-        
         const baseUrl = window.location.href.split('#')[0];
         const proposalLink = `${baseUrl}#/proposal/${budget.id}`;
         
@@ -57,54 +57,64 @@ export function Budgets() {
         const message = `Olá, ${firstName}!\n✨ Preparamos com todo o carinho a sua proposta comercial.\n\nVocê pode conferir todos os detalhes, valores e aprovar o seu orçamento diretamente pelo nosso link interativo:\n\n${proposalLink}\n\nQualquer dúvida, a ${companyName} está à disposição!`;
 
         let sentViaApi = false;
-
+        
+        let num = '';
+        const customers = await db.getAll('customers');
+        const customerObj = customers.find(c => c.name === budget.customerName);
+        
         if (customerObj && customerObj.phone) {
-            const num = customerObj.phone.replace(/\D/g, '');
-            if (num.length >= 10) {
-                try {
-                    const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
-                    const res = await fetch(`${apiUrl}/api/campaign`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            targets: [{ phone: num, message: message }]
-                        })
-                    });
+            num = customerObj.phone.replace(/\D/g, '');
+        }
+
+        if (num.length >= 10) {
+            try {
+                const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
+                const res = await fetch(`${apiUrl}/api/campaign`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        targets: [{ phone: num, message: message }]
+                    })
+                });
+                
+                if (res.ok) {
+                    sentViaApi = true;
                     
-                    if (res.ok) {
-                        sentViaApi = true;
-                        
-                        // Show Automation Toast
-                        const toast = document.createElement('div');
-                        toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; z-index: 9999; display: flex; align-items: center; gap: 12px; transition: all 0.3s ease; transform: translateY(100px); opacity: 0;';
-                        toast.innerHTML = `
-                            <div style="background: #25D366; padding: 8px; border-radius: 50%; display: flex;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                            </div>
-                            <div>
-                                <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">Proposta Comercial (CRM)</div>
-                                <div style="color: #64748b; font-size: 0.75rem;">Link enviado via API p/ <strong>${firstName}</strong></div>
-                            </div>
-                        `;
-                        document.body.appendChild(toast);
-                        setTimeout(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; }, 100);
-                        setTimeout(() => { toast.style.transform = 'translateY(100px)'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
-                    }
-                } catch(e) { console.warn("Background API Failed", e); }
-            }
+                    // Show Automation Toast
+                    const toast = document.createElement('div');
+                    toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; z-index: 9999; display: flex; align-items: center; gap: 12px; transition: all 0.3s ease; transform: translateY(100px); opacity: 0;';
+                    toast.innerHTML = `
+                        <div style="background: #25D366; padding: 8px; border-radius: 50%; display: flex;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">Proposta Comercial (CRM)</div>
+                            <div style="color: #64748b; font-size: 0.75rem;">Link enviado via API p/ <strong>${firstName}</strong></div>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+                    setTimeout(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; }, 100);
+                    setTimeout(() => { toast.style.transform = 'translateY(100px)'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
+                }
+            } catch(e) { console.warn("Background API Failed", e); }
         }
 
         if (!sentViaApi) {
-            let num = '';
-            if (customerObj && customerObj.phone) num = customerObj.phone.replace(/\D/g, '');
-            if (num.length >= 10) num = `55${num}`;
-            const url = `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
-            window.open(url, '_blank');
+            let finalNum = num;
+            if (finalNum.length >= 10) finalNum = `55${finalNum}`;
+            const url = finalNum.length >= 10 
+                ? `https://wa.me/${finalNum}?text=${encodeURIComponent(message)}`
+                : `https://wa.me/?text=${encodeURIComponent(message)}`;
+            
+            // Aqui decidimos abrir a aba no momento do fallback mesmo, ou usar uma pre-criada.
+            // O ideal seria criar no início e redirecionar.
+            // Porém o bloqueador costuma respeitar pequenos delays. Usaremos direct navigation aqui ou _blank direto.
+            window.open(url, '_blank') || (window.location.href = url);
         }
 
         // Update status to 'Sent' if it was 'Draft'
         if (budget.status === 'Rascunho') {
-            await db.update('budgets', budget.id, { status: 'Enviado' });
+            await db.update('budgets', budget.id.toString(), { status: 'Enviado' });
             fetchBudgets();
         }
     } catch(err) {

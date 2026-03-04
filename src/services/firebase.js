@@ -39,7 +39,7 @@ export { db, auth };
 // Helper to convert Firestore snapshot to array
 export const snapshotToArray = (snapshot) => {
     return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+        ...doc.data(),
+        id: doc.id
     }));
 };
