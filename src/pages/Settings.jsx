@@ -555,6 +555,7 @@ function SystemSettings() {
             setConfig({
                 companyName: 'Estúdio Criativo',
                 whatsapp: '',
+                instagram: '',
                 document: '',
                 currency: 'BRL',
                 theme: 'light'
@@ -729,6 +730,16 @@ function SystemSettings() {
                                 onChange={e => setConfig({...config, whatsapp: e.target.value})}
                                 placeholder="Ex: DD 90000-0000"
                             />
+                        </div>
+                        <div className="input-group">
+                            <label className="form-label">Perfil do Instagram (Opcional)</label>
+                            <input 
+                                className="form-input" 
+                                value={config.instagram || ''}
+                                onChange={e => setConfig({...config, instagram: e.target.value})}
+                                placeholder="Ex: ateliecarol"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Preencha sem o "@". Isso ativará banners na proposta e rastreamento!</p>
                         </div>
                         <div className="input-group">
                             <label className="form-label">Logo da Empresa (PNG Sem Fundo Recomedado)</label>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { FileText, CheckCircle, Package, ExternalLink, MessageCircle, Calendar, X, PlayCircle, Image as ImageIcon } from 'lucide-react';
+import { FileText, CheckCircle, Package, ExternalLink, MessageCircle, Calendar, X, PlayCircle, Image as ImageIcon, Instagram } from 'lucide-react';
 import db from '../services/database.js';
 
 export function ProposalView() {
@@ -8,7 +8,7 @@ export function ProposalView() {
   const [budget, setBudget] = parseInt ? useState(null) : useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [companyConfig, setCompanyConfig] = useState({ companyName: 'Estúdio Criativo', logoBase64: null, whatsapp: '' });
+  const [companyConfig, setCompanyConfig] = useState({ companyName: 'Estúdio Criativo', logoBase64: null, whatsapp: '', instagram: '' });
   
   // Product Modal State
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -299,6 +299,28 @@ export function ProposalView() {
                  <ExternalLink size={18} /> Tenho Dúvidas / Alterar
              </button>
           </div>
+          
+          {companyConfig.instagram && (
+              <div 
+                  onClick={() => window.open(`https://instagram.com/${companyConfig.instagram.replace('@', '')}`, '_blank')}
+                  style={{ 
+                      marginTop: '30px', padding: '20px', borderRadius: '12px', background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)', 
+                      color: 'white', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(220, 39, 67, 0.2)', transition: 'transform 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+              >
+                  <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '12px', borderRadius: '50%', display: 'flex' }}>
+                      <Instagram size={28} />
+                  </div>
+                  <div>
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Acompanhe nossa Mágica!</h4>
+                      <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.9, marginTop: '2px', lineHeight: '1.3' }}>
+                          Siga <strong>@{companyConfig.instagram.replace('@', '')}</strong>, poste um story dessa proposta marcando a gente e ganhe um brinde surpresa no seu pedido!
+                      </p>
+                  </div>
+              </div>
+          )}
 
         </div>
 
