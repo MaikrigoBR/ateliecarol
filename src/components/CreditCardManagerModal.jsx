@@ -162,70 +162,95 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
     return (
         <div className="modal-overlay" style={{ zIndex: 1050 }}>
             <div className="modal-content" style={{ maxWidth: '700px', width: '100%', padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-                {/* Header Dinâmico com Gráfico */}
-                <div style={{ background: 'var(--primary)', color: 'white', padding: '1.5rem', position: 'relative' }}>
+                {/* Header Dinâmico com Gráfico (Visual Cartão de Crédito) */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-indigo-700 via-purple-700 to-fuchsia-700 text-white p-6 sm:p-8" style={{ borderBottomLeftRadius: '24px', borderBottomRightRadius: '24px', boxShadow: '0 10px 30px -10px rgba(124, 58, 237, 0.5)' }}>
+                    
+                    {/* Elementos Decorativos de Background */}
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-5 blur-3xl mix-blend-overlay"></div>
+                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-fuchsia-400 opacity-20 blur-2xl mix-blend-screen"></div>
+
                     <div className="flex justify-between items-start relative z-10">
                         <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1 cursor-default">
-                                <CreditCard size={20} className="opacity-80" />
-                                <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>{account.name}</h2>
+                            <div className="flex items-center gap-2 mb-2 cursor-default opacity-90">
+                                <CreditCard size={22} className="drop-shadow-sm" />
+                                <h2 className="text-xl font-bold tracking-tight drop-shadow-sm m-0">{account.name}</h2>
                             </div>
                             
-                            <div className="mt-4 flex gap-6">
+                            <div className="mt-6 flex gap-8">
                                 <div>
-                                    <p className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-0.5">Limite Total</p>
-                                    <p className="font-medium text-[1.05rem]">R$ {limit.toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
+                                    <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.15em] mb-1">Limite Total</p>
+                                    <p className="font-semibold text-lg drop-shadow-sm">R$ {limit.toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
                                 </div>
                                 <div>
-                                    <p className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-0.5">Disponível</p>
-                                    <p className="font-bold text-[1.1rem] text-emerald-300">R$ {availableLimit.toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
+                                    <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.15em] mb-1">Limite Disponível</p>
+                                    <p className="font-black text-xl text-emerald-300 drop-shadow-md">R$ {availableLimit.toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Donut Chart de Comprometimento */}
-                        <div style={{ width: '80px', height: '80px', position: 'relative', marginTop: '-5px' }} className="shrink-0 drop-shadow-md">
+                        <div style={{ width: '90px', height: '90px', position: 'relative' }} className="shrink-0 drop-shadow-xl">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
                                         data={donutData}
-                                        innerRadius={26}
-                                        outerRadius={38}
+                                        innerRadius={30}
+                                        outerRadius={42}
                                         startAngle={90}
                                         endAngle={-270}
                                         dataKey="value"
                                         stroke="transparent"
-                                        paddingAngle={2}
+                                        paddingAngle={3}
                                     >
                                         {donutData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                            <Cell key={`cell-${index}`} fill={entry.color} style={{ filter: `drop-shadow(0 2px 4px rgba(0,0,0,0.2))` }} />
                                         ))}
                                     </Pie>
                                 </PieChart>
                             </ResponsiveContainer>
                             <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                                <span className="text-[11px] font-black" style={{ color: donutData[0].color === 'rgba(255,255,255,0.2)' ? 'white' : donutData[0].color, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                                <span className="text-xs font-black tracking-tighter" style={{ color: donutData[0].color === 'rgba(255,255,255,0.2)' ? 'white' : donutData[0].color, textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
                                     {percentUsed.toFixed(0)}%
                                 </span>
                             </div>
                         </div>
 
-                        <button onClick={onClose} className="absolute right-0 top-0 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-white border-0 z-20">
+                        <button onClick={onClose} className="absolute -right-2 -top-2 p-2 bg-black/10 hover:bg-black/20 rounded-full transition-colors text-white border-0 z-20 backdrop-blur-md">
                             <X size={20} />
                         </button>
                     </div>
 
-                    {/* Carrossel de Meses */}
-                    <div className="flex items-center justify-between mt-6 bg-white/10 rounded-xl p-2 backdrop-blur-sm relative z-10">
-                        <button onClick={handlePrevMonth} className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white border-0">
-                            <ChevronLeft size={20} />
-                        </button>
-                        <div className="flex-1 text-center font-bold tracking-wide">
-                            {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+                    {/* Carrossel de Meses (Time Travel) */}
+                    <div className="mt-8 relative z-10">
+                        <div className="flex items-center justify-between bg-white/10 rounded-2xl p-2 backdrop-blur-md border border-white/20 shadow-inner">
+                            <button onClick={handlePrevMonth} className="p-2.5 hover:bg-white/20 rounded-xl transition-all text-white border-0 flex items-center gap-1 group">
+                                <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                            </button>
+                            
+                            <div className="flex-1 flex flex-col items-center justify-center animate-fade-in" key={selectedDate.getTime()}>
+                                <span className="text-[10px] uppercase font-black tracking-[0.2em] text-white/50 mb-0.5" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>
+                                    {statusText}
+                                </span>
+                                <div className="text-xl font-bold tracking-wide text-white flex items-center gap-2 drop-shadow-md cursor-default">
+                                    {monthNames[selectedDate.getMonth()]} <span className="text-white/70 font-light">{selectedDate.getFullYear()}</span>
+                                </div>
+                            </div>
+                            
+                            <button onClick={handleNextMonth} className="p-2.5 hover:bg-white/20 rounded-xl transition-all text-white border-0 flex items-center gap-1 group">
+                                <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                            </button>
                         </div>
-                        <button onClick={handleNextMonth} className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white border-0">
-                            <ChevronRight size={20} />
-                        </button>
+                        
+                        {/* Mini-timeline decorators */}
+                        <div className="flex justify-center gap-1.5 mt-4">
+                            {[-2, -1, 0, 1, 2].map(offset => {
+                                const d = new Date(selectedDate);
+                                d.setMonth(d.getMonth() + offset);
+                                return (
+                                    <div key={offset} className={`h-1.5 rounded-full transition-all duration-300 ease-out ${offset === 0 ? 'w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'w-2 bg-white/20'}`} title={`${monthNames[d.getMonth()]}`} />
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
@@ -254,21 +279,27 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
                     ) : (
                         <div className="space-y-3">
                             {currentInvoice.transactions.map(t => (
-                                <div key={t.id} className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                                <div key={t.id} className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] hover:shadow-md transition-all group">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center shrink-0">
-                                            <TrendingDown size={18} />
+                                        <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:bg-indigo-100 transition-all">
+                                            {t.installmentsTotal > 1 ? <Calendar size={18} /> : <TrendingDown size={18} />}
                                         </div>
                                         <div>
                                             <p className="font-bold text-sm text-gray-800 dark:text-gray-200">
-                                                {t.description} 
-                                                {t.installmentsTotal > 1 && <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500">Parc {t.installmentNumber}/{t.installmentsTotal}</span>}
+                                                {t.description.replace(/\(\d+\/\d+\)/, '').trim()} 
                                             </p>
-                                            <p className="text-xs text-gray-400 mt-1">{new Date(t.date).toLocaleDateString()}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <p className="text-[11px] text-gray-400 font-medium">{new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace(' de', '')}</p>
+                                                {t.installmentsTotal > 1 && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                                        Parc {t.installmentNumber}/{t.installmentsTotal}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="font-bold text-sm text-red-600">
+                                        <p className="font-bold text-[15px] text-gray-700">
                                             R$ {Number(t.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                                         </p>
                                     </div>
