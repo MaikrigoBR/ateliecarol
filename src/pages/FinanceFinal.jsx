@@ -254,7 +254,7 @@ export function FinanceFinal() {
     const [editAccId, setEditAccId] = useState(null);
     const [editTransId, setEditTransId] = useState(null);
     const [newAccount, setNewAccount] = useState({ name: '', type: 'checking', balance: 0, limit: 0, dueDay: 10, color: '#3b82f6' });
-    const [newTrans, setNewTrans] = useState({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1 });
+    const [newTrans, setNewTrans] = useState({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
     const [selectedCreditCard, setSelectedCreditCard] = useState(null);
 
 
@@ -379,7 +379,9 @@ export function FinanceFinal() {
              accountId: t.accountId,
              date: t.date || new Date().toISOString().split('T')[0],
              status: t.status || 'paid',
-             installments: t.installments || 1
+             installments: t.installments || 1,
+             isRecurring: false,
+             recurrenceMonths: 12
         });
         setEditTransId(t.id);
         setIsTransModalOpen(true);
@@ -427,21 +429,50 @@ export function FinanceFinal() {
                 }
                 await Promise.all(promises);
             } else {
-                payload.createdAt = new Date().toISOString();
-                await db.create('transactions', payload);
+                if (newTrans.isRecurring && newTrans.recurrenceMonths > 1) {
+                    const promises = [];
+                    const parentId = `rec_${Date.now()}`;
+                    const [y, m, d] = payload.date.split('-');
+                    
+                    for(let i = 0; i < newTrans.recurrenceMonths; i++) {
+                        const targetDate = new Date(Number(y), Number(m) - 1 + i, Number(d));
+                        const isoDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}`;
+                        
+                        const transPayload = {
+                            ...payload,
+                            date: isoDate,
+                            createdAt: new Date().toISOString(),
+                            status: i === 0 ? payload.status : 'pending',
+                            parentId: parentId,
+                            description: `${payload.description} (${i+1}/${newTrans.recurrenceMonths})`
+                        };
+                        promises.push(db.create('transactions', transPayload));
+                    }
+                    await Promise.all(promises);
+                } else {
+                    payload.createdAt = new Date().toISOString();
+                    await db.create('transactions', payload);
+                }
             }
         }
 
         // We don't need manual balance updates anymore, fetchData recalculates it cleanly!
         setIsTransModalOpen(false);
         setEditTransId(null);
-        setNewTrans({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1 });
+        setNewTrans({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
         fetchData();
     };
 
     const handleDeleteTrans = async (id) => {
         if(confirm('Tem certeza que deseja excluir esse lançamento? O saldo das contas será atualizado.')) {
             await db.delete('transactions', id);
+            fetchData();
+        }
+    };
+
+    const handleConfirmPayment = async (t) => {
+        if(confirm(`Confirmar que o valor de R$ ${Number(t.amount).toLocaleString('pt-BR', {minimumFractionDigits:2})} foi efetivamente ${t.type === 'income' ? 'creditado' : 'debitado'}?`)) {
+            await db.update('transactions', t.id, { ...t, status: 'paid' });
             fetchData();
         }
     };
@@ -502,7 +533,7 @@ export function FinanceFinal() {
                     <button 
                         onClick={() => {
                             setEditTransId(null);
-                            setNewTrans({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1 });
+                            setNewTrans({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
                             setIsTransModalOpen(true);
                         }}
                         className="btn btn-primary btn-sm flex items-center gap-2"
@@ -816,6 +847,11 @@ export function FinanceFinal() {
                                         </td>
                                         <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                {t.status !== 'paid' && (
+                                                    <button onClick={() => handleConfirmPayment(t)} className="text-orange-400 hover:text-emerald-500 transition-colors" title="Dar Baixa (Confirmar Pgt/Recto)">
+                                                        <CheckCircle size={16} />
+                                                    </button>
+                                                )}
                                                 <button onClick={() => openEditTrans(t)} className="text-gray-300 hover:text-blue-500 transition-colors" title="Editar Lançamento">
                                                     <Edit2 size={16} />
                                                 </button>
@@ -953,6 +989,21 @@ export function FinanceFinal() {
                                         </select>
                                     </div>
                                 </div>
+                                {!editTransId && accounts.find(a => String(a.id) === String(newTrans.accountId))?.type !== 'credit' && (
+                                    <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 mt-4">
+                                        <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                            <input type="checkbox" checked={newTrans.isRecurring} onChange={e => setNewTrans({...newTrans, isRecurring: e.target.checked})} className="rounded text-blue-500" />
+                                            <span className="text-sm font-bold text-gray-700">Comportamento Fixo / Recorrente</span>
+                                        </label>
+                                        {newTrans.isRecurring && (
+                                            <div className="pl-6 flex items-center gap-3">
+                                                <span className="text-sm text-gray-500">Repetir mensalmente por</span>
+                                                <input type="number" min="2" max="60" className="form-input w-24" value={newTrans.recurrenceMonths} onChange={e => setNewTrans({...newTrans, recurrenceMonths: e.target.value})} />
+                                                <span className="text-sm text-gray-500">meses</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="modal-footer" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                                     <button type="button" onClick={() => setIsTransModalOpen(false)} className="btn btn-secondary">Cancelar</button>
                                     <button type="submit" className="btn btn-primary">Salvar Lançamento</button>
