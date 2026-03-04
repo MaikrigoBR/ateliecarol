@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     CreditCard, Wallet, TrendingUp, TrendingDown, Plus, 
     Calendar, DollarSign, Filter, MoreHorizontal, CheckCircle, AlertCircle, Trash2, BarChart2, Edit2,
-    ShoppingBag, Truck, Briefcase, Tag, Zap, Coffee, ArrowUpRight, ArrowDownLeft, Landmark, LayoutGrid, ArrowRight, X
+    ShoppingBag, Truck, Briefcase, Tag, Zap, Coffee, ArrowUpRight, ArrowDownLeft, Landmark, LayoutGrid, ArrowRight, X, Settings
 } from 'lucide-react';
 import db from '../services/database';
 import { useAuth } from '../contexts/AuthContext';
@@ -264,6 +264,18 @@ export function FinanceFinal() {
     const [chartData, setChartData] = useState([]);
     const [costCenterData, setCostCenterData] = useState([]);
     
+    // Dynamic Categories State
+    const [expenseCategories, setExpenseCategories] = useState(EXPENSE_CATEGORIES);
+    const [incomeCategories, setIncomeCategories] = useState(INCOME_CATEGORIES);
+    const [categoryColors, setCategoryColors] = useState(CATEGORY_COLORS);
+    
+    // Manage Categories Modal State
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryType, setNewCategoryType] = useState('expense');
+    const [newCategoryColor, setNewCategoryColor] = useState('#6366f1');
+    const [rawCategories, setRawCategories] = useState([]);
+    
     // Global Dash Filter
     const [globalAccFilter, setGlobalAccFilter] = useState('');
     
@@ -332,7 +344,7 @@ export function FinanceFinal() {
             const costCenterFormat = Object.keys(expenseMap).map(k => ({
                 name: k,
                 value: expenseMap[k],
-                color: CATEGORY_COLORS[k] || '#9ca3af'
+                color: categoryColors[k] || '#9ca3af'
             })).sort((a,b) => b.value - a.value);
 
             setStats({
@@ -351,6 +363,31 @@ export function FinanceFinal() {
         const originalAccs = await db.getAll('accounts') || [];
         const trans = await db.getAll('transactions') || [];
         const allOrders = await db.getAll('orders') || [];
+        
+        // Fetch Categories
+        let dbCategories = await db.getAll('categories') || [];
+        if (dbCategories.length === 0) {
+            // Seed defaults
+            const promises = [];
+            for (const cat of EXPENSE_CATEGORIES) {
+                promises.push(db.create('categories', { name: cat, type: 'expense', color: CATEGORY_COLORS[cat] || '#9ca3af' }));
+            }
+            for (const cat of INCOME_CATEGORIES) {
+                promises.push(db.create('categories', { name: cat, type: 'income', color: CATEGORY_COLORS[cat] || '#10b981' }));
+            }
+            await Promise.all(promises);
+            dbCategories = await db.getAll('categories') || [];
+        }
+
+        const expenses = dbCategories.filter(c => c.type === 'expense').map(c => c.name);
+        const incomes = dbCategories.filter(c => c.type === 'income').map(c => c.name);
+        const colors = {};
+        dbCategories.forEach(c => { colors[c.name] = c.color; });
+
+        setExpenseCategories(expenses.length > 0 ? expenses : EXPENSE_CATEGORIES);
+        setIncomeCategories(incomes.length > 0 ? incomes : INCOME_CATEGORIES);
+        setCategoryColors(Object.keys(colors).length > 0 ? colors : CATEGORY_COLORS);
+        setRawCategories(dbCategories);
         
         // Filter active orders for projection
         const pendingOrders = allOrders.filter(o => o.status !== 'completed' && o.status !== 'Concluído' && o.status !== 'cancelled');
@@ -376,6 +413,34 @@ export function FinanceFinal() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    const handleCreateCategory = async (e) => {
+        e.preventDefault();
+        if (!newCategoryName.trim()) return;
+        
+        await db.create('categories', { 
+            name: newCategoryName.trim(), 
+            type: newCategoryType, 
+            color: newCategoryColor 
+        });
+        
+        setNewCategoryName('');
+        fetchData();
+    };
+
+    const handleDeleteCategory = async (id, name) => {
+        // Warning if transactions are using this category
+        const isUsed = transactions.some(t => t.category === name);
+        if (isUsed) {
+            alert('Esta categoria já está sendo usada em lançamentos. Para excluí-la, altere a categoria desses lançamentos primeiro.');
+            return;
+        }
+
+        if(confirm('Tem certeza que deseja excluir esta categoria?')) {
+            await db.delete('categories', id);
+            fetchData();
+        }
+    };
 
     // ... Handlers (Create/Delete/Edit) ...
     const openEditAccount = (acc) => {
@@ -933,8 +998,8 @@ export function FinanceFinal() {
                                         </td>
                                         <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                                             <span style={{ 
-                                                backgroundColor: CATEGORY_COLORS[t.category] ? `${CATEGORY_COLORS[t.category]}15` : '#f3f4f6', 
-                                                color: CATEGORY_COLORS[t.category] || '#4b5563',
+                                                backgroundColor: categoryColors[t.category] ? `${categoryColors[t.category]}15` : '#f3f4f6', 
+                                                color: categoryColors[t.category] || '#4b5563',
                                                 padding: '2px 8px',
                                                 borderRadius: '999px',
                                                 fontSize: '0.7rem',
@@ -1071,10 +1136,15 @@ export function FinanceFinal() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="input-group">
-                                        <label className="form-label">Centro de Custo</label>
+                                        <label className="form-label flex justify-between items-center w-full">
+                                            <span>Centro de Custo</span>
+                                            <button type="button" onClick={() => setIsCategoryModalOpen(true)} className="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition flex items-center gap-1" title="Gerenciar Categorias">
+                                                <Settings size={12} /> Editar
+                                            </button>
+                                        </label>
                                         <select required className="form-input w-full" value={newTrans.category} onChange={e => setNewTrans({...newTrans, category: e.target.value})}>
                                             <option value="">Selecione...</option>
-                                            {(newTrans.type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map(cat => (
+                                            {(newTrans.type === 'expense' ? expenseCategories : incomeCategories).map(cat => (
                                                 <option key={cat} value={cat}>{cat}</option>
                                             ))}
                                         </select>
@@ -1133,6 +1203,76 @@ export function FinanceFinal() {
                                     <button type="submit" className="btn btn-primary">Salvar Lançamento</button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isCategoryModalOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1100 }}>
+                    <div className="modal-content" style={{ maxWidth: '500px', width: '100%' }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Gerenciar Centros de Custo</h2>
+                            <button type="button" className="btn btn-icon" onClick={() => setIsCategoryModalOpen(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <form onSubmit={handleCreateCategory} className="flex gap-2 items-end mb-6">
+                                <div className="flex-1">
+                                    <label className="form-label text-xs mb-1">Nome da Categoria</label>
+                                    <input type="text" required className="form-input w-full" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Ex: Material Gráfico..." />
+                                </div>
+                                <div className="w-28">
+                                    <label className="form-label text-xs mb-1">Tipo</label>
+                                    <select className="form-input w-full" value={newCategoryType} onChange={e => setNewCategoryType(e.target.value)}>
+                                        <option value="expense">Despesa</option>
+                                        <option value="income">Receita</option>
+                                    </select>
+                                </div>
+                                <div className="w-12">
+                                    <label className="form-label text-xs mb-1">Cor</label>
+                                    <input type="color" className="w-full h-[38px] p-0 border-0 rounded cursor-pointer" value={newCategoryColor} onChange={e => setNewCategoryColor(e.target.value)} />
+                                </div>
+                                <button type="submit" className="btn btn-primary h-[38px] flex items-center justify-center px-4" title="Adicionar Categoria">
+                                    <Plus size={16} />
+                                </button>
+                            </form>
+
+                            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Despesas (-)</h4>
+                                    <div className="flex flex-col gap-2">
+                                        {rawCategories.filter(c => c.type === 'expense').map(c => (
+                                            <div key={c.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-100 hover:bg-gray-100 transition">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></div>
+                                                    <span className="text-sm font-medium text-gray-700">{c.name}</span>
+                                                </div>
+                                                <button onClick={() => handleDeleteCategory(c.id, c.name)} className="text-gray-400 hover:text-red-500 p-1 transition" title={`Excluir ${c.name}`}>
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Receitas (+)</h4>
+                                    <div className="flex flex-col gap-2">
+                                        {rawCategories.filter(c => c.type === 'income').map(c => (
+                                            <div key={c.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-100 hover:bg-gray-100 transition">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></div>
+                                                    <span className="text-sm font-medium text-gray-700">{c.name}</span>
+                                                </div>
+                                                <button onClick={() => handleDeleteCategory(c.id, c.name)} className="text-gray-400 hover:text-red-500 p-1 transition" title={`Excluir ${c.name}`}>
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
