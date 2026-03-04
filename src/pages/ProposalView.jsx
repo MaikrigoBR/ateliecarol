@@ -285,21 +285,43 @@ export function ProposalView() {
               </div>
           </div>
 
-          {/* CTA Buttons */}
-          <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
-             <button 
-                 onClick={() => handleWhatsAppAction('Gostaria de *APROVAR* esta proposta! Vamos seguir com o pedido?')}
-                 style={{ width: '100%', padding: '16px', borderRadius: '10px', border: 'none', backgroundColor: '#25D366', color: 'white', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(37, 211, 102, 0.2)' }}
-             >
-                 <MessageCircle size={20} /> Aprovar pelo WhatsApp
-             </button>
-             <button 
-                 onClick={() => handleWhatsAppAction('Tenho algumas dúvidas sobre a proposta. Podemos conversar?')}
-                 style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', backgroundColor: 'transparent', color: '#64748b', fontSize: '0.95rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
-             >
-                 <ExternalLink size={18} /> Tenho Dúvidas / Alterar
-             </button>
-          </div>
+          {/* Status Message OR CTA Buttons */}
+          {budget.status === 'Aprovado' ? (
+              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
+                  <div style={{ width: '48px', height: '48px', backgroundColor: '#dcfce7', color: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                      <CheckCircle size={28} />
+                  </div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#166534', marginBottom: '8px' }}>Proposta Aprovada!</h3>
+                  <p style={{ color: '#15803d', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                      Que alegria! Esta proposta já foi validada e seu pedido está em andamento. Acompanhe as novidades pelo contato do nosso ateliê.
+                  </p>
+              </div>
+          ) : budget.status === 'Rejeitado' ? (
+              <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
+                  <div style={{ width: '48px', height: '48px', backgroundColor: '#fee2e2', color: '#ef4444', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                      <X size={28} />
+                  </div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#991b1b', marginBottom: '8px' }}>Proposta Cancelada</h3>
+                  <p style={{ color: '#b91c1c', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                      Esta proposta não é mais válida. Caso precise de um novo orçamento, entre em contato conosco.
+                  </p>
+              </div>
+          ) : (
+              <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+                 <button 
+                     onClick={() => handleWhatsAppAction('Gostaria de *APROVAR* esta proposta! Vamos seguir com o pedido?')}
+                     style={{ width: '100%', padding: '16px', borderRadius: '10px', border: 'none', backgroundColor: '#25D366', color: 'white', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(37, 211, 102, 0.2)' }}
+                 >
+                     <MessageCircle size={20} /> Aprovar pelo WhatsApp
+                 </button>
+                 <button 
+                     onClick={() => handleWhatsAppAction('Tenho algumas dúvidas sobre a proposta. Podemos conversar?')}
+                     style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', backgroundColor: 'transparent', color: '#64748b', fontSize: '0.95rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
+                 >
+                     <ExternalLink size={18} /> Tenho Dúvidas / Alterar
+                 </button>
+              </div>
+          )}
           
           <PromoBanner promoConfig={companyConfig?.promoBanner} companyConfig={companyConfig} />
 
