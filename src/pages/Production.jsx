@@ -255,10 +255,43 @@ export function Production() {
 
     // Helpers
     const getOrdersByStep = (stepId) => {
-        return orders.filter(o => {
+        const filtered = orders.filter(o => {
             const currentStep = o.productionStep || 'pending';
             return currentStep === stepId;
         });
+
+        // Forced Sort by Deadline (ASC - closest/overdue first)
+        return filtered.sort((a, b) => {
+            if (!a.deadline && !b.deadline) return 0;
+            if (!a.deadline) return 1; // Unscheduled goes to the bottom
+            if (!b.deadline) return -1;
+            
+            return new Date(a.deadline) - new Date(b.deadline);
+        });
+    };
+
+    const getDeadlineInfo = (deadline) => {
+        if (!deadline) return null;
+        
+        // Resetting hours to guarantee clean day diff math
+        const now = new Date();
+        now.setHours(0,0,0,0);
+        
+        // Handling timezone offsets dynamically by splitting date 'YYYY-MM-DD'
+        const parts = deadline.split('-');
+        if(parts.length !== 3) return null;
+        
+        const dead = new Date(parts[0], parts[1]-1, parts[2]); 
+        dead.setHours(0,0,0,0);
+        
+        const diffTime = dead - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) return { text: `Atrasado ${Math.abs(diffDays)}d`, color: 'bg-red-100 text-red-700 border-red-200' };
+        if (diffDays === 0) return { text: 'Vence Hoje!', color: 'bg-orange-100 text-orange-700 border-orange-200 font-bold uppercase' };
+        if (diffDays <= 2) return { text: `Faltam ${diffDays}d`, color: 'bg-amber-100 text-amber-700 border-amber-200 font-medium' };
+        
+        return { text: `Prazo: ${dead.toLocaleDateString()}`, color: 'bg-blue-50 text-blue-600 border-blue-100' };
     };
 
     // SLA display logic
@@ -327,6 +360,7 @@ export function Production() {
                                 )}
                                 {colOrders.map(order => {
                                     const sla = getSlaInfo(order, col.id);
+                                    const deadlineBadge = getDeadlineInfo(order.deadline);
                                     const isGargalo = sla.overtime;
                                     
                                     return (
@@ -358,7 +392,17 @@ export function Production() {
                                             )}
                                         </div>
                                         
-                                        <div className="text-sm font-medium mb-xs truncate">{order.customerName || order.customer || 'Cliente sem nome'}</div>
+                                        <div className="text-sm font-medium mb-1 truncate">{order.customerName || order.customer || 'Cliente sem nome'}</div>
+                                        
+                                        {/* NEW: Deadline Visual Indicator */}
+                                        {deadlineBadge && (
+                                            <div className="mb-2 flex">
+                                                <span className={`text-[10px] px-2 py-0.5 flex items-center gap-1 rounded border shadow-sm ${deadlineBadge.color}`}>
+                                                    <Calendar size={10} /> {deadlineBadge.text}
+                                                </span>
+                                            </div>
+                                        )}
+
                                         <div className="text-xs text-muted mb-sm line-clamp-2">
                                             {(() => {
                                                 const product = products.find(p => p.id == order.productId);
