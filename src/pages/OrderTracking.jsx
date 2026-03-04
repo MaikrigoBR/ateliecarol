@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Package, CheckCircle, Clock, Truck, Home, MapPin, Instagram, Palette } from 'lucide-react';
+import { Package, CheckCircle, Clock, Truck, Home, MapPin, Instagram, Palette, Printer, Award } from 'lucide-react';
 import db from '../services/database.js';
 import { PromoBanner } from '../components/PromoBanner';
 
