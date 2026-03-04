@@ -67,9 +67,14 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
           if (r.ok) {
             const data = await r.json();
             setApiStatus(data);
+          } else {
+             setApiStatus({ isReady: false, qrCode: null, error: true, errorMessage: `A API do Railway retornou Status: ${r.status}` });
           }
         } catch(e) {
-          setApiStatus({ isReady: false, qrCode: null, error: true });
+          let errorMsg = e.message.includes('Failed to fetch') 
+              ? "Backend Offline. A API no Railway está dormindo ou a variável VITE_WHATSAPP_API_URL na Vercel está ausente/incorreta." 
+              : e.message;
+          setApiStatus({ isReady: false, qrCode: null, error: true, errorMessage: errorMsg });
         }
       };
       fetchStatus();
@@ -111,11 +116,15 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
             setSendResults({ success: targets.length, failed: 0, queued: true });
         } else {
             console.error("Failed to queue campaign.");
-            setSendResults({ success: 0, failed: targets.length });
+            let errorText = await response.text();
+            setSendResults({ success: 0, failed: targets.length, errorMessage: `O servidor bloqueou o envio (Status ${response.status}): ${errorText}` });
         }
     } catch (error) {
         console.error("Fetch error:", error);
-        setSendResults({ success: 0, failed: targets.length });
+        let errorMsg = error.message.includes('Failed to fetch') 
+            ? "Falha de Rede (Failed to fetch). A variável VITE_WHATSAPP_API_URL não foi ajustada na Vercel ou o Railway dormiu." 
+            : error.message;
+        setSendResults({ success: 0, failed: targets.length, errorMessage: errorMsg });
     }
 
     setIsSending(false);
@@ -146,14 +155,19 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
           {!apiStatus.isReady && (
             <div style={{ padding: '20px', textAlign: 'center', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa', marginBottom: '20px' }}>
                 <h3 style={{ color: '#c2410c', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                   <AlertTriangle size={20} /> WhatsApp Desconectado
+                   <AlertTriangle size={20} /> WhatsApp Desconectado ou Backend Adormecido
                 </h3>
                 <p style={{ color: '#9a3412', fontSize: '0.9rem', marginBottom: '16px' }}>
-                  Sua API de WhatsApp na Nuvem de disparos está deslogada. <br/>
-                  <b>{apiStatus.qrCode ? "Abra o WhatsApp > Aparelhos Conectados no seu celular e escaneie o código abaixo:" : "Aguarde, gerando conexão segura e QR Code..."}</b>
+                  Sua API de WhatsApp na Nuvem de disparos está deslogada ou não respondeu.<br/>
+                  <b>{apiStatus.qrCode ? "Abra o WhatsApp > Aparelhos Conectados no seu celular e escaneie o código abaixo:" : "Tentando conectar com a API de disparos (Railway/Local)..."}</b>
                 </p>
+                {apiStatus.errorMessage && !apiStatus.qrCode && (
+                    <div style={{ fontSize: '0.8rem', color: '#991b1b', background: '#fee2e2', padding: '8px', borderRadius: '6px', display: 'inline-block', border: '1px solid #f87171' }}>
+                        <b>Diagnóstico Técnico:</b> {apiStatus.errorMessage}
+                    </div>
+                )}
                 {apiStatus.qrCode && (
-                  <div style={{ background: 'white', padding: '16px', display: 'inline-block', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+                  <div style={{ background: 'white', padding: '16px', display: 'inline-block', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', marginTop: '8px' }}>
                     <img src={apiStatus.qrCode} alt="WhatsApp QR Code" style={{ width: '250px', height: '250px' }} />
                   </div>
                 )}
@@ -271,6 +285,11 @@ export function MarketingCampaignModal({ isOpen, onClose, customers }) {
                         ? `${sendResults.success} contato(s) transferidos pro Servidor com sucesso.` 
                         : `${sendResults.failed} falha(s) de comunicação com a API.`}
                   </div>
+                  {sendResults.errorMessage && (
+                      <div style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: '8px', padding: '6px', background: '#fee2e2', borderRadius: '4px', border: '1px dashed #fca5a5' }}>
+                          <b>Motivo Técnico:</b> {sendResults.errorMessage}
+                      </div>
+                  )}
               </div>
           )}
           </div>

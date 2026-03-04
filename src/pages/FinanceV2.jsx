@@ -12,7 +12,6 @@ import {
 } from 'recharts';
 import '../css/pages.css';
 import { calculateFinancialStats } from '../components/FinanceHelpers';
-import { CreditCardManagerModal } from '../components/CreditCardManagerModal';
 
 function StatCard({ title, value, icon: Icon, color, subtext, valueColor }) {
     const getColor = (c) => {
@@ -686,7 +685,7 @@ export function FinanceV2() {
                                             if (bestDay <= 0) bestDay += 30; // Approximation for best day
 
                                             return (
-                                                <tr key={acc.id} onClick={() => setSelectedCreditCard(acc)} className="group transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/20 border-t cursor-pointer" style={{ borderColor: 'var(--border)' }}>
+                                                <tr key={acc.id} onClick={() => window.location.hash = '#/credit-cards'} className="group transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/20 border-t cursor-pointer" style={{ borderColor: 'var(--border)' }}>
                                                     <td style={{ padding: '1rem 1.5rem' }}>
                                                         <div className="flex items-center gap-4">
                                                             <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 text-purple-600 shrink-0">
@@ -959,15 +958,6 @@ export function FinanceV2() {
                         </div>
                     </div>
                 </div>
-            )}
-
-            {selectedCreditCard && (
-                <CreditCardManagerModal 
-                    account={selectedCreditCard} 
-                    transactions={transactions} 
-                    onClose={() => setSelectedCreditCard(null)}
-                    onUpdate={fetchData} 
-                />
             )}
         </div>
     );

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp, CreditCard } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const SectionTitle = ({ title, color, bgColor }) => (
@@ -105,6 +105,10 @@ export function Sidebar({ onClose }) {
         <Link to="/financeiro-teste" className={`nav-item ${isActive('/financeiro-teste')}`}>
           <DollarSign size={20} color="#ea580c" />
           <span style={{color: '#ea580c', fontWeight: 'bold'}}>Financeiro (Testes)</span>
+        </Link>
+        <Link to="/credit-cards" className={`nav-item ${isActive('/credit-cards')}`}>
+          <CreditCard size={20} />
+          <span>Gestão de Cartões</span>
         </Link>
         <Link to="/staff" className={`nav-item ${isActive('/staff')}`}>
           <Briefcase size={20} />

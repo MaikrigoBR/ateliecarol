@@ -386,6 +386,11 @@ export function FinanceFinal() {
     const handleSaveTrans = async (e) => {
         e.preventDefault();
         const amount = Number(newTrans.amount);
+        const account = accounts.find(a => a.id === newTrans.accountId);
+        const isCredit = account?.type === 'credit';
+        // Se estiver editando, mantemos como está. O parcelamento entra na criação.
+        const installments = editTransId ? 1 : (Number(newTrans.installments) || 1);
+        
         const payload = {
             ...newTrans,
             amount: amount
@@ -394,8 +399,35 @@ export function FinanceFinal() {
         if (editTransId) {
             await db.update('transactions', editTransId, payload);
         } else {
-            payload.createdAt = new Date().toISOString();
-            await db.create('transactions', payload);
+            if (installments > 1 && isCredit && payload.type === 'expense') {
+                const promises = [];
+                const installmentAmount = amount / installments;
+                const parentId = `group_${Date.now()}`;
+                const [y, m, d] = payload.date.split('-');
+                
+                for(let i = 0; i < installments; i++) {
+                    // Avança 1 mês para cada nova parcela
+                    const targetDate = new Date(Number(y), Number(m) - 1 + i, Number(d));
+                    // Handle timezone inconsistencies by formatting manually or using UTC string part
+                    const isoDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}`;
+
+                    const transPayload = {
+                        ...payload,
+                        amount: installmentAmount,
+                        date: isoDate,
+                        createdAt: new Date().toISOString(),
+                        installmentsTotal: installments,
+                        installmentNumber: i + 1,
+                        parentId: parentId,
+                        description: `${payload.description} (${i+1}/${installments})`
+                    };
+                    promises.push(db.create('transactions', transPayload));
+                }
+                await Promise.all(promises);
+            } else {
+                payload.createdAt = new Date().toISOString();
+                await db.create('transactions', payload);
+            }
         }
 
         // We don't need manual balance updates anymore, fetchData recalculates it cleanly!
@@ -883,6 +915,16 @@ export function FinanceFinal() {
                                         {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>
                                 </div>
+                                {accounts.find(a => a.id === newTrans.accountId)?.type === 'credit' && newTrans.type === 'expense' && !editTransId && (
+                                    <div className="input-group">
+                                        <label className="form-label">Parcelas no Cartão</label>
+                                        <select className="form-input w-full" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})}>
+                                            {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
+                                                <option key={n} value={n}>{n === 1 ? '1x (À vista)' : `${n}x sem juros (R$ ${(Number(newTrans.amount || 0)/n).toLocaleString('pt-BR', {minimumFractionDigits: 2})})`}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="input-group">
                                         <label className="form-label">Data</label>
