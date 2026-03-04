@@ -319,6 +319,19 @@ export function Production() {
                     updatedOrder.productionStep = 'completed';
                     AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Todos os itens concluídos. Pedido finalizado.`);
                     triggerAutomation(updatedOrder, 'completed', task);
+                    
+                    if (!updatedOrder.financeGenerated) {
+                        await db.create('transactions', {
+                            type: 'income',
+                            amount: updatedOrder.total || 0,
+                            description: `Recebimento Ref. Pedido #${updatedOrder.id.toString().substring(0,8)}`,
+                            category: 'Vendas de Produtos',
+                            date: nowIso.split('T')[0],
+                            status: 'pending',
+                            customerId: updatedOrder.customer || ''
+                        });
+                        updatedOrder.financeGenerated = true;
+                    }
                 }
             } else {
                 updatedOrder.status = 'Pronto para Retirada';
@@ -326,6 +339,19 @@ export function Production() {
                 updatedOrder.productionHistory = history;
                 AuditService.log(currentUser, 'UPDATE', 'Order', order.id, `Produção finalizada. Aguardando retirada/envio.`);
                 triggerAutomation(updatedOrder, 'completed', task);
+                
+                if (!updatedOrder.financeGenerated) {
+                    await db.create('transactions', {
+                        type: 'income',
+                        amount: updatedOrder.total || 0,
+                        description: `Recebimento Ref. Pedido #${updatedOrder.id.toString().substring(0,8)}`,
+                        category: 'Vendas de Produtos',
+                        date: nowIso.split('T')[0],
+                        status: 'pending',
+                        customerId: updatedOrder.customer || ''
+                    });
+                    updatedOrder.financeGenerated = true;
+                }
             }
         } else {
             history.push({

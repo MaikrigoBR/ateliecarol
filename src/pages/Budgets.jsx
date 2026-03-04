@@ -128,13 +128,23 @@ export function Budgets() {
         
         // Optional: Create Order
         if (window.confirm('Deseja criar um Pedido de Venda agora?')) {
+            const mappedItems = budget.items?.map(it => ({
+                productId: it.productId || '',
+                name: it.productName || 'Item Orçamento',
+                quantity: it.quantity || 1,
+                price: it.price || 0,
+                total: it.total || 0,
+                productionStep: 'pending' // inicia fila
+            })) || [];
+
             const newOrder = {
                 customer: budget.customerName,
                 date: new Date().toISOString().split('T')[0],
                 status: 'Novo',
                 items: budget.items.length,
                 total: budget.total,
-                fromBudget: budget.id
+                fromBudget: budget.id,
+                cartItems: mappedItems
             };
             await db.create('orders', newOrder);
             alert('Pedido criado com sucesso!');

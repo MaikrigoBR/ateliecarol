@@ -703,6 +703,32 @@ export function FinanceFinal() {
                 />
             </div>
 
+            {/* Warning Pending Income (Point 7 of Flow) */}
+            {(() => {
+                const pendings = transactionsWithBalance.filter(t => t.type === 'income' && t.status !== 'paid');
+                const totalPending = pendings.reduce((sum, t) => sum + Number(t.amount), 0);
+                if (totalPending > 0) {
+                    return (
+                        <div className="mb-6 p-4 rounded-xl flex items-center justify-between" style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa' }}>
+                            <div className="flex items-center gap-4">
+                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#ffedd5', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <AlertCircle size={20} />
+                                </div>
+                                <div>
+                                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#9a3412', margin: 0 }}>Atenção: Recebimentos Pendentes</h3>
+                                    <p style={{ color: '#c2410c', fontSize: '0.85rem', margin: 0 }}>Você possui {pendings.length} pedido(s) concluído(s) aguardando o recebimento.</p>
+                                </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#c2410c', textTransform: 'uppercase', fontWeight: 700 }}>Valor Bloqueado</div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ea580c' }}>R$ {totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                            </div>
+                        </div>
+                    );
+                }
+                return null;
+            })()}
+
             {/* Charts Grid */}
             <div className="flex flex-col lg:flex-row gap-6 mb-6">
                 {/* Main Dynamic Chart */}
