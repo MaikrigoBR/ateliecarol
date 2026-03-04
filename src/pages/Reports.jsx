@@ -106,86 +106,95 @@ export function Reports() {
 
   /* --- EXPORT --- */
   const exportPDF = () => {
-      const doc = new jsPDF();
-      doc.setFontSize(18);
-      const titleMap = {
-          'sales': 'Relatório de Vendas',
-          'inventory': 'Relatório de Estoque Valorado',
-          'finance': 'Relatório Financeiro',
-          'customers': 'Relatório de Clientes'
-      };
-      doc.text(titleMap[activeTab], 14, 22);
-      doc.setFontSize(11);
-      doc.text(`Gerado em: ${new Date().toLocaleDateString()} - Período: ${dateRange.start} a ${dateRange.end}`, 14, 30);
+      try {
+          const doc = new jsPDF();
+          doc.setFontSize(18);
+          const titleMap = {
+              'sales': 'Relatório de Vendas',
+              'inventory': 'Relatório de Estoque Valorado',
+              'finance': 'Relatório Financeiro',
+              'customers': 'Relatório de Clientes'
+          };
+          doc.text(titleMap[activeTab], 14, 22);
+          doc.setFontSize(11);
+          doc.text(`Gerado em: ${new Date().toLocaleDateString()} - Período: ${dateRange.start} a ${dateRange.end}`, 14, 30);
 
-      const tableColumn = [];
-      const tableRows = [];
+          const tableColumn = [];
+          const tableRows = [];
 
-      if (activeTab === 'sales') {
-          tableColumn.push("Data", "Cliente", "Status", "Valor (R$)");
-          filteredData.forEach(order => {
-              tableRows.push([
-                  new Date(order.date || order.createdAt).toLocaleDateString(),
-                  order.customer || order.customerName || 'Cliente Final',
-                  order.status,
-                  `R$ ${(parseFloat(order.total) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
-              ]);
-          });
-          const total = filteredData.reduce((acc, curr) => acc + (parseFloat(curr.total) || 0), 0);
-          tableRows.push(['', '', 'TOTAL:', `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`]);
+          if (activeTab === 'sales') {
+              tableColumn.push("Data", "Cliente", "Status", "Valor (R$)");
+              filteredData.forEach(order => {
+                  const dString = order.date || order.createdAt;
+                  const dateVal = dString ? new Date(dString).toLocaleDateString() : '-';
+                  tableRows.push([
+                      dateVal,
+                      order.customer || order.customerName || 'Cliente Final',
+                      order.status || 'Não Informado',
+                      `R$ ${(parseFloat(order.total) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+                  ]);
+              });
+              const total = filteredData.reduce((acc, curr) => acc + (parseFloat(curr.total) || 0), 0);
+              tableRows.push(['', '', 'TOTAL:', `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`]);
 
-      } else if (activeTab === 'inventory') {
-          tableColumn.push("Item", "Tipo", "Qtd", "Custo Unit.", "Total");
-          filteredData.forEach(item => {
-              tableRows.push([
-                  item.name,
-                  item.type,
-                  `${item.quantity} ${item.unit}`,
-                  `R$ ${(item.cost || 0).toFixed(2)}`,
-                  `R$ ${((item.quantity || 0) * (item.cost || 0)).toFixed(2)}`
-              ]);
-          });
+          } else if (activeTab === 'inventory') {
+              tableColumn.push("Item", "Tipo", "Qtd", "Custo Unit.", "Total");
+              filteredData.forEach(item => {
+                  tableRows.push([
+                      item.name,
+                      item.type,
+                      `${item.quantity || 0} ${item.unit || ''}`,
+                      `R$ ${(parseFloat(item.cost) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`,
+                      `R$ ${((parseFloat(item.quantity) || 0) * (parseFloat(item.cost) || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+                  ]);
+              });
 
-      } else if (activeTab === 'finance') {
-          tableColumn.push("Data", "Descrição", "Categoria", "Tipo", "Status", "Valor");
-          filteredData.forEach(t => {
-              tableRows.push([
-                  new Date(t.date).toLocaleDateString(),
-                  t.description,
-                  t.category,
-                  t.type === 'income' ? 'Receita' : 'Despesa',
-                  t.status === 'paid' ? 'Pago' : 'Pendente',
-                  `R$ ${(t.amount || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
-              ]);
-          });
-           const balance = filteredData.reduce((acc, t) => acc + (t.type === 'income' ? (t.amount||0) : -(t.amount||0)), 0);
-           tableRows.push(['', '', '', '', 'BALANÇO:', `R$ ${balance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`]);
+          } else if (activeTab === 'finance') {
+              tableColumn.push("Data", "Descrição", "Categoria", "Tipo", "Status", "Valor");
+              filteredData.forEach(t => {
+                  tableRows.push([
+                      t.date ? new Date(t.date).toLocaleDateString() : '-',
+                      t.description,
+                      t.category,
+                      t.type === 'income' ? 'Receita' : 'Despesa',
+                      t.status === 'paid' ? 'Pago' : 'Pendente',
+                      `R$ ${(parseFloat(t.amount) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+                  ]);
+              });
+              const balance = filteredData.reduce((acc, t) => acc + (t.type === 'income' ? (parseFloat(t.amount)||0) : -(parseFloat(t.amount)||0)), 0);
+              tableRows.push(['', '', '', '', 'BALANÇO:', `R$ ${balance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`]);
 
-      } else if (activeTab === 'customers') {
-          tableColumn.push("Nome", "Email", "Tipo", "Documento", "Status");
-          filteredData.forEach(c => {
-              tableRows.push([
-                  c.name,
-                  c.email,
-                  c.type || 'PF',
-                  c.document || '-',
-                  c.status === 'inactive' ? 'Inativo' : 'Ativo'
-              ]);
-          });
-      }
+          } else if (activeTab === 'customers') {
+              tableColumn.push("Nome", "Email", "Tipo", "Documento", "Status");
+              filteredData.forEach(c => {
+                  tableRows.push([
+                      c.name,
+                      c.email || '-',
+                      c.type || 'PF',
+                      c.document || '-',
+                      c.status === 'inactive' ? 'Inativo' : 'Ativo'
+                  ]);
+              });
+          }
 
-      // Use autoTable directly if doc.autoTable fails, but try safe method
-      if (typeof doc.autoTable === 'function') {
-          doc.autoTable(tableColumn, tableRows, { startY: 40 });
-      } else {
+          // Blindar inputs do autoTable contra valores nulos/objetos
+          const safeTableRows = tableRows.map(row => row.map(cell => {
+              if (cell === null || cell === undefined) return '-';
+              if (typeof cell === 'object') return JSON.stringify(cell);
+              return String(cell);
+          }));
+
           autoTable(doc, {
               head: [tableColumn],
-              body: tableRows,
+              body: safeTableRows,
               startY: 40
           });
+          
+          doc.save(`relatorio_${activeTab}_export.pdf`);
+      } catch (err) {
+          console.error("Erro na exportação de PDF", err);
+          alert("Ops! Ocorreu um erro ao gerar este PDF. Os dados podem estar inconsistentes. Detalhes: " + err.message);
       }
-      
-      doc.save(`relatorio_${activeTab}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const exportExcel = () => {
