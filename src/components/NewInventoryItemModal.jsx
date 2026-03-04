@@ -19,6 +19,12 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
     minStock: '',
   });
 
+  const [createFinance, setCreateFinance] = useState(false);
+  const [financeAccountId, setFinanceAccountId] = useState('');
+  const [financeDate, setFinanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [financeStatus, setFinanceStatus] = useState('pending');
+  const [accounts, setAccounts] = useState([]);
+
   useEffect(() => {
       if (isOpen) {
           if (itemToEdit) {
@@ -34,18 +40,23 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
                   minStock: itemToEdit.minStock || ''
               });
           } else {
-             setFormData({
-                name: '',
-                type: defaultType,
-                cost: '',
-                purchaseDate: new Date().toISOString().split('T')[0],
-                serial: '',
-                value: '',
-                quantity: '',
-                unit: 'un',
-                minStock: '',
-             });
+              setFormData({
+                 name: '',
+                 type: defaultType,
+                 cost: '',
+                 purchaseDate: new Date().toISOString().split('T')[0],
+                 serial: '',
+                 value: '',
+                 quantity: '',
+                 unit: 'un',
+                 minStock: '',
+              });
           }
+          db.getAll('accounts').then(res => setAccounts(res || []));
+          setCreateFinance(false);
+          setFinanceAccountId('');
+          setFinanceDate(new Date().toISOString().split('T')[0]);
+          setFinanceStatus('pending');
       }
   }, [isOpen, itemToEdit, defaultType]);
 
@@ -79,6 +90,27 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
     } else {
         const newItem = await db.create('inventory', { ...itemData, createdAt: new Date().toISOString() });
         AuditService.log(currentUser, 'CREATE', 'Inventory', newItem.id || 'unknown', `Criou item: ${formData.name}`);
+        
+        // --- Integração Financeira Automática ---
+        const totalCost = formData.type === 'equipment' 
+            ? (parseFloat(formData.cost) || 0) 
+            : (parseFloat(formData.cost) || 0) * (parseFloat(formData.quantity) || 0);
+
+        if (createFinance && totalCost > 0 && financeAccountId) {
+            const category = formData.type === 'equipment' ? 'Equipamentos & Ativos' : 'Materiais & Insumos';
+            await db.create('transactions', {
+                description: `Compra de ${formData.type === 'equipment' ? 'Equipamento' : 'Estoque'}: ${formData.name}`,
+                amount: totalCost,
+                type: 'expense',
+                category: category,
+                accountId: financeAccountId,
+                date: financeDate,
+                status: financeStatus,
+                installments: 1,
+                isRecurring: false,
+                createdAt: new Date().toISOString()
+            });
+        }
     }
     
     if (onItemSaved) onItemSaved();
@@ -226,6 +258,68 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultTyp
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* Injeção: Integração Financeira */}
+            {!itemToEdit && formData.cost > 0 && (
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                    <label className="flex items-center gap-2 cursor-pointer mb-4">
+                        <input 
+                            type="checkbox" 
+                            checked={createFinance} 
+                            onChange={e => setCreateFinance(e.target.checked)} 
+                            className="rounded text-blue-500 w-4 h-4" 
+                        />
+                        <span className="text-sm font-bold text-gray-800">Lançar no Financeiro (Gerar Despesa)</span>
+                    </label>
+
+                    {createFinance && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4 animate-fade-in">
+                            <div className="flex items-center justify-between text-sm bg-white p-2 rounded border border-gray-100 mb-2">
+                                <span className="text-gray-500 font-medium">Valor Total da Saída:</span>
+                                <span className="font-bold text-red-500">
+                                    R$ {(formData.type === 'equipment' ? (parseFloat(formData.cost) || 0) : ((parseFloat(formData.cost) || 0) * (parseFloat(formData.quantity) || 0))).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="input-group">
+                                    <label className="form-label text-xs">Vínculo de Conta *</label>
+                                    <select 
+                                        className="form-input text-sm" 
+                                        value={financeAccountId} 
+                                        onChange={e => setFinanceAccountId(e.target.value)}
+                                        required={createFinance}
+                                    >
+                                        <option value="">Selecione uma conta...</option>
+                                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label text-xs">Data de Vencimento/Pagamento</label>
+                                    <input 
+                                        type="date" 
+                                        className="form-input text-sm" 
+                                        value={financeDate}
+                                        onChange={e => setFinanceDate(e.target.value)}
+                                        required={createFinance}
+                                    />
+                                </div>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label text-xs">Situação do Pagamento</label>
+                                <select 
+                                    className="form-input text-sm" 
+                                    value={financeStatus} 
+                                    onChange={e => setFinanceStatus(e.target.value)}
+                                >
+                                    <option value="pending">A Pagar (Provisionado)</option>
+                                    <option value="paid">Já Pago (Debita Imediatamente)</option>
+                                </select>
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
 
           </div>
