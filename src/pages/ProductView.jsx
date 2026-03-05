@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingBag, Star, Image as ImageIcon, MessageCircle } from 'lucide-react';
+import { ShoppingBag, Star, Image as ImageIcon, MessageCircle, PlayCircle } from 'lucide-react';
 import db from '../services/database';
 
 export function ProductView() {
@@ -47,6 +47,13 @@ export function ProductView() {
 
     const message = `Olá! Gostei e tenho interesse no produto: ${product.name} (Ref: ${product.id}). Ele ainda está disponível?`;
     
+    const mediaItems = product.images && product.images.length > 0 
+        ? product.images 
+        : (product.image ? [product.image] : []);
+    
+    // Check if there are thumbnails/videos to show below main image
+    const hasThumbnails = mediaItems.length > 1 || product.videoUrl;
+
     return (
         <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', paddingBottom: '40px' }}>
             {/* Header */}
@@ -67,14 +74,36 @@ export function ProductView() {
                                 {product.campaignDiscount}% OFF 🔥
                             </div>
                         )}
-                        {(product.images && product.images.length > 0) ? (
-                            <img src={product.images[0]} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : product.image ? (
-                            <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {mediaItems.length > 0 ? (
+                            <img src={mediaItems[0]} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                             <ImageIcon size={64} color="#cbd5e1" />
                         )}
                     </div>
+
+                    {hasThumbnails && (
+                        <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', 
+                            gap: '8px', 
+                            padding: '16px 28px 0 28px',
+                            backgroundColor: '#ffffff'
+                        }}>
+                            {mediaItems.slice(1).map((img, idx) => (
+                                <a key={idx} href={img} target="_blank" rel="noopener noreferrer" style={{ display: 'block', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'zoom-in' }}>
+                                    <img src={img} alt={`Thumb ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                </a>
+                            ))}
+                            {product.videoUrl && (
+                                <a href={product.videoUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', aspectRatio: '1/1', borderRadius: '12px', backgroundColor: '#fef2f2', border: '1px solid #fee2e2', alignItems: 'center', justifyContent: 'center', color: '#ef4444', textDecoration: 'none', transition: 'all 0.2s', boxShadow: 'inset 0 2px 4px rgba(239,68,68,0.1)' }}>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <PlayCircle size={28} style={{ margin: '0 auto 4px' }} />
+                                        <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.5px' }}>VÍDEO</div>
+                                    </div>
+                                </a>
+                            )}
+                        </div>
+                    )}
 
                     <div style={{ padding: '24px 28px' }}>
                         <div style={{ marginBottom: '20px' }}>
