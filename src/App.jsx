@@ -16,6 +16,7 @@ import { CreditCards } from './pages/CreditCards';
 import { Inventory } from './pages/Inventory';
 import { Equipments } from './pages/Equipments';
 import { Budgets } from './pages/Budgets';
+import { EquipmentMigration } from './pages/EquipmentMigration';
 import { OrderPrint } from './pages/OrderPrint';
 import { Users } from './pages/Users';
 import { Staff } from './pages/Staff';
@@ -86,6 +87,7 @@ function App() {
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/equipments" element={<Equipments />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/equipment-migrate" element={<EquipmentMigration />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/staff" element={<Staff />} />
                   <Route path="/reports" element={<Reports />} />
