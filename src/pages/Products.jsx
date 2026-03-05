@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Image as ImageIcon, Trash2, Edit2, Tag, PieChart } from 'lucide-react';
+import { Plus, Image as ImageIcon, Trash2, Edit2, Tag, PieChart, QrCode } from 'lucide-react';
 import db from '../services/database.js';
 import { NewProductModal } from '../components/NewProductModal.jsx';
 import AuditService from '../services/AuditService.js';
@@ -13,6 +13,7 @@ export function Products() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [qrCodeProduct, setQrCodeProduct] = useState(null);
 
   const fetchProducts = async () => {
     const allProducts = await db.getAll('products');
@@ -91,6 +92,14 @@ export function Products() {
                 <div className="flex gap-1">
                     <button 
                         className="btn btn-icon" 
+                        style={{ backgroundColor: '#f1f5f9' }}
+                        onClick={() => setQrCodeProduct(product)}
+                        title="Display QR Code (Catálogo)"
+                    >
+                        <QrCode size={16} color="#0f172a" />
+                    </button>
+                    <button 
+                        className="btn btn-icon" 
                         onClick={() => handleEdit(product)}
                         title="Editar Produto"
                     >
@@ -160,6 +169,62 @@ export function Products() {
           productToEdit={editingProduct}
         />
       )}
+
+      {/* MODAL: QR CODE DE VITRINE PARA PRODUTO */}
+      {qrCodeProduct && (
+           <div className="modal-overlay" onClick={() => setQrCodeProduct(null)}>
+              <style>
+              {`
+                @media print {
+                  body * { visibility: hidden; }
+                  #printable-tag-prod, #printable-tag-prod * { visibility: visible; }
+                  #printable-tag-prod {
+                    position: absolute; left: 0; top: 0; margin: 0 !important;
+                    padding: 24px !important; border: 2px dashed #cbd5e1 !important;
+                    border-radius: 12px !important; width: 400px !important;
+                    box-shadow: none !important;
+                  }
+                  .modal-overlay { background: transparent !important; overflow: visible !important; }
+                }
+              `}
+              </style>
+              <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center', padding: '32px' }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>Display interativo</h2>
+                  <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '24px' }}>
+                      Posicione este código na sua vitrine ou balcão. O cliente lerá e abrirá a ficha resumida do produto no smartphone.
+                  </p>
+                  
+                  <div id="printable-tag-prod" style={{ 
+                      backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', 
+                      border: '2px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: '16px', margin: '0 auto', maxWidth: '400px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+                  }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: '#8b5cf6', letterSpacing: '1px' }}>
+                          ESCANEIE PARA COMPRAR
+                      </div>
+                      <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}#/product/${qrCodeProduct.id}`)}`} 
+                          alt={`QR Code ${qrCodeProduct.name}`}
+                          style={{ width: '140px', height: '140px', objectFit: 'contain' }}
+                      />
+                      <div style={{ textAlign: 'center', width: '100%' }}>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2, marginTop: '8px', wordBreak: 'break-word' }}>
+                              {qrCodeProduct.name}
+                          </div>
+                      </div>
+                  </div>
+
+                  <div style={{ marginTop: '32px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                      <button className="btn btn-secondary" onClick={() => setQrCodeProduct(null)}>Cancelar</button>
+                      <button className="btn btn-primary" style={{ backgroundColor: '#8b5cf6', borderColor: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => window.print()}>
+                          Imprimir Display
+                      </button>
+                  </div>
+              </div>
+           </div>
+      )}
+
     </div>
   );
 }
