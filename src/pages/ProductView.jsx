@@ -31,12 +31,17 @@ export function ProductView() {
         return <div style={{ display: 'flex', justifyContent: 'center', padding: '40px', color: '#64748b' }}>Carregando configuração do produto...</div>;
     }
 
-    if (!product) {
+    if (!product || !product.isPublic) {
         return (
             <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <ShoppingBag size={64} color="#cbd5e1" style={{ marginBottom: '16px' }} />
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#334155' }}>Produto Inativo</h2>
-                <p style={{ color: '#64748b', marginTop: '8px' }}>Este produto pode ter sido removido do catálogo ou o link está incorreto.</p>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#334155' }}>Produto Exclusivo ou Inativo</h2>
+                <p style={{ color: '#64748b', marginTop: '8px', maxWidth: '400px', lineHeight: 1.6 }}>
+                    Este produto chegou através de um link exclusivo, já foi removido, ou não está mais habilitado para exibição pública no catálogo no momento.
+                </p>
+                <Link to="/portfolio" style={{ marginTop: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: '#8b5cf6', color: 'white', borderRadius: '12px', textDecoration: 'none', fontWeight: 700 }}>
+                    <ShoppingBag size={18} /> Ver Todo o Portfólio
+                </Link>
             </div>
         );
     }
@@ -62,8 +67,11 @@ export function ProductView() {
                     <div style={{ backgroundColor: '#f3e8ff', padding: '6px', borderRadius: '8px' }}>
                         <ShoppingBag size={20} color="#9333ea" />
                     </div>
-                    Catálogo de Produtos
+                    {companyConfig.companyName || 'Catálogo de Produtos'}
                 </div>
+                <Link to="/portfolio" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 700, color: '#8b5cf6', textDecoration: 'none', backgroundColor: '#f3e8ff', padding: '8px 16px', borderRadius: '20px' }}>
+                    <ShoppingBag size={14} /> Ver Feed
+                </Link>
             </header>
 
             <main style={{ maxWidth: '600px', margin: '0 auto', padding: '24px' }}>

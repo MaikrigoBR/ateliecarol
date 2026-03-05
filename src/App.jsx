@@ -27,6 +27,7 @@ import { DesignLibrary } from './pages/DesignLibrary';
 import { OrderTracking } from './pages/OrderTracking';
 import { ProposalView } from './pages/ProposalView';
 import { ProductView } from './pages/ProductView';
+import { ProductPortfolio } from './pages/ProductPortfolio';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { DataProvider } from './contexts/DataContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -69,6 +70,7 @@ function App() {
                 <Route path="/status/:id" element={<OrderTracking />} />
                 <Route path="/proposal/:id" element={<ProposalView />} />
                 <Route path="/product/:id" element={<ProductView />} />
+                <Route path="/portfolio" element={<ProductPortfolio />} />
 
                 {/* Protected Routes (Wrapped in Layout) */}
                 <Route element={

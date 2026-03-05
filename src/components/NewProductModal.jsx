@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, Plus, DollarSign, Users, Package, Clock, Image as ImageIcon, Video, Percent, Tag, PieChart, Info, Upload } from 'lucide-react';
+import { X, Save, Trash2, Plus, DollarSign, Users, Package, Clock, Image as ImageIcon, Video, Percent, Tag, PieChart, Info, Upload, Eye } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,7 +24,8 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
     category: '',
     videoUrl: '',
     campaignActive: false,
-    campaignDiscount: ''
+    campaignDiscount: '',
+    isPublic: false
   }, productSchema);
 
   const [images, setImages] = useState([]);
@@ -54,7 +55,8 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                       category: productToEdit.category || '',
                       videoUrl: productToEdit.videoUrl || '',
                       campaignActive: productToEdit.campaignActive || false,
-                      campaignDiscount: productToEdit.campaignDiscount || ''
+                      campaignDiscount: productToEdit.campaignDiscount || '',
+                      isPublic: productToEdit.isPublic || false
                   });
                   
                   // Restore images (legacy image vs array of images)
@@ -90,7 +92,7 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
               } else {
                   // Reset
                   setValues({
-                    name: '', description: '', price: '', stock: '', category: '', videoUrl: '', campaignActive: false, campaignDiscount: ''
+                    name: '', description: '', price: '', stock: '', category: '', videoUrl: '', campaignActive: false, campaignDiscount: '', isPublic: false
                   });
                   setImages([]);
                   setSelectedMaterials([]);
@@ -256,6 +258,7 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
       totalCost: totalCost,
       laborDetails: laborItems, 
       materials: selectedMaterials.map(m => ({ id: m.id, qty: m.qtyUsed })),
+      isPublic: values.isPublic || false,
       updatedAt: new Date().toISOString(),
       updatedBy: currentUser?.email || 'Sistema'
     };
@@ -354,6 +357,22 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                     <div className="input-group">
                         <label className="form-label">Descrição Pública</label>
                         <textarea name="description" className="form-input" rows="3" placeholder="Apresentação do produto para o cliente..." value={values.description} onChange={handleChange} />
+                    </div>
+
+                    <div className="p-4 bg-teal-50 border border-teal-100 rounded-xl mb-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-teal-800">
+                                <Eye size={20} className="text-teal-600"/>
+                                <div>
+                                    <h4 className="font-bold text-sm">Disponível no Portfólio Público</h4>
+                                    <p className="text-xs text-teal-600">Ative para este produto aparecer na listagem da vitrine (Instagram/Feed).</p>
+                                </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="isPublic" className="sr-only peer" checked={values.isPublic} onChange={e => handleChange({ target: { name: 'isPublic', value: e.target.checked }})} />
+                                <div className="w-11 h-6 bg-teal-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
+                            </label>
+                        </div>
                     </div>
 
                     <div className="p-4 bg-white border rounded-xl shadow-sm">
