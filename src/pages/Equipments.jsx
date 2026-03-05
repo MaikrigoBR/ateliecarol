@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Hammer, Wrench, Calendar, DollarSign, Activity, Plus, Trash2, Edit2, AlertCircle, Link as LinkIcon, Download } from 'lucide-react';
+import { Hammer, Wrench, Calendar, DollarSign, Activity, Plus, Trash2, Edit2, AlertCircle, Link as LinkIcon, Download, Package } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,6 +14,9 @@ export function Equipments() {
   const [editingEquip, setEditingEquip] = useState(null);
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
   const [activeEquipForMaintenance, setActiveEquipForMaintenance] = useState(null);
+  
+  const [isConsumablesModalOpen, setIsConsumablesModalOpen] = useState(false);
+  const [activeEquipForConsumable, setActiveEquipForConsumable] = useState(null);
 
   // Form State - Equipment
   const [equipForm, setEquipForm] = useState({
@@ -24,7 +27,8 @@ export function Equipments() {
     lifespanMonths: '60', // Default 5 years
     monthlyHours: '160', // Default 40h/week
     status: 'Ativo',
-    maintenanceHistory: []
+    maintenanceHistory: [],
+    consumables: []
   });
 
   // Form State - Maintenance
@@ -33,6 +37,14 @@ export function Equipments() {
     description: '',
     cost: '',
     technician: ''
+  });
+
+  // Form State - Consumable
+  const [consForm, setConsForm] = useState({
+    name: '',
+    cost: '',
+    yield: '',
+    yieldUnit: 'páginas'
   });
 
   useEffect(() => {
@@ -145,6 +157,60 @@ export function Equipments() {
       setIsMaintenanceModalOpen(true);
   };
 
+  const handleSaveConsumable = async (e) => {
+      e.preventDefault();
+      if (!activeEquipForConsumable) return;
+
+      try {
+          const arr = [...(activeEquipForConsumable.consumables || [])];
+          arr.push({
+              id: Date.now().toString(),
+              name: consForm.name,
+              cost: parseFloat(consForm.cost) || 0,
+              yield: parseInt(consForm.yield) || 1,
+              yieldUnit: consForm.yieldUnit
+          });
+
+          await db.update('equipments', activeEquipForConsumable.id, { consumables: arr });
+          AuditService.log(currentUser, 'UPDATE', 'Equipments', activeEquipForConsumable.id, `Adicionou insumo: ${consForm.name}`);
+          
+          setActiveEquipForConsumable({ ...activeEquipForConsumable, consumables: arr });
+          fetchEquipments();
+          
+          // reset form
+          setConsForm({
+              name: '', cost: '', yield: '', yieldUnit: 'páginas'
+          });
+      } catch (err) {
+          alert("Erro ao salvar insumo.");
+      }
+  };
+
+  const handleDeleteConsumable = async (consId) => {
+      if (!activeEquipForConsumable) return;
+      if (window.confirm("Deseja remover este insumo do equipamento?")) {
+          try {
+              const arr = (activeEquipForConsumable.consumables || []).filter(c => c.id !== consId);
+              await db.update('equipments', activeEquipForConsumable.id, { consumables: arr });
+              setActiveEquipForConsumable({ ...activeEquipForConsumable, consumables: arr });
+              fetchEquipments();
+          } catch (e) {
+              console.error(e);
+          }
+      }
+  };
+
+  const openConsumablesModal = (equip) => {
+      setActiveEquipForConsumable(equip);
+      setConsForm({
+          name: '',
+          cost: '',
+          yield: '',
+          yieldUnit: 'páginas'
+      });
+      setIsConsumablesModalOpen(true);
+  };
+
   // KPIs
   const totalEquipmentsValue = equipments.reduce((acc, eq) => acc + (eq.purchasePrice || 0), 0);
   const totalMaintenanceCost = equipments.reduce((acc, eq) => {
@@ -225,6 +291,9 @@ export function Equipments() {
                                             <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                                                 {eq.maintenanceHistory?.length || 0} registro(s) no log
                                             </span>
+                                            <span style={{ fontSize: '0.75rem', color: '#8b5cf6', fontWeight: 600, marginTop: '4px' }}>
+                                                {eq.consumables?.length || 0} insumo(s) / refil(s)
+                                            </span>
                                         </div>
                                     </td>
                                     <td>
@@ -242,6 +311,9 @@ export function Equipments() {
                                     </td>
                                     <td>
                                         <div className="flex gap-2">
+                                            <button className="btn btn-icon" style={{ backgroundColor: '#faf5ff', color: '#9333ea' }} title="Insumos e Refis" onClick={() => openConsumablesModal(eq)}>
+                                                <Package size={16} />
+                                            </button>
                                             <button className="btn btn-icon" style={{ backgroundColor: '#f1f5f9' }} title="Registrar Manutenção" onClick={() => openMaintenanceModal(eq)}>
                                                 <Wrench size={16} color="#475569" />
                                             </button>
@@ -322,63 +394,139 @@ export function Equipments() {
         {/* MODAL: MANUTENÇÃO */}
         {isMaintenanceModalOpen && activeEquipForMaintenance && (
             <div className="modal-overlay" onClick={() => setIsMaintenanceModalOpen(false)}>
-                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-                    <div className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+                    <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                            <h2 style={{ fontSize: '1.25rem' }}>Registro de Manutenção</h2>
-                            <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Equipamento: <strong>{activeEquipForMaintenance.name}</strong></p>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>Registro de Manutenção</h2>
+                            <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '4px 0 0 0' }}>Equipamento: <strong>{activeEquipForMaintenance.name}</strong></p>
                         </div>
                         <button className="btn btn-icon text-muted" onClick={() => setIsMaintenanceModalOpen(false)}>✕</button>
                     </div>
                     
-                    <div style={{ maxHeight: '250px', overflowY: 'auto', backgroundColor: '#f8fafc', padding: '16px', margin: '0 -24px', borderBottom: '1px solid #e2e8f0' }}>
-                        <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: '12px', textTransform: 'uppercase' }}>Histórico Existente</h4>
-                        {(!activeEquipForMaintenance.maintenanceHistory || activeEquipForMaintenance.maintenanceHistory.length === 0) ? (
-                            <div style={{ color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic' }}>Nenhuma manutenção registrada anteriormente.</div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {activeEquipForMaintenance.maintenanceHistory.slice().reverse().map(req => (
-                                    <div key={req.id} style={{ backgroundColor: 'white', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                            <span style={{ fontWeight: 600, color: '#334155' }}>{new Date(req.date).toLocaleDateString()}</span>
-                                            <span style={{ color: '#ef4444', fontWeight: 700 }}>R$ {(req.cost || 0).toFixed(2)}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div style={{ maxHeight: '250px', overflowY: 'auto', backgroundColor: '#f8fafc', padding: '24px', borderBottom: '1px solid #e2e8f0' }}>
+                            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Histórico Existente</h4>
+                            {(!activeEquipForMaintenance.maintenanceHistory || activeEquipForMaintenance.maintenanceHistory.length === 0) ? (
+                                <div style={{ color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', backgroundColor: '#ffffff', padding: '16px', borderRadius: '6px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>Nenhuma manutenção registrada anteriormente.</div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {activeEquipForMaintenance.maintenanceHistory.slice().reverse().map(req => (
+                                        <div key={req.id} style={{ backgroundColor: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', boxShadow: '0 1px 2px rgba(0,0,0,0.01)' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center' }}>
+                                                <span style={{ fontWeight: 600, color: '#334155' }}>{new Date(req.date + 'T12:00:00').toLocaleDateString()}</span>
+                                                <span style={{ color: '#ef4444', fontWeight: 700, backgroundColor: '#fef2f2', padding: '2px 8px', borderRadius: '4px' }}>R$ {(req.cost || 0).toFixed(2)}</span>
+                                            </div>
+                                            <div style={{ color: '#475569', lineHeight: '1.4' }}>{req.description}</div>
+                                            {req.technician && <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><span>👨‍🔧 Técnico/Local:</span> {req.technician}</div>}
                                         </div>
-                                        <div style={{ color: '#64748b' }}>{req.description}</div>
-                                        {req.technician && <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px' }}>Técnico/Local: {req.technician}</div>}
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <form onSubmit={handleSaveMaintenance} style={{ padding: '24px' }}>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginBottom: '16px' }}>Adicionar Novo Registro</h4>
+                            <div style={{ display: 'grid', gap: '16px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Data da Manutenção / Serviço</label>
+                                    <input type="date" className="form-input" required value={maintForm.date} onChange={e => setMaintForm({...maintForm, date: e.target.value})} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Descrição do Problema ou Serviço Executado</label>
+                                    <input type="text" className="form-input" placeholder="Ex: Troca do Rolete Tração, Limpeza Geral..." required value={maintForm.description} onChange={e => setMaintForm({...maintForm, description: e.target.value})} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '16px' }}>
+                                    <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Custo Total (R$)</label>
+                                        <input type="number" step="0.01" min="0" className="form-input" required value={maintForm.cost} onChange={e => setMaintForm({...maintForm, cost: e.target.value})} />
                                     </div>
-                                ))}
+                                    <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Técnico / Fornecedor</label>
+                                        <input type="text" className="form-input" placeholder="Opcional (Ex: Assistência Epson)" value={maintForm.technician} onChange={e => setMaintForm({...maintForm, technician: e.target.value})} />
+                                    </div>
+                                </div>
                             </div>
-                        )}
+
+                            <div className="modal-footer" style={{ marginTop: '24px', padding: 0, border: 'none' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setIsMaintenanceModalOpen(false)}>Voltar</button>
+                                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}>Registrar Gasto</button>
+                            </div>
+                        </form>
                     </div>
-
-                    <form onSubmit={handleSaveMaintenance} style={{ paddingTop: '20px' }}>
-                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '16px' }}>Adicionar Novo Registro</h4>
-                        <div style={{ display: 'grid', gap: '12px' }}>
-                            <div className="form-group">
-                                <label>Data da Manutenção / Compra de Peça</label>
-                                <input type="date" className="form-input" required value={maintForm.date} onChange={e => setMaintForm({...maintForm, date: e.target.value})} />
-                            </div>
-                            <div className="form-group">
-                                <label>Descrição do Problema ou Troca (Ex: Refil de Tinta, Lâmina Nova)</label>
-                                <input type="text" className="form-input" placeholder="O que foi feito?" required value={maintForm.description} onChange={e => setMaintForm({...maintForm, description: e.target.value})} />
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Custo Total (R$)</label>
-                                    <input type="number" step="0.01" min="0" className="form-input" required value={maintForm.cost} onChange={e => setMaintForm({...maintForm, cost: e.target.value})} />
+                </div>
+            </div>
+        )}
+        {/* MODAL: INSUMOS E ACESSÓRIOS */}
+        {isConsumablesModalOpen && activeEquipForConsumable && (
+            <div className="modal-overlay" onClick={() => setIsConsumablesModalOpen(false)}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+                    <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><Package size={22} color="#8b5cf6" /> Insumos &amp; Rendimentos</h2>
+                            <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '4px 0 0 0' }}>Gerencie refis associados à: <strong>{activeEquipForConsumable.name}</strong></p>
+                        </div>
+                        <button className="btn btn-icon text-muted" onClick={() => setIsConsumablesModalOpen(false)}>✕</button>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div style={{ maxHeight: '250px', overflowY: 'auto', backgroundColor: '#f8fafc', padding: '24px', borderBottom: '1px solid #e2e8f0' }}>
+                            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Insumos Vinculados</h4>
+                            {(!activeEquipForConsumable.consumables || activeEquipForConsumable.consumables.length === 0) ? (
+                                <div style={{ color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', backgroundColor: '#ffffff', padding: '16px', borderRadius: '6px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>Nenhum insumo (Ex: Toner, Tinta, Lâmina) vinculado.</div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {activeEquipForConsumable.consumables.map(cons => (
+                                        <div key={cons.id} style={{ backgroundColor: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', boxShadow: '0 1px 2px rgba(0,0,0,0.01)', display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1.5fr) auto', gap: '16px', alignItems: 'center' }}>
+                                            <div>
+                                                <div style={{ fontWeight: 600, color: '#334155' }}>{cons.name}</div>
+                                                <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}>Preço do Refil: <strong>R$ {cons.cost?.toFixed(2)}</strong></div>
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Rendimento: {cons.yield} {cons.yieldUnit}</span>
+                                                <span style={{ fontWeight: 700, color: '#0ea5e9' }}>Custo: R$ {(cons.cost / cons.yield).toFixed(3)} / {cons.yieldUnit === 'páginas' ? 'pág' : 'un'}</span>
+                                            </div>
+                                            <div>
+                                                <button className="btn btn-icon text-danger" onClick={() => handleDeleteConsumable(cons.id)} title="Remover Insumo">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Fornecedor / Técnico</label>
-                                    <input type="text" className="form-input" placeholder="Opcional" value={maintForm.technician} onChange={e => setMaintForm({...maintForm, technician: e.target.value})} />
-                                </div>
-                            </div>
+                            )}
                         </div>
 
-                        <div className="modal-footer" style={{ marginTop: '20px' }}>
-                            <button type="button" className="btn" onClick={() => setIsMaintenanceModalOpen(false)}>Voltar</button>
-                            <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}>Registrar Gasto</button>
-                        </div>
-                    </form>
+                        <form onSubmit={handleSaveConsumable} style={{ padding: '24px' }}>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginBottom: '16px' }}>Adicionar Insumo ou Acessório</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                                <div className="form-group" style={{ marginBottom: 0, gridColumn: 'span 2' }}>
+                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Nome do Insumo (Ex: Toner Preto, Lâmina de Corte Premium)</label>
+                                    <input type="text" className="form-input" required value={consForm.name} onChange={e => setConsForm({...consForm, name: e.target.value})} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Custo Médio / Valor (R$)</label>
+                                    <input type="number" step="0.01" min="0" className="form-input" required value={consForm.cost} onChange={e => setConsForm({...consForm, cost: e.target.value})} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Rendimento Estimado</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input type="number" className="form-input" style={{ flex: 2 }} required value={consForm.yield} onChange={e => setConsForm({...consForm, yield: e.target.value})} />
+                                        <select className="form-input" style={{ flex: 1, padding: '0 8px' }} value={consForm.yieldUnit} onChange={e => setConsForm({...consForm, yieldUnit: e.target.value})}>
+                                            <option value="páginas">Pág</option>
+                                            <option value="cortes">Cortes</option>
+                                            <option value="unidades">Unid</option>
+                                            <option value="dias">Dias</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="modal-footer" style={{ marginTop: '24px', padding: 0, border: 'none' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setIsConsumablesModalOpen(false)}>Concluir</button>
+                                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}><Plus size={16} /> Adicionar Refil</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         )}
