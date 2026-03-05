@@ -582,28 +582,101 @@ export function Equipments() {
         {/* MODAL: QR CODE E PATRIMÔNIO */}
         {qrCodeEquip && (
              <div className="modal-overlay" onClick={() => setQrCodeEquip(null)}>
-                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>Tag Patrimonial</h2>
+                <style>
+                {`
+                  @media print {
+                    body * {
+                      visibility: hidden;
+                    }
+                    #printable-tag, #printable-tag * {
+                      visibility: visible;
+                    }
+                    #printable-tag {
+                      position: absolute;
+                      left: 0;
+                      top: 0;
+                      margin: 0 !important;
+                      padding: 16px !important;
+                      border: 2px solid #000 !important;
+                      border-radius: 8px !important;
+                      width: 380px !important;
+                      box-shadow: none !important;
+                    }
+                    /* Esconder rolagens e background do modal */
+                    .modal-overlay {
+                      background: transparent !important;
+                      overflow: visible !important;
+                    }
+                  }
+                `}
+                </style>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center', padding: '32px' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>Etiqueta de Patrimônio</h2>
                     <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '24px' }}>
-                        <strong>{qrCodeEquip.name}</strong><br/>
-                        {qrCodeEquip.model && <span>{qrCodeEquip.model}</span>}
+                        Visualize como ficará a impressão. Recomenda-se uso de papel adesivo.
                     </p>
                     
-                    <div style={{ backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'inline-block' }}>
+                    {/* ETIQUETA VISÍVEL E IMPRIMÍVEL */}
+                    <div id="printable-tag" style={{ 
+                        backgroundColor: '#ffffff', 
+                        padding: '16px', 
+                        borderRadius: '12px', 
+                        border: '2px dashed #cbd5e1', 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '20px',
+                        margin: '0 auto',
+                        maxWidth: '380px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+                    }}>
                         <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeEquip.patrimonyId || qrCodeEquip.id)}`} 
-                            alt={`QR Code ${qrCodeEquip.patrimonyId || qrCodeEquip.id}`}
-                            style={{ width: '200px', height: '200px', mixBlendMode: 'multiply' }}
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeEquip.patrimonyId || qrCodeEquip.id)}`} 
+                            alt={`QR Code`}
+                            style={{ width: '90px', height: '90px', objectFit: 'contain' }}
                         />
-                        <div style={{ marginTop: '16px', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '1px' }}>
-                            {qrCodeEquip.patrimonyId || qrCodeEquip.id}
+                        <div style={{ textAlign: 'left', flex: 1 }}>
+                            <div style={{ 
+                                fontSize: '0.7rem', 
+                                fontWeight: 800, 
+                                textTransform: 'uppercase', 
+                                color: '#0f172a', 
+                                borderBottom: '2px solid #e2e8f0', 
+                                paddingBottom: '6px', 
+                                marginBottom: '10px',
+                                letterSpacing: '0.5px'
+                            }}>
+                                Gestão de Ativos
+                            </div>
+                            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+                                {qrCodeEquip.name}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '4px' }}>
+                                <strong>Mod:</strong> {qrCodeEquip.model || 'N/D'}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '2px' }}>
+                                <strong>Data:</strong> {new Date(qrCodeEquip.purchaseDate).toLocaleDateString()}
+                            </div>
+                            <div style={{ 
+                                marginTop: '10px', 
+                                fontSize: '1.1rem', 
+                                fontWeight: 900, 
+                                fontFamily: 'monospace', 
+                                color: '#000',
+                                backgroundColor: '#f8fafc',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                display: 'inline-block',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                ID: {qrCodeEquip.patrimonyId || qrCodeEquip.id?.substring(0,8).toUpperCase()}
+                            </div>
                         </div>
                     </div>
 
-                    <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                        <button className="btn btn-secondary" onClick={() => setQrCodeEquip(null)}>Fechar</button>
+                    <div style={{ marginTop: '32px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                        <button className="btn btn-secondary" onClick={() => setQrCodeEquip(null)}>Cancelar</button>
                         <button className="btn btn-primary" style={{ backgroundColor: '#0f172a', borderColor: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => window.print()}>
-                            Imprimir Tag
+                            Imprimir Etiqueta
                         </button>
                     </div>
                 </div>
