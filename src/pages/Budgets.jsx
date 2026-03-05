@@ -146,9 +146,63 @@ export function Budgets() {
                 fromBudget: budget.id,
                 cartItems: mappedItems
             };
-            await db.create('orders', newOrder);
-            alert('Pedido criado com sucesso!');
-        }
+            
+            const createdOrder = await db.create('orders', newOrder);
+            
+            // ---------- AUTOMAÇÃO WHATSAPP (CRM) ----------
+            try {
+                const customers = await db.getAll('customers');
+                const cName = budget.customerName || '';
+                
+                const customerObj = customers.find(c => c.name === cName);
+                
+                if (customerObj && customerObj.phone) {
+                    const num = customerObj.phone.replace(/\D/g, '');
+                    if (num.length >= 10) {
+                        let companyName = 'nossa equipe';
+                        try {
+                            const saved = localStorage.getItem('stationery_config');
+                            if (saved) {
+                                const parsed = JSON.parse(saved);
+                                if (parsed.companyName) companyName = parsed.companyName;
+                            }
+                        } catch(e) {}
+
+                        const baseUrl = window.location.href.split('#')[0];
+                        const finalId = createdOrder?.id || 'ID-Novo';
+                        const trackingLink = `${baseUrl}#/status/${finalId}`;
+                        const firstName = customerObj.name.split(' ')[0];
+                        
+                        const msgText = `Olá ${firstName}!\n✨ O seu pedido #${finalId.toString().substring(0,8)} acaba de entrar na nossa *[Fila de Produção]*.\n\nAcompanhe a mágica acontecendo em tempo real com a ${companyName} pelo Link abaixo:\n\n${trackingLink}`;
+                        
+                        const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
+                        
+                        fetch(`${apiUrl}/api/campaign`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                targets: [{ phone: num, message: msgText }]
+                            })
+                        }).then(res => {
+                            if(res.ok) {
+                                alert(`✅ Pedido criado com sucesso!\n\nSistema CRM:\nNotificação enviada pelo WhatsApp para ${firstName}!`);
+                            } else {
+                                alert(`⚠️ Pedido criado com sucesso!\n\nFalha na API do WhatsApp (Erro ${res.status}). O webhook não respondeu com sucesso.`);
+                            }
+                        }).catch(e => {
+                            alert(`❌ Pedido criado com sucesso!\n\nErro ao tentar conectar na API de WhatsApp: ${e.message}`);
+                        });
+                    } else {
+                        alert(`⚠️ Pedido criado! Mas o telefone de ${cName} é inválido ou curto demais.`);
+                    }
+                } else {
+                    alert(`⚠️ Pedido criado! Porém não encontramos o telefone cadastrado para o cliente: ${cName}`);
+                }
+            } catch (err) {
+                alert(`❌ Erro interno no CRM: ${err.message}\nMas o pedido foi criado.`);
+            }
+            // ----------------------------------------------
+        } // Close 'Deseja criar um Pedido de Venda agora'
 
         fetchBudgets();
       }

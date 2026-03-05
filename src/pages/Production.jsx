@@ -249,13 +249,19 @@ export function Production() {
                             targets: [{ phone: num, message: msgText }]
                         })
                     }).then(res => {
-                         if(!res.ok) console.warn("WhatsApp API returned error on automation code: " + res.status);
+                         if(res.ok) {
+                             if (stepId === 'pending') {
+                                 alert(`SISTEMA CRM (Kanban):\nO produto/pedido de ${firstName} acabou de ENTRAR NA PRODUÇÃO!\nUm WhatsApp automático com o link de rastreamento foi enviado a ele.`);
+                             }
+                         } else {
+                             console.warn("WhatsApp API returned error on automation code: " + res.status);
+                         }
                     }).catch(e => console.warn("Background auto-send WhatsApp Error:", e));
                 } catch(e) {
                     console.warn("Automation background fetch syntax failed:", e);
                 }
                 
-                // Show Automation Toast
+                // Show Automation Toast (non-blocking for standard steps)
                 const toast = document.createElement('div');
                 toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; z-index: 9999; display: flex; align-items: center; gap: 12px; transition: all 0.3s ease; transform: translateY(100px); opacity: 0;';
                 toast.innerHTML = `
@@ -284,6 +290,60 @@ export function Production() {
             }
         }
     };
+
+    // --- DETECTOR DE ENTRADA NO KANBAN ---
+    // Emprega a essência da metodologia lógica disparando na "Fila de Produção" (pending) 
+    // assim que a task "entrar" formalmente no Kanban (via Orders ou Budgets).
+    React.useEffect(() => {
+        let tasksToInitialize = [];
+        // Filtra e identifica as tasks recém chegadas que nasceram direto no "pending" (sem history do Kanban)
+        productionTasks.forEach(task => {
+            if (task.productionStep === 'pending' && (!task.productionHistory || task.productionHistory.length === 0)) {
+                tasksToInitialize.push(task);
+            }
+        });
+
+        if (tasksToInitialize.length > 0 && orders.length > 0) {
+            let initializedAny = false;
+            
+            Promise.all(tasksToInitialize.map(async (task) => {
+                const order = orders.find(o => o.id === task.id);
+                if (!order) return;
+                
+                const nowIso = new Date().toISOString();
+                // Assina o Kanban carimbando a primeira entrada no Pending
+                const history = [{
+                    step: 'pending',
+                    enteredAt: order.date || nowIso,
+                    assigneeId: null
+                }];
+                
+                let updatedOrder = { ...order };
+                if (task._isItem) {
+                    if (!updatedOrder.cartItems) updatedOrder.cartItems = [];
+                    updatedOrder.cartItems[task._itemIndex] = {
+                        ...updatedOrder.cartItems[task._itemIndex],
+                        productionHistory: history,
+                        productionStep: 'pending',
+                        lastStepUpdatedAt: nowIso
+                    };
+                } else {
+                    updatedOrder.productionHistory = history;
+                    updatedOrder.productionStep = 'pending';
+                    updatedOrder.lastStepUpdatedAt = nowIso;
+                }
+                
+                // Consolida no Banco e Exige a Automação
+                await db.update('orders', order.id, updatedOrder);
+                triggerAutomation(updatedOrder, 'pending', task);
+                initializedAny = true;
+            })).then(() => {
+                if (initializedAny) {
+                    setTimeout(() => fetchOrders(), 800);
+                }
+            });
+        }
+    }, [productionTasks, orders]);
 
     const finalizeMove = async (task, nextStep) => {
         const order = orders.find(o => o.id === task.id);

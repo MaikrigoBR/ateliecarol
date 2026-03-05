@@ -219,6 +219,60 @@ export function Orders() {
 
       // 2. Update Status
       await db.update('orders', order.id, { status: 'processing', productionStep: 'pending' });
+
+      // ---------- AUTOMAÇÃO WHATSAPP (CRM) ----------
+      try {
+          const customers = await db.getAll('customers');
+          const cName = order.customerName || order.customer || '';
+          
+          const customerObj = customers.find(c => c.name === cName);
+          
+          if (customerObj && customerObj.phone) {
+              const num = customerObj.phone.replace(/\D/g, '');
+              if (num.length >= 10) {
+                  let companyName = 'nossa equipe';
+                  try {
+                      const saved = localStorage.getItem('stationery_config');
+                      if (saved) {
+                          const parsed = JSON.parse(saved);
+                          if (parsed.companyName) companyName = parsed.companyName;
+                      }
+                  } catch(e) {}
+
+                  const baseUrl = window.location.href.split('#')[0];
+                  const trackingLink = `${baseUrl}#/status/${order.id}`;
+                  const firstName = customerObj.name.split(' ')[0];
+                  
+                  const msgText = `Olá ${firstName}!\n✨ O seu pedido #${order.id.toString().substring(0,8)} acaba de entrar na nossa *[Fila de Produção]*.\n\nAcompanhe a mágica acontecendo em tempo real com a ${companyName} pelo Link abaixo:\n\n${trackingLink}`;
+                  
+                  const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
+                  
+                  fetch(`${apiUrl}/api/campaign`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          targets: [{ phone: num, message: msgText }]
+                      })
+                  }).then(res => {
+                      if(res.ok) {
+                          alert(`✅ Sistema CRM:\nNotificação de Fila de Produção enviada com sucesso para o WhatsApp de ${firstName}!`);
+                      } else {
+                          alert(`⚠️ Falha na API do WhatsApp (Erro ${res.status}). O webhook não respondeu com sucesso.`);
+                      }
+                  }).catch(e => {
+                      alert(`❌ Erro ao tentar conectar na API de WhatsApp: ${e.message}\nA API está online?`);
+                  });
+              } else {
+                  alert(`⚠️ Pedido iniciado, mas o telefone de ${cName} é inválido ou curto demais.`);
+              }
+          } else {
+              alert(`⚠️ Pedido iniciado, mas não encontramos o telefone cadastrado para o cliente: ${cName}`);
+          }
+      } catch (err) {
+          alert(`❌ Erro interno no CRM: ${err.message}`);
+      }
+      // ----------------------------------------------
+
       fetchOrders();
   };
 
