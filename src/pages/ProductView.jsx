@@ -7,11 +7,21 @@ export function ProductView() {
     const { id } = useParams();
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [companyConfig, setCompanyConfig] = useState({ companyName: '', whatsapp: '' });
 
     useEffect(() => {
         const load = async () => {
             const prod = await db.getById('products', id);
             setProduct(prod);
+
+            try {
+                const settings = await db.getById('settings', 'global');
+                if (settings) {
+                    setCompanyConfig(settings);
+                    if (prod) document.title = `${settings.companyName || 'Catálogo'} | ${prod.name}`;
+                }
+            } catch(e) { console.error("Could not fetch settings", e); }
+
             setLoading(false);
         };
         load();
@@ -134,7 +144,23 @@ export function ProductView() {
                             onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                             onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
                             onClick={() => {
-                                window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+                                let phone = companyConfig.whatsapp || '';
+                                if (!phone) {
+                                    try {
+                                        const saved = localStorage.getItem('stationery_config');
+                                        if (saved) {
+                                            const parsed = JSON.parse(saved);
+                                            if (parsed.whatsapp) phone = parsed.whatsapp;
+                                        }
+                                    } catch(e){}
+                                }
+                                
+                                if(phone) {
+                                    const num = phone.replace(/\D/g, '');
+                                    window.open(`https://wa.me/55${num}?text=${encodeURIComponent(message)}`, '_blank');
+                                } else {
+                                    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+                                }
                             }}
                         >
                             <MessageCircle size={24} />
