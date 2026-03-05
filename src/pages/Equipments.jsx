@@ -649,7 +649,7 @@ export function Equipments() {
                         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
                     }}>
                         <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`https://ateliecarol.vercel.app/#/equipments?maintenance_id=${qrCodeEquip.id}`)}`} 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}#/equipments?maintenance_id=${qrCodeEquip.id}`)}`} 
                             alt={`QR Code`}
                             style={{ width: '90px', height: '90px', objectFit: 'contain' }}
                         />
