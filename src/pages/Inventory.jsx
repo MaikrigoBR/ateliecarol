@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export function Inventory() {
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('equipment'); // equipment, materials
+  const activeTab = 'material';
   const [items, setItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -28,7 +28,7 @@ export function Inventory() {
   };
   
   const handleDelete = async (id, name) => {
-      if (window.confirm('Tem certeza? Para materiais, isso remove o histórico de estoque.')) {
+      if (window.confirm('Tem certeza? Isso remove o histórico de estoque deste material/insumo.')) {
           await db.delete('inventory', id);
           AuditService.log(currentUser, 'DELETE', 'Inventory', id, `Excluiu item: ${name}`);
           fetchItems();
@@ -43,43 +43,22 @@ export function Inventory() {
           item.description?.toLowerCase().includes(term) ||
           item.model?.toLowerCase().includes(term) ||
           item.manufacturer?.toLowerCase().includes(term) ||
-          item.color?.toLowerCase().includes(term) ||
-          item.serial?.toLowerCase().includes(term);
+          item.color?.toLowerCase().includes(term);
           
       return matchesTab && matchesSearch;
   });
 
   return (
     <div className="animate-fade-in">
-        {/* Tabs */}
-        <div className="tabs">
-            <button 
-                className={`tab-item ${activeTab === 'equipment' ? 'active' : ''}`}
-                onClick={() => setActiveTab('equipment')}
-            >
-                <Hammer size={16} className="inline mr-2"/>
-                Equipamentos & Ativos
-            </button>
-            <button 
-                className={`tab-item ${activeTab === 'material' ? 'active' : ''}`}
-                onClick={() => setActiveTab('material')}
-            >
-                <Package size={16} className="inline mr-2"/>
-                Matéria-Prima
-            </button>
-        </div>
-
         {/* Content */}
         <div className="card">
             <div className="card-header">
                 <div>
                     <h3 className="card-title">
-                        {activeTab === 'equipment' ? 'Lista de Equipamentos' : 'Estoque de Materiais'}
+                        Estoque de Materiais & Insumos
                     </h3>
                     <p className="text-sm text-muted">
-                        {activeTab === 'equipment' 
-                            ? 'Gerencie seus ativos, máquinas e ferramentas.' 
-                            : 'Controle o estoque de insumos para produção.'}
+                        Controle o estoque de insumos para produção do Ateliê.
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -101,22 +80,11 @@ export function Inventory() {
                 <table className="table">
                     <thead>
                         <tr>
-                            <th>Nome do Item</th>
-                            {activeTab === 'equipment' ? (
-                                <>
-                                    <th>Serial / ID</th>
-                                    <th>Data Compra</th>
-                                    <th>Valor Estimado</th>
-                                    <th>Status</th>
-                                </>
-                            ) : (
-                                <>
-                                    <th>Quantidade Atual</th>
-                                    <th>Estoque Mínimo</th>
-                                    <th>Custo Unit.</th>
-                                    <th>Status</th>
-                                </>
-                            )}
+                            <th>Nome do Item / Material</th>
+                            <th>Quantidade Atual</th>
+                            <th>Estoque Mínimo</th>
+                            <th>Custo Base (Últ. Compra)</th>
+                            <th>Status (Alerta)</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -132,29 +100,18 @@ export function Inventory() {
                                     </div>
                                     {item.description && <div className="text-[11px] text-gray-400 mt-1 truncate max-w-xs" title={item.description}>{item.description}</div>}
                                 </td>
-                                {activeTab === 'equipment' ? (
-                                    <>
-                                        <td className="text-muted">{item.serial || '-'}</td>
-                                        <td className="text-muted">{item.purchaseDate}</td>
-                                        <td>R$ {item.value?.toFixed(2)}</td>
-                                        <td><span className="badge badge-success">Ativo</span></td>
-                                    </>
-                                ) : (
-                                    <>
-                                        <td style={{ fontWeight: 600 }}>
-                                            {item.quantity} {item.unit}
-                                        </td>
-                                        <td className="text-muted">{item.minStock} {item.unit}</td>
-                                        <td>R$ {item.cost?.toFixed(2)}</td>
-                                        <td>
-                                            {item.quantity <= item.minStock ? (
-                                                <span className="badge badge-danger">Baixo Estoque</span>
-                                            ) : (
-                                                <span className="badge badge-success">OK</span>
-                                            )}
-                                        </td>
-                                    </>
-                                )}
+                                <td style={{ fontWeight: 600 }}>
+                                    {item.quantity} {item.unit}
+                                </td>
+                                <td className="text-muted">{item.minStock} {item.unit}</td>
+                                <td>R$ {item.cost?.toFixed(2)}</td>
+                                <td>
+                                    {item.quantity <= item.minStock ? (
+                                        <span className="badge badge-danger">Baixo Estoque</span>
+                                    ) : (
+                                        <span className="badge badge-success">Suficiente</span>
+                                    )}
+                                </td>
                                 <td>
                                     <div className="flex gap-1">
                                         <button 
@@ -177,8 +134,8 @@ export function Inventory() {
                         ))}
                          {filteredItems.length === 0 && (
                             <tr>
-                                <td colSpan={activeTab === 'equipment' ? 6 : 6} className="text-center p-4 text-muted">
-                                    Nenhum item encontrado nesta categoria.
+                                <td colSpan="6" className="text-center p-4 text-muted">
+                                    Nenhum material de estoque encontrado.
                                 </td>
                             </tr>
                         )}
