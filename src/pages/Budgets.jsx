@@ -156,6 +156,29 @@ export function Budgets() {
                 
                 const customerObj = customers.find(c => c.name === cName);
                 
+                const showToast = (title, message, type = 'success') => {
+                    const toast = document.createElement('div');
+                    const isError = type === 'error';
+                    const color = isError ? '#ef4444' : '#25D366';
+                    const icon = isError 
+                        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
+                        : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
+
+                    toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; z-index: 9999; display: flex; align-items: center; gap: 12px; transition: all 0.3s ease; transform: translateY(100px); opacity: 0;';
+                    toast.innerHTML = `
+                        <div style="background: ${color}; padding: 8px; border-radius: 50%; display: flex;">
+                            ${icon}
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">${title}</div>
+                            <div style="color: #64748b; font-size: 0.75rem; max-width: 250px;">${message}</div>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+                    setTimeout(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; }, 100);
+                    setTimeout(() => { toast.style.transform = 'translateY(100px)'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 5000);
+                };
+
                 if (customerObj && customerObj.phone) {
                     const num = customerObj.phone.replace(/\D/g, '');
                     if (num.length >= 10) {
@@ -185,21 +208,21 @@ export function Budgets() {
                             })
                         }).then(res => {
                             if(res.ok) {
-                                alert(`✅ Pedido criado com sucesso!\n\nSistema CRM:\nNotificação enviada pelo WhatsApp para ${firstName}!`);
+                                showToast('Automação CRM', `WhatsApp enviado para ${firstName}!`, 'success');
                             } else {
-                                alert(`⚠️ Pedido criado com sucesso!\n\nFalha na API do WhatsApp (Erro ${res.status}). O webhook não respondeu com sucesso.`);
+                                showToast('Falha no Envio', `A API recusou a conexão (Erro ${res.status}).`, 'error');
                             }
                         }).catch(e => {
-                            alert(`❌ Pedido criado com sucesso!\n\nErro ao tentar conectar na API de WhatsApp: ${e.message}`);
+                            showToast('Servidor Offline', `Erro de conexão: ${e.message}`, 'error');
                         });
                     } else {
-                        alert(`⚠️ Pedido criado! Mas o telefone de ${cName} é inválido ou curto demais.`);
+                        showToast('Telefone Inválido', `O número de ${cName} está incompleto.`, 'error');
                     }
                 } else {
-                    alert(`⚠️ Pedido criado! Porém não encontramos o telefone cadastrado para o cliente: ${cName}`);
+                    showToast('Sem Contato', `Não encontramos o Zap de: ${cName}`, 'error');
                 }
             } catch (err) {
-                alert(`❌ Erro interno no CRM: ${err.message}\nMas o pedido foi criado.`);
+                console.error(err);
             }
             // ----------------------------------------------
         } // Close 'Deseja criar um Pedido de Venda agora'

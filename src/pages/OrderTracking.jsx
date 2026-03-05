@@ -63,9 +63,9 @@ export function OrderTracking() {
   ];
 
   const getActiveIndex = (currentStep, itemStatus) => {
-      let index = 0;
-      if (itemStatus === 'Novo') index = 0;
-      if (currentStep === 'pending' || currentStep === 'design' || itemStatus === 'processing') index = 1;
+      let index = 0; // "Na Fila"
+      if (currentStep === 'pending') index = 0;
+      if (currentStep === 'design') index = 1;
       if (currentStep === 'printing' || currentStep === 'finishing' || currentStep === 'cutting') index = 2;
       if (currentStep === 'completed' || itemStatus === 'Concluído' || itemStatus === 'Pronto para Retirada') index = 3;
       return index;
