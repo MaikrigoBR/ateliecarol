@@ -3,9 +3,12 @@ import { Hammer, Wrench, Calendar, DollarSign, Activity, Plus, Trash2, Edit2, Al
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export function Equipments() {
   const { currentUser } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [equipments, setEquipments] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -56,6 +59,22 @@ export function Equipments() {
   useEffect(() => {
     fetchEquipments();
   }, []);
+
+  // Check URL params to open maintenance modal automatically from QR Code scan
+  useEffect(() => {
+    if (equipments.length > 0 && location.search) {
+      const params = new URLSearchParams(location.search);
+      const maintId = params.get('maintenance_id');
+      if (maintId) {
+        const eq = equipments.find(e => e.id === maintId || e.patrimonyId === maintId);
+        if (eq) {
+          openMaintenanceModal(eq);
+          // Clear param after opening so it doesn't reopen upon refresh
+          navigate('/equipments', { replace: true });
+        }
+      }
+    }
+  }, [equipments, location.search, navigate]);
 
   const fetchEquipments = async () => {
     setLoading(true);
@@ -630,7 +649,7 @@ export function Equipments() {
                         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
                     }}>
                         <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeEquip.patrimonyId || qrCodeEquip.id)}`} 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`https://ateliecarol.vercel.app/#/equipments?maintenance_id=${qrCodeEquip.id}`)}`} 
                             alt={`QR Code`}
                             style={{ width: '90px', height: '90px', objectFit: 'contain' }}
                         />
