@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Hammer, Wrench, Calendar, DollarSign, Activity, Plus, Trash2, Edit2, AlertCircle, Link as LinkIcon, Download, Package } from 'lucide-react';
+import { Hammer, Wrench, Calendar, DollarSign, Activity, Plus, Trash2, Edit2, AlertCircle, Link as LinkIcon, Download, Package, QrCode } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,10 +18,16 @@ export function Equipments() {
   const [isConsumablesModalOpen, setIsConsumablesModalOpen] = useState(false);
   const [activeEquipForConsumable, setActiveEquipForConsumable] = useState(null);
 
+  const [qrCodeEquip, setQrCodeEquip] = useState(null);
+
   // Form State - Equipment
   const [equipForm, setEquipForm] = useState({
     name: '',
     brand: '',
+    model: '',
+    description: '',
+    photoUrl: '',
+    patrimonyId: '',
     purchaseDate: new Date().toISOString().split('T')[0],
     purchasePrice: '',
     lifespanMonths: '60', // Default 5 years
@@ -68,6 +74,7 @@ export function Equipments() {
       try {
           const payload = {
               ...equipForm,
+              patrimonyId: equipForm.patrimonyId || Date.now().toString(36).toUpperCase(), // Auto-generate if empty
               purchasePrice: parseFloat(equipForm.purchasePrice) || 0,
               lifespanMonths: parseInt(equipForm.lifespanMonths) || 60,
               monthlyHours: parseInt(equipForm.monthlyHours) || 160
@@ -129,18 +136,23 @@ export function Equipments() {
           setEquipForm({
               name: equip.name,
               brand: equip.brand || '',
+              model: equip.model || '',
+              description: equip.description || '',
+              photoUrl: equip.photoUrl || '',
+              patrimonyId: equip.patrimonyId || '',
               purchaseDate: equip.purchaseDate || '',
               purchasePrice: equip.purchasePrice,
               lifespanMonths: equip.lifespanMonths,
               monthlyHours: equip.monthlyHours,
               status: equip.status || 'Ativo',
-              maintenanceHistory: equip.maintenanceHistory || []
+              maintenanceHistory: equip.maintenanceHistory || [],
+              consumables: equip.consumables || []
           });
       } else {
           setEditingEquip(null);
           setEquipForm({
-            name: '', brand: '', purchaseDate: new Date().toISOString().split('T')[0],
-            purchasePrice: '', lifespanMonths: '60', monthlyHours: '160', status: 'Ativo', maintenanceHistory: []
+            name: '', brand: '', model: '', description: '', photoUrl: '', patrimonyId: '', purchaseDate: new Date().toISOString().split('T')[0],
+            purchasePrice: '', lifespanMonths: '60', monthlyHours: '160', status: 'Ativo', maintenanceHistory: [], consumables: []
           });
       }
       setIsEquipModalOpen(true);
@@ -275,12 +287,29 @@ export function Equipments() {
                             return (
                                 <tr key={eq.id}>
                                     <td>
-                                        <div style={{ fontWeight: 700, color: '#334155', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            {eq.status === 'Ativo' ? <Activity size={16} color="#10b981"/> : <AlertCircle size={16} color="#ef4444"/>}
-                                            {eq.name}
-                                        </div>
-                                        <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
-                                            {eq.brand} • Adquirido: {new Date(eq.purchaseDate).toLocaleDateString()}
+                                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                            {eq.photoUrl ? (
+                                                <img src={eq.photoUrl} alt="Equipamento" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                                            ) : (
+                                                <div style={{ width: '48px', height: '48px', backgroundColor: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Hammer size={24} color="#cbd5e1" />
+                                                </div>
+                                            )}
+                                            <div>
+                                                <div style={{ fontWeight: 700, color: '#334155', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {eq.status === 'Ativo' ? <Activity size={16} color="#10b981"/> : <AlertCircle size={16} color="#ef4444"/>}
+                                                    {eq.name}
+                                                </div>
+                                                <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '4px' }}>
+                                                    {eq.brand} {eq.model && `• ${eq.model}`} • Adquirido: {new Date(eq.purchaseDate).toLocaleDateString()}
+                                                </div>
+                                                {(eq.description || eq.patrimonyId) && (
+                                                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '0.7rem', flexWrap: 'wrap' }}>
+                                                        {eq.patrimonyId && <span style={{ backgroundColor: '#f8fafc', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>Tag: {eq.patrimonyId}</span>}
+                                                        {eq.description && <span style={{ color: '#94a3b8', fontStyle: 'italic', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{eq.description}</span>}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                     <td>
@@ -311,11 +340,14 @@ export function Equipments() {
                                     </td>
                                     <td>
                                         <div className="flex gap-2">
+                                            <button className="btn btn-icon" style={{ backgroundColor: '#f1f5f9' }} title="Gerar QR / Patrimônio" onClick={() => setQrCodeEquip(eq)}>
+                                                <QrCode size={16} color="#0f172a" />
+                                            </button>
                                             <button className="btn btn-icon" style={{ backgroundColor: '#faf5ff', color: '#9333ea' }} title="Insumos e Refis" onClick={() => openConsumablesModal(eq)}>
                                                 <Package size={16} />
                                             </button>
-                                            <button className="btn btn-icon" style={{ backgroundColor: '#f1f5f9' }} title="Registrar Manutenção" onClick={() => openMaintenanceModal(eq)}>
-                                                <Wrench size={16} color="#475569" />
+                                            <button className="btn btn-icon" style={{ backgroundColor: '#fef2f2', color: '#ef4444' }} title="Registrar Manutenção" onClick={() => openMaintenanceModal(eq)}>
+                                                <Wrench size={16} />
                                             </button>
                                             <button className="btn btn-icon" title="Editar Equipamento" onClick={() => openEquipModal(eq)}>
                                                 <Edit2 size={16} />
@@ -355,12 +387,28 @@ export function Equipments() {
                                 <input type="text" className="form-input" value={equipForm.brand} onChange={e => setEquipForm({...equipForm, brand: e.target.value})} />
                             </div>
                             <div className="form-group">
+                                <label>Modelo</label>
+                                <input type="text" className="form-input" value={equipForm.model} onChange={e => setEquipForm({...equipForm, model: e.target.value})} />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label>Descrição Adicional (Detalhes, Cor, etc)</label>
+                                <textarea className="form-input" value={equipForm.description} onChange={e => setEquipForm({...equipForm, description: e.target.value})} rows="2" />
+                            </div>
+                            <div className="form-group">
+                                <label>Nº Patrimonial / Tag</label>
+                                <input type="text" className="form-input" placeholder="Gerado auto se vazio" value={equipForm.patrimonyId} onChange={e => setEquipForm({...equipForm, patrimonyId: e.target.value})} />
+                            </div>
+                            <div className="form-group">
                                 <label>Status</label>
                                 <select className="form-input" value={equipForm.status} onChange={e => setEquipForm({...equipForm, status: e.target.value})}>
                                     <option value="Ativo">🟢 Ativo (Operante)</option>
                                     <option value="Manutenção">⚠️ Em Manutenção</option>
                                     <option value="Inativo">🔴 Inativo / Aposentado</option>
                                 </select>
+                            </div>
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label>URL da Foto do Equipamento</label>
+                                <input type="url" className="form-input" placeholder="https://..." value={equipForm.photoUrl} onChange={e => setEquipForm({...equipForm, photoUrl: e.target.value})} />
                             </div>
                             <div className="form-group">
                                 <label>Data de Aquisição</label>
@@ -529,6 +577,37 @@ export function Equipments() {
                     </div>
                 </div>
             </div>
+        )}
+
+        {/* MODAL: QR CODE E PATRIMÔNIO */}
+        {qrCodeEquip && (
+             <div className="modal-overlay" onClick={() => setQrCodeEquip(null)}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '32px' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>Tag Patrimonial</h2>
+                    <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '24px' }}>
+                        <strong>{qrCodeEquip.name}</strong><br/>
+                        {qrCodeEquip.model && <span>{qrCodeEquip.model}</span>}
+                    </p>
+                    
+                    <div style={{ backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'inline-block' }}>
+                        <img 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeEquip.patrimonyId || qrCodeEquip.id)}`} 
+                            alt={`QR Code ${qrCodeEquip.patrimonyId || qrCodeEquip.id}`}
+                            style={{ width: '200px', height: '200px', mixBlendMode: 'multiply' }}
+                        />
+                        <div style={{ marginTop: '16px', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '1px' }}>
+                            {qrCodeEquip.patrimonyId || qrCodeEquip.id}
+                        </div>
+                    </div>
+
+                    <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                        <button className="btn btn-secondary" onClick={() => setQrCodeEquip(null)}>Fechar</button>
+                        <button className="btn btn-primary" style={{ backgroundColor: '#0f172a', borderColor: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => window.print()}>
+                            Imprimir Tag
+                        </button>
+                    </div>
+                </div>
+             </div>
         )}
     </div>
   );
