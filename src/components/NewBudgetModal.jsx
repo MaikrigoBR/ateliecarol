@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Trash2 } from 'lucide-react';
+import { X, Save, Plus, Trash2, Wrench } from 'lucide-react';
 import db from '../services/database.js';
 
 export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [equipments, setEquipments] = useState([]);
   
   const [formData, setFormData] = useState({
     customer: '',
@@ -19,15 +20,23 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
     price: 0
   });
 
+  const [currentMachine, setCurrentMachine] = useState({
+    equipId: '',
+    minutes: 30, // Default 30 min
+    hourCost: 0
+  });
+
   useEffect(() => {
     const loadData = async () => {
         if (isOpen) {
             try {
                 const loadedCustomers = await db.getAll('customers');
                 const loadedProducts = await db.getAll('products');
+                const loadedEquips = await db.getAll('equipments');
                 
                 setCustomers(Array.isArray(loadedCustomers) ? loadedCustomers : []);
                 setProducts(Array.isArray(loadedProducts) ? loadedProducts : []);
+                setEquipments(Array.isArray(loadedEquips) ? loadedEquips : []);
 
                 const nextWeek = new Date();
                 nextWeek.setDate(nextWeek.getDate() + 7);
@@ -38,10 +47,12 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                     items: []
                 });
                 setCurrentItem({ productId: '', quantity: 1, price: 0 });
+                setCurrentMachine({ equipId: '', minutes: 30, hourCost: 0 });
             } catch (error) {
                 console.error("Error loading modal data:", error);
                 setCustomers([]);
                 setProducts([]);
+                setEquipments([]);
             }
         }
     };
@@ -56,6 +67,18 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
       quantity: 1,
       price: product ? product.price : 0
     });
+  };
+
+  const handleMachineSelect = (e) => {
+      const eId = e.target.value;
+      const equip = equipments.find(eq => eq.id === eId);
+      if (equip) {
+          const deprecMonthly = (parseFloat(equip.purchasePrice) || 0) / (parseInt(equip.lifespanMonths) || 1);
+          const hrCost = deprecMonthly / (parseInt(equip.monthlyHours) || 160);
+          setCurrentMachine(prev => ({ ...prev, equipId: eId, hourCost: hrCost }));
+      } else {
+          setCurrentMachine(prev => ({ ...prev, equipId: '', hourCost: 0 }));
+      }
   };
 
   const addItem = () => {
@@ -78,6 +101,27 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
     const newItems = [...formData.items];
     newItems.splice(index, 1);
     setFormData({...formData, items: newItems});
+  };
+
+  const addMachineCost = () => {
+      if (!currentMachine.equipId) return;
+      const equip = equipments.find(eq => eq.id === currentMachine.equipId);
+      
+      const totalCostForTime = (currentMachine.hourCost / 60) * currentMachine.minutes;
+      
+      setFormData(prev => ({
+          ...prev,
+          items: [...prev.items, {
+              productId: `equip-${currentMachine.equipId}`,
+              productName: `Custo Hora-Máquina: ${equip.name} (${currentMachine.minutes} min)`,
+              quantity: 1,
+              price: totalCostForTime,
+              total: totalCostForTime,
+              isMachineCost: true
+          }]
+      }));
+      
+      setCurrentMachine({ equipId: '', minutes: 30, hourCost: 0 });
   };
 
   const calculateTotal = () => {
@@ -147,7 +191,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-md)', marginTop: 'var(--space-md)' }}>
-                <h4 style={{ marginBottom: 'var(--space-sm)' }}>Adicionar Itens</h4>
+                <h4 style={{ marginBottom: 'var(--space-sm)' }}>Adicionar Novo Produto</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 'var(--space-sm)', alignItems: 'end' }}>
                     <div className="input-group" style={{ marginBottom: 0 }}>
                         <select 
@@ -155,7 +199,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                             value={currentItem.productId}
                             onChange={handleProductSelect}
                         >
-                            <option value="">Produto...</option>
+                            <option value="">Produto (Catálogo)...</option>
                             {products.map(p => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
@@ -175,7 +219,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                          <input 
                             type="number" 
                             className="form-input" 
-                            placeholder="Preço"
+                            placeholder="Preço (Un)"
                             step="0.01"
                             value={currentItem.price}
                             onChange={e => setCurrentItem({...currentItem, price: parseFloat(e.target.value)})}
@@ -185,6 +229,45 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                         <Plus size={16} />
                     </button>
                 </div>
+            </div>
+
+            {/* Injeção: Adicionar Hora-Máquina no Orçamento */}
+            <div style={{ backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', padding: '16px', borderRadius: '8px', marginTop: '16px' }}>
+                <h4 style={{ marginBottom: '8px', fontSize: '0.9rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Wrench size={14} color="#64748b" /> Embutir Custo de Hora-Máquina (Desgaste/Depreciação)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: 'var(--space-sm)', alignItems: 'end' }}>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                        <select 
+                            className="form-input"
+                            value={currentMachine.equipId}
+                            onChange={handleMachineSelect}
+                        >
+                            <option value="">Selecione o Equipamento...</option>
+                            {equipments.map(eq => (
+                                <option key={eq.id} value={eq.id}>{eq.name} (R$ {((parseFloat(eq.purchasePrice)/(parseInt(eq.lifespanMonths)||1))/(parseInt(eq.monthlyHours)||160)).toFixed(2)}/h)</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                        <input 
+                            type="number" 
+                            className="form-input" 
+                            placeholder="Minutos"
+                            min="1"
+                            value={currentMachine.minutes}
+                            onChange={e => setCurrentMachine({...currentMachine, minutes: parseInt(e.target.value)})}
+                        />
+                    </div>
+                    <button type="button" className="btn btn-primary" style={{ backgroundColor: '#0f766e', borderColor: '#0f766e' }} onClick={addMachineCost}>
+                        Embutir Custo
+                    </button>
+                </div>
+                {currentMachine.equipId && (
+                    <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '8px', fontWeight: 600 }}>
+                        Impacto no Orçamento: + R$ {((currentMachine.hourCost / 60) * (currentMachine.minutes || 0)).toFixed(2)}
+                    </div>
+                )}
             </div>
 
             <div style={{ marginTop: 'var(--space-md)', maxHeight: '200px', overflowY: 'auto' }}>
