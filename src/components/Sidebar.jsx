@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp, CreditCard } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp, CreditCard, Wrench } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const SectionTitle = ({ title, color, bgColor }) => (
@@ -111,8 +111,12 @@ export function Sidebar({ onClose }) {
           <span>Produtos (Catálogo)</span>
         </Link>
         <Link to="/inventory" className={`nav-item ${isActive('/inventory')}`}>
-          <Hammer size={20} />
-          <span>Ativos & Materiais</span>
+          <Package size={20} />
+          <span>Estoque de Materiais</span>
+        </Link>
+        <Link to="/equipments" className={`nav-item ${isActive('/equipments')}`}>
+          <Wrench size={20} />
+          <span>Máquinas & Ferramentas</span>
         </Link>
 
         <SectionTitle title="Gestão" color="#ea580c" bgColor="#fff7ed" />

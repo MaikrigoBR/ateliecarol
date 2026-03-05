@@ -14,6 +14,7 @@ import { Settings } from './pages/Settings';
 import { FinanceFinal as Finance } from './pages/FinanceFinal';
 import { CreditCards } from './pages/CreditCards';
 import { Inventory } from './pages/Inventory';
+import { Equipments } from './pages/Equipments';
 import { Budgets } from './pages/Budgets';
 import { OrderPrint } from './pages/OrderPrint';
 import { Users } from './pages/Users';
@@ -83,6 +84,7 @@ function App() {
                   <Route path="/finance" element={<Finance />} />
                   <Route path="/credit-cards" element={<CreditCards />} />
                   <Route path="/inventory" element={<Inventory />} />
+                  <Route path="/equipments" element={<Equipments />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/staff" element={<Staff />} />
