@@ -398,8 +398,9 @@ export function Orders() {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: '1rem' }}>
+    <>
+      <div className={`animate-fade-in ${isProductionModalOpen ? 'print-hidden' : ''}`} style={{ maxWidth: '1200px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div className="input-group" style={{ marginBottom: 0, width: '300px' }}>
             <input 
@@ -599,6 +600,7 @@ export function Orders() {
           </table>
         </div>
       </div>
+    </div>
 
       <NewOrderModal 
         isOpen={isModalOpen} 
@@ -637,6 +639,6 @@ export function Orders() {
         onComplete={(o) => handleCompleteOrder(o)}
       />
 
-    </div>
+    </>
   );
 }

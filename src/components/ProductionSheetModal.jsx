@@ -202,13 +202,22 @@ export function ProductionSheetModal({ isOpen, onClose, order }) {
             position: absolute;
             z-index: 9999;
             width: 100vw;
-            height: 100vh;
+            min-height: 100vh;
             padding: 0 !important;
+            margin: 0 !important;
           }
-          .print-hidden {
+          .print-hidden, .sidebar-wrapper, .header, .sidebar-overlay {
               display: none !important;
           }
           
+          /* Collapse everything so the document creates exactly 1 page */
+          body, html, #root, .layout-container, .main-content, .page-content {
+             height: auto !important;
+             margin: 0 !important;
+             padding: 0 !important;
+             overflow: visible !important;
+          }
+
           /* Force solid layout for Linear cards when printing */
           div[style*="var(--surface-hover)"] {
               background-color: #f9f9f9 !important;
