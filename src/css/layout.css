@@ -271,13 +271,13 @@
 
   .table-container {
     overflow-x: auto;
-
     margin: 0 -1rem;
     padding: 0 1rem;
   }
 
   .recharts-wrapper {
-    width: 100% !important;
+    /* Permitir que o Recharts defina o tamanho no JS */
+    min-width: 100%;
   }
 
   .header-title {

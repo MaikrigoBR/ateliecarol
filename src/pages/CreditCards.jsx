@@ -382,8 +382,8 @@ export function CreditCards() {
                     <div className="chart-header">
                         <BarChart2 size={20} color="var(--primary)" /> Projeção de Faturas (6 Meses)
                     </div>
-                    <div style={{ width: '100%', height: '280px', minWidth: 0, minHeight: 0 }}>
-                        <ResponsiveContainer width="99%" height="100%">
+                    <div style={{ width: '100%', minHeight: '280px' }}>
+                        <ResponsiveContainer width="100%" height={280}>
                             <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorFatura" x1="0" y1="0" x2="0" y2="1">
@@ -479,8 +479,8 @@ export function CreditCards() {
                         </div>
 
                         {/* Donut Chart para Limite Global */}
-                        <div style={{ marginTop: '1rem', position: 'relative', height: '160px', width: '100%', minWidth: 0, minHeight: 0 }}>
-                            <ResponsiveContainer width="99%" height="100%">
+                        <div style={{ marginTop: '1rem', position: 'relative', minHeight: '160px', width: '100%' }}>
+                            <ResponsiveContainer width="100%" height={160}>
                                 <PieChart>
                                     <Pie
                                         data={[

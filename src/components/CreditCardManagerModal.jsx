@@ -189,8 +189,8 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
                         </div>
 
                         {/* Donut Chart de Comprometimento */}
-                        <div style={{ width: '90px', height: '90px', position: 'relative', minWidth: 0, minHeight: 0 }} className="shrink-0 drop-shadow-xl">
-                            <ResponsiveContainer width="99%" height="100%">
+                        <div style={{ width: '90px', minHeight: '90px', position: 'relative' }} className="shrink-0 drop-shadow-xl">
+                            <ResponsiveContainer width="100%" height={90}>
                                 <PieChart>
                                     <Pie
                                         data={donutData}

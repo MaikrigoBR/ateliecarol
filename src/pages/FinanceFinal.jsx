@@ -188,7 +188,7 @@ function FinancialOverviewChart({ data }) {
         <div style={{ position: 'relative', height: '100%', display: 'flex' }}>
             {/* Sticky Y-Axis Overlay */}
             <div style={{ width: '65px', height: '100%', flexShrink: 0, backgroundColor: 'var(--surface, transparent)', zIndex: 10, minWidth: 0, minHeight: 0 }}>
-                <ResponsiveContainer width="99%" height="100%">
+                <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={yAxisData} margin={{ top: 20, right: 0, bottom: 20, left: 0 }}>
                         <XAxis dataKey="name" hide={true} />
                         <YAxis 
@@ -221,7 +221,7 @@ function FinancialOverviewChart({ data }) {
                 }}
             >
                 <div style={{ width: `${Math.max(100, data.length * 45)}px`, height: '100%', minHeight: '300px', minWidth: 0 }}>
-                    <ResponsiveContainer width="99%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={data} margin={{ top: 20, right: 10, bottom: 20, left: 0 }} barGap={2}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={<CustomXAxisTick />} interval={0} />
@@ -759,7 +759,7 @@ export function FinanceFinal() {
                     <div style={{ flex: 1, width: '100%', minWidth: 0, minHeight: '320px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                         {costCenterData.length > 0 ? (
                             <>
-                                <ResponsiveContainer width="99%" height={220}>
+                                <ResponsiveContainer width="100%" height={220}>
                                     <PieChart>
                                         <Pie
                                             data={costCenterData}
