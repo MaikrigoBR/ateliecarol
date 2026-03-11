@@ -1,235 +1,271 @@
 import React from 'react';
-import { X, Edit, Trash2, Printer, Share2, Play, CheckCircle, Package, Calendar, DollarSign, User, AlertCircle, Clock } from 'lucide-react';
+import { 
+    X, Edit, Trash2, Printer, Share2, Play, CheckCircle, Package, 
+    Calendar, DollarSign, User, AlertCircle, Clock, Check, Truck, 
+    CreditCard, FileText, ArrowRight, Phone
+} from 'lucide-react';
 
 export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdit, onDelete, onPrint, onShare, onStartProduction, onComplete }) {
     if (!isOpen || !order) return null;
 
-    const getStatusBadge = (status) => {
-        let style = { backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' };
-        let label = status;
+    // ----- Status Pipeline Logic -----
+    const pipelineSteps = [
+        { id: 'Novo', title: 'Novo', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-100', activeBg: 'bg-blue-500' },
+        { id: 'Em Produção', title: 'Produção', icon: Play, color: 'text-amber-500', bg: 'bg-amber-100', activeBg: 'bg-amber-500' },
+        { id: 'Pronto para Retirada', title: 'Pronto', icon: Package, color: 'text-purple-500', bg: 'bg-purple-100', activeBg: 'bg-purple-500' },
+        { id: 'Concluído', title: 'Concluído', icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-100', activeBg: 'bg-emerald-500' },
+    ];
 
-        switch (status) {
-            case 'Novo':
-                style = { backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' };
-                break;
-            case 'processing':
-            case 'Em Produção':
-                label = 'Em Produção';
-                style = { backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' };
-                break;
-            case 'Pronto para Retirada':
-                style = { backgroundColor: '#fae8ff', color: '#a21caf', border: '1px solid #f5d0fe' };
-                break;
-            case 'Concluído':
-            case 'completed':
-                label = 'Concluído';
-                style = { backgroundColor: '#d1fae5', color: '#047857', border: '1px solid #a7f3d0' };
-                break;
-            case 'Pagamento Parcial':
-                label = 'Pgto. Parcial';
-                style = { backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fed7aa' };
-                break;
-            case 'Despachado':
-                style = { backgroundColor: '#e0e7ff', color: '#4338ca', border: '1px solid #c7d2fe' };
-                break;
-            case 'Aguardando Aprovação':
-                style = { backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' };
-                break;
-        }
+    const currentStatus = order.status === 'processing' ? 'Em Produção' : 
+                          order.status === 'completed' ? 'Concluído' : 
+                          order.status || 'Novo';
 
-        return <span style={{ ...style, padding: '4px 12px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' }}>{label}</span>;
-    };
+    // Map legacy status to pipeline index
+    let currentStepIndex = 0;
+    if (['Em Produção', 'Pagamento Parcial'].includes(currentStatus)) currentStepIndex = 1;
+    if (['Pronto para Retirada', 'Despachado'].includes(currentStatus)) currentStepIndex = 2;
+    if (currentStatus === 'Concluído') currentStepIndex = 3;
 
-    const getFinancialStatus = (o) => {
-        const total = o.total || 0;
-        const paid = o.amountPaid || 0;
-        const balance = o.balanceDue || 0;
-        const isOverdue = o.nextDueDate && new Date(o.nextDueDate) < new Date();
-
-        if (balance <= 0.05 && total > 0) return <span className="text-sm font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200">Totalmente Pago</span>;
-        if (paid === 0) return <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">Pagamento Pendente</span>;
-
-        return (
-            <div className="flex flex-col gap-1 items-end sm:items-start text-sm p-3 bg-orange-50 rounded-lg border border-orange-100">
-                <span className="font-bold text-gray-700">Pago: R$ {paid.toFixed(2).replace('.', ',')}</span>
-                <span className={`font-bold ${isOverdue ? 'text-red-600' : 'text-orange-600'}`}>
-                    Restam: R$ {balance.toFixed(2).replace('.', ',')}
-                </span>
-                {o.nextDueDate && (
-                    <span className={`flex items-center gap-1 mt-1 text-xs ${isOverdue ? 'text-red-700 font-bold' : 'text-gray-500'}`}>
-                        {isOverdue ? <AlertCircle size={12} /> : <Clock size={12} />}
-                        Vence: {new Date(o.nextDueDate).toLocaleDateString()}
-                    </span>
-                )}
-            </div>
-        );
-    };
+    // ----- Financial Logic -----
+    const total = parseFloat(order.total) || 0;
+    const paid = parseFloat(order.amountPaid) || 0;
+    let balance = parseFloat(order.balanceDue) || 0;
+    // Recalculate balance for precision
+    balance = Math.max(0, total - paid);
+    
+    const paidPercentage = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+    const isOverdue = order.nextDueDate && new Date(order.nextDueDate) < new Date();
 
     const totalItems = order.cartItems ? order.cartItems.reduce((acc, item) => acc + (parseInt(item.quantity) || 1), 0) : order.items || 0;
 
     return (
-        <div className="modal-overlay" style={{ zIndex: 1050 }}>
-            <div className="modal-content animate-slide-up" style={{ maxWidth: '800px', width: '100%', padding: 0, overflow: 'hidden', backgroundColor: 'var(--surface)', borderRadius: '24px' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" style={{ zIndex: 1050, backdropFilter: 'blur(4px)' }}>
+            <div className="modal-content animate-slide-up" style={{ maxWidth: '850px', width: '100%', padding: 0, overflow: 'hidden', backgroundColor: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }} onClick={e => e.stopPropagation()}>
                 
-                {/* Header Dinâmico */}
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 relative">
-                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white border-0 z-20">
+                {/* Modern Dashboard Header */}
+                <div className="bg-white p-6 border-b border-gray-200 relative overflow-hidden">
+                    {/* Background decorations */}
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 rounded-full bg-blue-50 opacity-50 pointer-events-none"></div>
+                    <div className="absolute top-0 left-0 -ml-16 -mt-16 w-48 h-48 rounded-full bg-indigo-50 opacity-50 pointer-events-none"></div>
+
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors text-gray-500 border-0 z-20">
                         <X size={20} />
                     </button>
                     
-                    <div className="flex justify-between items-start mt-2">
+                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                         <div>
-                            <span className="text-blue-200 font-bold tracking-widest text-xs uppercase mb-1 block">Detalhes do Pedido</span>
-                            <h2 className="text-2xl font-bold flex items-center gap-3">
-                                #{String(order.id).slice(-6).toUpperCase()}
-                            </h2>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-blue-600 rounded-xl shadow-md text-white">
+                                    <FileText size={24} />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold tracking-widest text-blue-600 uppercase mb-0.5">Detalhes do Pedido</p>
+                                    <h2 className="text-2xl font-black text-gray-800 tracking-tight leading-none">
+                                        #{String(order.id).slice(-6).toUpperCase()}
+                                    </h2>
+                                </div>
+                            </div>
                         </div>
-                        <div className="mt-2">
-                            {getStatusBadge(order.status)}
+
+                        {/* Visual Status Pipeline */}
+                        <div className="w-full md:w-auto mt-4 md:mt-0 pt-2 md:pt-0">
+                            <div className="flex items-center gap-1 sm:gap-2">
+                                {pipelineSteps.map((step, idx) => {
+                                    const isActive = idx === currentStepIndex;
+                                    const isPast = idx < currentStepIndex;
+                                    const StepIcon = step.icon;
+                                    
+                                    return (
+                                        <div key={idx} className="flex items-center">
+                                            <div title={step.title} style={{ transition: 'all 0.3s' }} className={`flex flex-col items-center gap-1 ${isActive || isPast ? 'opacity-100' : 'opacity-40 grayscale'}`}>
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm ${isActive ? step.activeBg + ' text-white ring-4 ring-' + step.activeBg.replace('bg-', '') + '/20' : isPast ? step.activeBg + ' text-white' : 'bg-gray-200 text-gray-500'}`}>
+                                                    {isPast ? <Check size={14} className="animate-fade-in" /> : <StepIcon size={14} />}
+                                                </div>
+                                                <span className={`text-[9px] font-bold uppercase ${isActive ? step.color : 'text-gray-400'}`}>{step.title}</span>
+                                            </div>
+                                            {idx < pipelineSteps.length - 1 && (
+                                                <div className={`w-6 sm:w-10 h-1 mx-1 sm:mx-2 rounded-full ${isPast ? pipelineSteps[idx].activeBg : 'bg-gray-200'}`}></div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Content */}
-                <div className="p-6 max-h-[60vh] overflow-y-auto">
+                {/* Dashboard Cards Content Area */}
+                <div className="p-6 max-h-[60vh] overflow-y-auto hide-scrollbar space-y-6">
                     
-                    {/* Resumo grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                        {/* Info Cliente & Datas */}
-                        <div className="space-y-4">
-                            <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-100 rounded-xl">
-                                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg shrink-0">
-                                    <User size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-bold text-gray-500 uppercase">Cliente</p>
-                                    <p className="font-bold text-gray-800 text-base">{order.customer || 'Não identificado'}</p>
-                                </div>
+                    {/* Top Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Customer Card */}
+                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><User size={60} /></div>
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><User size={18} /></div>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cliente</h4>
                             </div>
-
-                            <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-100 rounded-xl">
-                                <div className="p-2 bg-purple-100 text-purple-600 rounded-lg shrink-0">
-                                    <Calendar size={20} />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 w-full">
-                                    <div>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase">Data da Venda</p>
-                                        <p className="font-semibold text-gray-700 text-sm">{order.date ? new Date(order.date).toLocaleDateString() : '--'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase">Prazo de Entrega</p>
-                                        {order.deadline ? (
-                                            <p className={`font-bold text-sm ${new Date(order.deadline) < new Date() ? 'text-red-600' : 'text-blue-600'}`}>
-                                                {new Date(order.deadline).toLocaleDateString()}
-                                            </p>
-                                        ) : (
-                                            <p className="font-semibold text-gray-500 text-sm">Não def.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Info Financeiro */}
-                        <div className="p-5 bg-white border border-gray-200 shadow-sm rounded-xl flex flex-col justify-between relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                                <DollarSign size={100} />
-                            </div>
-                            <div>
-                                <p className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 mb-2"><DollarSign size={14} /> Resumo Financeiro</p>
-                                <h3 className="text-3xl font-black text-gray-800 tracking-tight">
-                                    <sup className="text-sm text-gray-500 font-semibold mr-1">R$</sup>
-                                    {((order.total || 0)).toFixed(2).replace('.', ',')}
-                                </h3>
-                            </div>
-                            <div className="mt-4 z-10">
-                                {getFinancialStatus(order)}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Itens do Pedido */}
-                    <div className="mb-4">
-                        <h4 className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Package size={16} className="text-indigo-500" /> Itens Inclusos ({totalItems})
-                        </h4>
-                        
-                        <div className="border border-gray-200 rounded-xl overflow-hidden">
-                            {order.cartItems && order.cartItems.length > 0 ? (
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-200">
-                                        <tr>
-                                            <th className="py-2 px-4">Produto</th>
-                                            <th className="py-2 px-4 text-center">Qtd</th>
-                                            <th className="py-2 px-4 text-right">Preço Un.</th>
-                                            <th className="py-2 px-4 text-right">Subtotal</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {order.cartItems.map((item, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50">
-                                                <td className="py-3 px-4 font-medium text-gray-700">{item.name || item.productName || 'Item Indefinido'}</td>
-                                                <td className="py-3 px-4 text-center text-gray-600">{item.quantity}</td>
-                                                <td className="py-3 px-4 text-right text-gray-600">R$ {parseFloat(item.price || 0).toFixed(2).replace('.', ',')}</td>
-                                                <td className="py-3 px-4 text-right font-bold text-gray-800">R$ {(item.quantity * parseFloat(item.price || 0)).toFixed(2).replace('.', ',')}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            ) : (
-                                <div className="p-4 text-center text-gray-500 italic text-sm bg-gray-50">
-                                    Itens não detalhados. Total cadastrado: {order.items} iten(s).
-                                </div>
+                            <p className="font-bold text-gray-800 text-lg leading-tight">{order.customer || 'Não identificado'}</p>
+                            {order.customerPhone && (
+                                <p className="text-xs text-gray-500 mt-2 flex items-center gap-1"><Phone size={12}/> {order.customerPhone}</p>
                             )}
                         </div>
+
+                        {/* Dates Card */}
+                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform"><Calendar size={60} /></div>
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Calendar size={18} /></div>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cronograma</h4>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500 font-medium">Lançamento</span>
+                                    <span className="font-bold text-gray-700">{order.date ? new Date(order.date).toLocaleDateString() : '--'}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm border-t border-gray-50 pt-2">
+                                    <span className="text-gray-500 font-medium flex items-center gap-1"><Clock size={14}/> Prazo Final</span>
+                                    {order.deadline ? (
+                                        <span className={`font-bold px-2 py-0.5 rounded-full text-xs ${new Date(order.deadline) < new Date() ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                            {new Date(order.deadline).toLocaleDateString()}
+                                        </span>
+                                    ) : (
+                                        <span className="text-gray-400 font-semibold text-xs">A Definir</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Financial Card (Visual) */}
+                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:-translate-y-2 transition-transform"><DollarSign size={60} /></div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><DollarSign size={18} /></div>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Financeiro</h4>
+                            </div>
+                            
+                            <h3 className="text-2xl font-black text-gray-800 tracking-tight mt-1">
+                                <sup className="text-xs text-gray-400 font-semibold mr-1">R$</sup>
+                                {total.toFixed(2).replace('.', ',')}
+                            </h3>
+
+                            {/* Progress Bar for Payment */}
+                            <div className="mt-3">
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className="text-[10px] font-bold text-emerald-600 uppercase">Pago: R$ {paid.toFixed(2)}</span>
+                                    {balance > 0 ? (
+                                        <span className={`text-[10px] font-bold uppercase ${isOverdue ? 'text-red-500' : 'text-orange-500'}`}>Falta: R$ {balance.toFixed(2)}</span>
+                                    ) : (
+                                        <span className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1"><Check size={10}/> Quitado</span>
+                                    )}
+                                </div>
+                                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden flex">
+                                    <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${paidPercentage}%` }}></div>
+                                    {balance > 0 && <div className={`${isOverdue ? 'bg-red-500' : 'bg-orange-400'} h-1.5 rounded-r-full transition-all`} style={{ width: `${100 - paidPercentage}%`, opacity: 0.2 }}></div>}
+                                </div>
+                                {balance > 0 && order.nextDueDate && (
+                                     <div className={`mt-1.5 text-[10px] font-bold flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-gray-400'}`}>
+                                        {isOverdue ? <AlertCircle size={10}/> : <Clock size={10}/>} Vencimento: {new Date(order.nextDueDate).toLocaleDateString()}
+                                     </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Observações */}
+                    {/* Items Table Display - Modern Card Format */}
+                    <div className="bg-white border border-gray-200 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] overflow-hidden">
+                        <div className="bg-gray-50 border-b border-gray-200 p-4 flex justify-between items-center">
+                            <h4 className="text-sm font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                                <Package size={16} className="text-indigo-500" /> Cesta de Produtos
+                            </h4>
+                            <span className="bg-white border border-gray-200 text-gray-600 text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                                {totalItems} Itens Físicos
+                            </span>
+                        </div>
+                        
+                        {order.cartItems && order.cartItems.length > 0 ? (
+                            <div className="divide-y divide-gray-100">
+                                {order.cartItems.map((item, idx) => (
+                                    <div key={idx} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-gray-50/50 transition-colors">
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100/50 flex items-center justify-center shrink-0 text-indigo-500 shadow-sm">
+                                                <Package size={18} />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-sm text-gray-800">{item.name || item.productName || 'Item Indefinido'}</p>
+                                                <p className="text-xs text-gray-500 mt-0.5 font-medium">Qtd: {item.quantity} un.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase">Subtotal</span>
+                                            <span className="font-bold text-gray-800 text-sm">
+                                                R$ {(item.quantity * parseFloat(item.price || 0)).toFixed(2).replace('.', ',')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-8 text-center text-gray-400 flex flex-col items-center">
+                                <Package size={32} className="opacity-20 mb-2"/>
+                                <span className="text-sm font-medium">Itens não detalhados neste pedido legado.</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Observations */}
                     {order.observations && (
-                         <div className="mt-6 p-4 bg-yellow-50 border border-yellow-100 rounded-xl text-sm">
-                             <p className="text-xs font-bold text-yellow-700 uppercase mb-1">Observações do Pedido</p>
-                             <p className="text-gray-700">{order.observations}</p>
+                         <div className="p-5 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-100 rounded-2xl relative overflow-hidden group">
+                             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform"><FileText size={60}/></div>
+                             <div className="flex items-center gap-2 mb-2 relative z-10">
+                                 <AlertCircle size={16} className="text-amber-500 relative z-10"/>
+                                 <p className="text-xs font-black text-amber-700 uppercase tracking-widest relative z-10">Anotações Importantes</p>
+                             </div>
+                             <p className="text-sm text-amber-900 font-medium relative z-10 leading-relaxed">{order.observations}</p>
                          </div>
                     )}
                 </div>
 
-                {/* Footer de Ações Moderno */}
-                <div className="p-4 bg-gray-50 border-t border-gray-200 flex flex-wrap gap-3 justify-end items-center">
+                {/* Modern Footer Actions */}
+                <div className="p-5 bg-white border-t border-gray-200 flex flex-wrap gap-3 justify-between items-center bg-gray-50/50">
                     
-                    {/* Ações Secundárias */}
-                    <div className="flex items-center gap-2 mr-auto opacity-80 hover:opacity-100 transition-opacity">
-                        <button onClick={() => { onClose(); onDelete(order.id); }} className="btn btn-icon text-red-500 hover:bg-red-50 hover:text-red-700 border border-transparent hover:border-red-200 p-2" title="Excluir">
+                    {/* Secondary Actions (Left) */}
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => { onClose(); onDelete(order.id); }} className="btn btn-icon text-red-400 hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-200 p-2.5 rounded-xl transition-all shadow-sm bg-white" title="Excluir o Pedido">
                             <Trash2 size={18} />
                         </button>
-                        <button onClick={() => { onClose(); onEdit(order); }} className="btn btn-icon text-blue-500 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 p-2" title="Editar">
+                        <button onClick={() => { onClose(); onEdit(order); }} className="btn btn-icon text-blue-500 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 p-2.5 rounded-xl transition-all shadow-sm bg-white" title="Editar Pedido">
                             <Edit size={18} />
                         </button>
                     </div>
 
-                    {/* Ações Principais */}
-                    <button onClick={() => { onClose(); onPrint(order); }} className="btn bg-white border border-gray-200 text-gray-700 font-semibold hover:bg-gray-100 shadow-sm px-4 py-2 flex items-center gap-2 rounded-lg">
-                        <Printer size={16} /> Imprimir OP
-                    </button>
-                    
-                    <button onClick={() => onShare(order)} className="btn bg-pink-50 border border-pink-200 text-pink-600 font-semibold hover:bg-pink-100 shadow-sm px-4 py-2 flex items-center gap-2 rounded-lg">
-                        <Share2 size={16} /> Zap Cliente
-                    </button>
-
-                    {order.status === 'Novo' && (
-                        <button onClick={() => { onClose(); onStartProduction(order); }} className="btn bg-amber-50 border border-amber-300 text-amber-700 font-semibold hover:bg-amber-100 hover:text-amber-800 shadow-sm px-4 py-2 flex items-center gap-2 rounded-lg">
-                            <Play size={16} /> Produzir
+                    {/* Primary Actions (Right) */}
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end flex-1">
+                        <button onClick={() => { onClose(); onPrint(order); }} className="btn bg-white border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 hover:text-gray-900 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.05)] px-4 py-2.5 flex items-center gap-2 rounded-xl transition-all">
+                            <Printer size={16} /> Imprimir OP
                         </button>
-                    )}
-
-                    {order.status !== 'Concluído' ? (
-                        <button onClick={() => { onClose(); onComplete(order); }} className="btn bg-emerald-500 border border-emerald-600 text-white font-bold hover:bg-emerald-600 shadow-md px-5 py-2 flex items-center gap-2 rounded-lg">
-                            <CheckCircle size={18} /> Finalizar & Receber
+                        
+                        <button onClick={() => onShare(order)} className="btn bg-[#25D366]/10 border border-[#25D366]/20 text-[#128C7E] font-bold hover:bg-[#25D366]/20 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.05)] px-4 py-2.5 flex items-center gap-2 rounded-xl transition-all">
+                            <Share2 size={16} /> Notificar
                         </button>
-                    ) : (
-                        <span className="px-4 py-2 bg-gray-200 text-gray-500 font-bold rounded-lg flex items-center gap-2 cursor-not-allowed border border-gray-300">
-                            <CheckCircle size={18} /> Pedido Finalizado
-                        </span>
-                    )}
+
+                        {currentStepIndex === 0 && (
+                            <button onClick={() => { onClose(); onStartProduction(order); }} className="btn bg-amber-500 border border-amber-600 text-white font-bold hover:bg-amber-600 shadow-md px-5 py-2.5 flex items-center gap-2 rounded-xl transition-all transform hover:-translate-y-0.5">
+                                <Play size={16} fill="currentColor"/> Produzir
+                            </button>
+                        )}
+
+                        {currentStepIndex > 0 && currentStepIndex < 3 ? (
+                            <button onClick={() => { onClose(); onComplete(order); }} className="btn bg-emerald-500 border border-emerald-600 text-white font-bold hover:bg-emerald-600 shadow-md px-5 py-2.5 flex items-center gap-2 rounded-xl transition-all transform hover:-translate-y-0.5">
+                                <CheckCircle size={18} /> Concluir & Receber
+                            </button>
+                        ) : currentStepIndex === 3 ? (
+                            <span className="px-5 py-2.5 bg-gray-100 text-gray-400 font-bold rounded-xl flex items-center gap-2 cursor-not-allowed border border-gray-200 shadow-inner">
+                                <CheckCircle size={18} /> Finalizado
+                            </span>
+                        ) : null}
+                    </div>
 
                 </div>
             </div>
