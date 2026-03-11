@@ -197,9 +197,9 @@ export function Orders() {
       // 1. Find Product(s) and Check/Deduct Stock
       let itemsToCheck = [];
       if (order.cartItems && order.cartItems.length > 0) {
-          itemsToCheck = order.cartItems.map(item => ({ productId: item.productId, qty: parseInt(item.quantity) || 1 }));
+          itemsToCheck = order.cartItems.map(item => ({ productId: item.productId, qty: parseFloat(item.quantity) || 1 }));
       } else if (order.productId) {
-          itemsToCheck = [{ productId: order.productId, qty: parseInt(order.items) || 1 }];
+          itemsToCheck = [{ productId: order.productId, qty: parseFloat(order.items) || 1 }];
       }
 
       if (itemsToCheck.length > 0) {
