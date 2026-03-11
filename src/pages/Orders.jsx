@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckCircle, Printer, Play, Edit, AlertCircle, Clock, Share2, DollarSign, Package } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Printer, Play, Edit, AlertCircle, Clock, Share2, DollarSign, Package, Calendar } from 'lucide-react';
 import db from '../services/database.js';
 
 import { NewOrderModal } from '../components/NewOrderModal';
@@ -449,123 +449,89 @@ export function Orders() {
           </div>
       </div>
 
-      <div className="card" style={{ overflowX: 'auto' }}>
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: '80px' }}>ID</th>
-                <th>Cliente</th>
-                <th>Data Pedido</th>
-                <th>Prazo (Deadline)</th>
-                <th>Status</th>
-                <th>Financeiro</th>
-                <th>Itens</th>
-                <th>Total</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map(order => (
-                <tr 
-                    key={order.id} 
-                    onClick={() => { setSelectedOrderDetails(order); setIsDetailsModalOpen(true); }}
-                    className="hover:bg-gray-50/50 cursor-pointer transition-colors"
-                >
-                  <td className="text-muted" title={order.id}>
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', backgroundColor: 'var(--surface-hover)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                          #{String(order.id).slice(-6).toUpperCase()}
-                      </span>
-                  </td>
-                  <td style={{ fontWeight: 500 }}>{order.customer}</td>
-                  <td className="text-muted">{order.date ? new Date(order.date).toLocaleDateString() : '--'}</td>
-                  <td>
-                    {order.deadline ? (
-                        <span style={{ 
-                            fontSize: '0.8rem', 
-                            padding: '2px 8px', 
-                            borderRadius: '12px', 
-                            backgroundColor: new Date(order.deadline) < new Date() ? '#FEE2E2' : '#EFF6FF',
-                            color: new Date(order.deadline) < new Date() ? '#DC2626' : '#2563EB',
-                            fontWeight: 600
+      <div className="flex flex-col gap-4">
+        {filteredOrders.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 bg-white rounded-2xl border border-gray-100 border-dashed">
+                Nenhum pedido encontrado.
+            </div>
+        ) : filteredOrders.map(order => (
+            <div 
+                key={order.id} 
+                onClick={() => { setSelectedOrderDetails(order); setIsDetailsModalOpen(true); }}
+                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col lg:flex-row gap-4 lg:gap-6 items-start lg:items-center relative"
+            >
+                {/* Left section: ID & Customer */}
+                <div className="flex-1 min-w-0 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 shrink-0 text-gray-400 font-bold text-sm tracking-wider">
+                        #{String(order.id).slice(-4).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-gray-800 text-lg truncate whitespace-nowrap overflow-hidden">{order.customer || 'Cliente não identificado'}</h3>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 font-medium whitespace-nowrap flex-wrap">
+                            <span className="flex items-center gap-1"><Calendar size={12}/> {order.date ? new Date(order.date).toLocaleDateString() : '--'}</span>
+                            {order.deadline && (
+                                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${new Date(order.deadline) < new Date() ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                    <Clock size={12}/> Vence {new Date(order.deadline).toLocaleDateString()}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Middle section: Status & Finance */}
+                <div className="flex-1 flex flex-row lg:flex-row gap-8 justify-between lg:justify-center items-center w-full lg:w-auto mt-4 lg:mt-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-50">
+                    <div className="flex flex-col items-start w-1/2 lg:w-auto">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Status</span>
+                        {getStatusBadge(order.status)}
+                    </div>
+                    <div className="flex flex-col items-end lg:items-start w-1/2 lg:w-auto text-right lg:text-left">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Financeiro</span>
+                        {getFinancialStatus(order)}
+                    </div>
+                </div>
+
+                {/* Right section: Total & Actions */}
+                <div className="flex-1 lg:flex-none flex flex-col sm:flex-row lg:flex-row items-start sm:items-center justify-between lg:justify-end gap-6 w-full lg:w-auto mt-4 lg:mt-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-50">
+                    <div className="text-left lg:text-right shrink-0">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Total ({order.items} iten{order.items !== 1 ? 's' : ''})</span>
+                        <div className="text-xl font-black text-gray-800">
+                            <span className="text-sm text-gray-400 font-semibold mr-1">R$</span>
+                            {((order.total || 0)).toFixed(2).replace('.', ',')}
+                        </div>
+                    </div>
+                    
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto sm:ml-0 overflow-x-auto pb-2 sm:pb-0" onClick={(e) => e.stopPropagation()}>
+                        <button className="btn btn-icon w-8 h-8 md:w-9 md:h-9 rounded-lg bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors border border-transparent hover:border-red-100 flex items-center justify-center p-0" title="Excluir" onClick={() => handleDelete(order.id)}>
+                            <Trash2 size={16} />
+                        </button>
+                        <button className="btn btn-icon w-8 h-8 md:w-9 md:h-9 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors border border-transparent hover:border-blue-100 flex items-center justify-center p-0" title="Editar" onClick={() => { setOrderToEdit(order); setIsModalOpen(true); }}>
+                            <Edit size={16} />
+                        </button>
+                        <button className="btn btn-icon w-8 h-8 md:w-9 md:h-9 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-500 hover:text-pink-600 transition-colors border border-pink-100 hover:border-pink-200 flex items-center justify-center p-0" title="Enviar Link de Rastreio (WhatsApp)" onClick={() => {
+                            const link = window.location.origin + window.location.pathname + "#/status/" + order.id;
+                            const text = encodeURIComponent(`Olá ${order.customer.split(' ')[0]}!\n✨ Acompanhe em tempo real a mágica acontecendo no seu pedido com a ${companyConfig.companyName || 'nossa equipe'} pelo Link abaixo:\n\n${link}`);
+                            window.open(`https://wa.me/?text=${text}`, '_blank');
                         }}>
-                            {new Date(order.deadline).toLocaleDateString()}
-                        </span>
-                    ) : (
-                        <span className="text-muted">--</span>
-                    )}
-                  </td>
-                  <td>{getStatusBadge(order.status)}</td>
-                  <td>{getFinancialStatus(order)}</td>
-                  <td>{order.items}</td>
-                  <td style={{ fontWeight: 600 }}>R$ {((order.total || 0)).toFixed(2).replace('.', ',')}</td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', alignItems: 'center' }}>
-                        <button 
-                          className="btn btn-icon" 
-                          title="Excluir"
-                          onClick={() => handleDelete(order.id)}
-                          style={{ color: 'var(--danger)' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                        <button 
-                          className="btn btn-icon" 
-                          title="Editar"
-                          onClick={() => { setOrderToEdit(order); setIsModalOpen(true); }}
-                          style={{ color: 'var(--primary)' }}
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button 
-                          className="btn btn-icon"
-                          title="Enviar Link de Rastreio (WhatsApp)"
-                          onClick={() => {
-                          const link = window.location.origin + window.location.pathname + "#/status/" + order.id;
-                          const text = encodeURIComponent(`Olá ${order.customer.split(' ')[0]}!\n✨ Acompanhe em tempo real a mágica acontecendo no seu pedido com a ${companyConfig.companyName || 'nossa equipe'} pelo Link abaixo:\n\n${link}`);
-                          window.open(`https://wa.me/?text=${text}`, '_blank');
-                          }}
-                          style={{ color: '#E1306C' }}
-                        >
                             <Share2 size={16} />
                         </button>
-                        <button 
-                          className="btn btn-icon"
-                          title="Imprimir Ordem de Produção"
-                          onClick={() => {
-                              setOrderForProduction(order);
-                              setIsProductionModalOpen(true);
-                          }}
-                        >
+                        <button className="btn btn-icon w-8 h-8 md:w-9 md:h-9 rounded-lg bg-gray-50 hover:bg-gray-200 text-gray-600 transition-colors border border-gray-100 hover:border-gray-300 flex items-center justify-center p-0" title="Imprimir Ordem de Produção" onClick={() => { setOrderForProduction(order); setIsProductionModalOpen(true); }}>
                             <Printer size={16} />
                         </button>
                         {order.status === 'Novo' && (
-                            <button 
-                                className="btn btn-icon" 
-                                title="Iniciar Produção"
-                                onClick={() => handleSendToProduction(order)}
-                                style={{ color: 'var(--warning)' }}
-                            >
+                            <button className="btn btn-icon w-8 h-8 md:w-9 md:h-9 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 hover:border-amber-300 flex items-center justify-center p-0" title="Iniciar Produção" onClick={() => handleSendToProduction(order)}>
                                 <Play size={16} />
                             </button>
                         )}
                         {order.status !== 'Concluído' && (
-                            <button 
-                                className="btn btn-icon" 
-                                title="Finalizar e Receber"
-                                onClick={() => handleCompleteOrder(order)}
-                                style={{ color: 'var(--success)' }}
-                            >
+                            <button className="btn btn-icon w-8 h-8 md:w-9 md:h-9 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 hover:border-emerald-300 flex items-center justify-center p-0" title="Finalizar e Receber" onClick={() => handleCompleteOrder(order)}>
                                 <CheckCircle size={16} />
                             </button>
                         )}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                </div>
+            </div>
+        ))}
       </div>
 
       <NewOrderModal 
