@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Image as ImageIcon, Trash2, Edit2, Tag, PieChart, QrCode } from 'lucide-react';
+import { Plus, Image as ImageIcon, Trash2, Edit2, Tag, PieChart, QrCode, Filter, Printer } from 'lucide-react';
 import db from '../services/database.js';
 import { NewProductModal } from '../components/NewProductModal.jsx';
+import { ProductDetailsModal } from '../components/ProductDetailsModal.jsx';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,8 +13,12 @@ export function Products() {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [viewingProduct, setViewingProduct] = useState(null);
   const [qrCodeProduct, setQrCodeProduct] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [profitFilter, setProfitFilter] = useState('all');
 
   const fetchProducts = async () => {
     const allProducts = await db.getAll('products');
@@ -26,12 +31,100 @@ export function Products() {
   }, []);
 
   useEffect(() => {
-    const results = products.filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredProducts(results);
-  }, [searchTerm, products]);
+    try {
+        let results = products;
+        
+        if (searchTerm) {
+            results = results.filter(product => 
+              product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              product.category?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        if (selectedCategory !== 'all') {
+            results = results.filter(product => product.category === selectedCategory);
+        }
+        
+        if (profitFilter === 'loss') {
+            results = results.filter(product => (product.totalCost || 0) > (product.price || 0));
+        } else if (profitFilter === 'profit') {
+            results = results.filter(product => (product.price || 0) > (product.totalCost || 0));
+        }
+
+        setFilteredProducts(results);
+    } catch (e) {
+        console.error("Filter crash prevented:", e);
+    }
+  }, [searchTerm, selectedCategory, profitFilter, products]);
+
+  const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
+
+  const handlePrintReport = () => {
+      const printWindow = window.open('', '_blank');
+      const html = `
+          <html>
+          <head>
+              <title>Relatório de Portfólio de Produtos</title>
+              <style>
+                  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #1f2937; }
+                  table { width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 13px; }
+                  th, td { border-bottom: 1px solid #e5e7eb; padding: 12px 8px; text-align: left; }
+                  th { background-color: #f9fafb; font-weight: 700; color: #4b5563; text-transform: uppercase; font-size: 11px; }
+                  .danger { color: #dc2626; font-weight: 700; }
+                  .success { color: #059669; font-weight: 700; }
+                  h1 { font-size: 24px; font-weight: 800; margin-bottom: 5px; color: #111827; }
+                  p { font-size: 14px; color: #6b7280; margin: 0 0 5px 0; }
+                  @media print {
+                      @page { size: landscape; margin: 10mm; }
+                      body { padding: 0; }
+                  }
+              </style>
+          </head>
+          <body>
+              <h1>Relatório de Custos e Fichas de Produto</h1>
+              <p>Documento gerado em: ${new Date().toLocaleString()}</p>
+              <p>Total de Itens Listados: ${filteredProducts.length}</p>
+              <table>
+                  <thead>
+                      <tr>
+                          <th>Nome do Produto</th>
+                          <th>Categoria</th>
+                          <th>Custo Inicial (R$)</th>
+                          <th>Custo Completo c/ Impostos (R$)</th>
+                          <th>Preço Final (R$)</th>
+                          <th>Margem (%)</th>
+                          <th>Estoque</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${filteredProducts.map(p => {
+                          const cost = parseFloat(p.totalCost) || 0;
+                          const base = parseFloat(p.baseCost) || 0;
+                          const price = parseFloat(p.price) || 0;
+                          const margin = price > 0 ? (((price - cost) / price) * 100).toFixed(1) : 0;
+                          return `
+                              <tr>
+                                  <td style="font-weight:600">${p.name}</td>
+                                  <td>${p.category || '-'}</td>
+                                  <td>${base.toFixed(2)}</td>
+                                  <td>${cost.toFixed(2)}</td>
+                                  <td style="font-weight:600">${price.toFixed(2)}</td>
+                                  <td class="${margin < 0 ? 'danger' : 'success'}">${margin}%</td>
+                                  <td>${p.stock}</td>
+                              </tr>
+                          `;
+                      }).join('')}
+                  </tbody>
+              </table>
+              <script>
+                  window.onload = function() { window.print(); }
+              </script>
+          </body>
+          </html>
+      `;
+      printWindow.document.write(html);
+      printWindow.document.close();
+  };
 
   const handleDelete = async ( id, name ) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
@@ -53,25 +146,55 @@ export function Products() {
 
   return (
     <div className="animate-fade-in">
-      <div className="card-header">
-        <div className="input-group" style={{ marginBottom: 0, width: '300px' }}>
-          <input 
-            type="text" 
-            placeholder="Buscar produtos..." 
-            className="form-input" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="card-header items-center flex-wrap gap-4">
+        <div className="flex gap-2 items-center flex-wrap w-full md:w-auto">
+            <div className="input-group" style={{ marginBottom: 0, width: '250px' }}>
+            <input 
+                type="text" 
+                placeholder="Buscar produtos..." 
+                className="form-input shadow-sm" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            </div>
+            <select 
+                className="form-input min-w-[150px] shadow-sm text-sm" 
+                style={{ marginBottom: 0 }}
+                value={selectedCategory} 
+                onChange={e => setSelectedCategory(e.target.value)}
+            >
+                <option value="all">Todas as Categorias</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select 
+                className="form-input min-w-[150px] shadow-sm text-sm" 
+                style={{ marginBottom: 0 }}
+                value={profitFilter} 
+                onChange={e => setProfitFilter(e.target.value)}
+            >
+                <option value="all">Filtro de Receita (Todos)</option>
+                <option value="profit">Operando com Lucro</option>
+                <option value="loss">Operando em Prejuízo</option>
+            </select>
         </div>
-        <button className="btn btn-primary" onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}>
-          <Plus size={16} />
-          Adicionar Produto
-        </button>
+        
+        <div className="flex gap-2 mt-4 md:mt-0 w-full md:w-auto overflow-x-auto">
+            <button className="btn btn-outline flex items-center gap-2 whitespace-nowrap bg-white text-gray-700 hover:text-blue-600 border-gray-200" onClick={handlePrintReport}>
+                <Printer size={16} /> Relatório em PDF / Print
+            </button>
+            <button className="btn btn-primary shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2 whitespace-nowrap" onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}>
+                <Plus size={16} /> Adicionar Produto
+            </button>
+        </div>
       </div>
 
       <div className="product-grid">
         {filteredProducts.map(product => (
-          <div key={product.id} className="card">
+          <div 
+            key={product.id} 
+            className="card cursor-pointer hover:shadow-lg transition-all" 
+            onClick={() => { setViewingProduct(product); setIsDetailsModalOpen(true); }}
+          >
             <div className="product-image-container relative">
               {product.campaignActive && (
                   <div className="absolute top-2 left-2 bg-pink-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm z-10 flex items-center gap-1">
@@ -89,7 +212,7 @@ export function Products() {
             <div style={{ marginBottom: 'var(--space-sm)' }}>
               <div className="product-action-row">
                 <h3 className="product-title">{product.name}</h3>
-                <div className="flex gap-1">
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <button 
                         className="btn btn-icon" 
                         style={{ backgroundColor: '#f1f5f9' }}
@@ -130,10 +253,21 @@ export function Products() {
                       {product.description}
                   </p>
               )}
-              {product.totalCost > 0 && product.price > 0 && (
-                <div className="mt-2 flex items-center gap-1 text-[10px] bg-gray-50 border border-gray-100 p-1 w-fit rounded">
-                    <PieChart size={12} className="text-gray-400" />
-                    <span className="text-gray-500">Mg: {( ((product.price - product.totalCost) / product.price) * 100 ).toFixed(0)}%</span>
+              {(product.totalCost > 0 || product.baseCost > 0) && product.price > 0 && (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-slate-100 px-1.5 py-0.5 w-fit rounded shadow-sm">
+                        <span className="text-slate-500 font-bold uppercase tracking-wide">Custo Full: <span className="font-mono text-slate-800">R$ {parseFloat(product.totalCost || product.baseCost || 0).toFixed(2)}</span></span>
+                    </div>
+                    {(product.price - (product.totalCost || product.baseCost || 0)) < 0 ? (
+                        <div className="flex items-center gap-1 text-[10px] bg-red-50 text-red-600 border border-red-100 px-1.5 py-0.5 rounded shadow-sm animate-pulse">
+                            <span className="font-bold">PREJUÍZO DETECTADO</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1 text-[10px] bg-green-50 text-green-700 border border-green-100 px-1.5 py-0.5 rounded shadow-sm">
+                            <PieChart size={10} />
+                            <span className="font-bold">Mg. {( ((product.price - (product.totalCost || product.baseCost || 0)) / product.price) * 100 ).toFixed(1)}%</span>
+                        </div>
+                    )}
                 </div>
               )}
             </div>
@@ -165,8 +299,28 @@ export function Products() {
           onProductSaved={() => {
             fetchProducts();
             handleCloseModal();
+            // Automatically update the viewing product if the details modal is also open underneath
+            if (isDetailsModalOpen && editingProduct) {
+                db.getById('products', editingProduct.id).then(updated => {
+                    if (updated) setViewingProduct(updated);
+                });
+            }
           }}
           productToEdit={editingProduct}
+        />
+      )}
+
+      {isDetailsModalOpen && (
+        <ProductDetailsModal
+          isOpen={isDetailsModalOpen}
+          onClose={() => { setIsDetailsModalOpen(false); setViewingProduct(null); }}
+          product={viewingProduct}
+          onEdit={(p) => handleEdit(p)}
+          onDelete={(id, name) => {
+              handleDelete(id, name);
+              setIsDetailsModalOpen(false);
+          }}
+          onShareQrCode={(p) => setQrCodeProduct(p)}
         />
       )}
 

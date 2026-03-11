@@ -12,6 +12,7 @@ export function Inventory() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
 
   useEffect(() => {
     fetchItems();
@@ -48,6 +49,22 @@ export function Inventory() {
       return matchesTab && matchesSearch;
   });
 
+  const sortedItems = [...filteredItems].sort((a, b) => {
+      switch (sortBy) {
+          case 'name_asc': return (a.name || '').localeCompare(b.name || '');
+          case 'name_desc': return (b.name || '').localeCompare(a.name || '');
+          case 'cost_asc': return (a.cost || 0) - (b.cost || 0);
+          case 'cost_desc': return (b.cost || 0) - (a.cost || 0);
+          case 'qty_asc': return (a.quantity || 0) - (b.quantity || 0);
+          case 'qty_desc': return (b.quantity || 0) - (a.quantity || 0);
+          case 'status_alert':
+              const aAlert = (a.quantity <= a.minStock) ? 1 : 0;
+              const bAlert = (b.quantity <= b.minStock) ? 1 : 0;
+              return bAlert - aAlert;
+          default: return 0;
+      }
+  });
+
   return (
     <div className="animate-fade-in">
         {/* Content */}
@@ -69,6 +86,18 @@ export function Inventory() {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                      />
+                     <select 
+                        className="form-input" 
+                        value={sortBy} 
+                        onChange={e => setSortBy(e.target.value)}
+                        style={{ maxWidth: '200px' }}
+                     >
+                         <option value="name_asc">Nome (A-Z)</option>
+                         <option value="name_desc">Nome (Z-A)</option>
+                         <option value="status_alert">Acabando Primeiro</option>
+                         <option value="qty_desc">Maior Quantidade</option>
+                         <option value="cost_desc">Maior Custo Unitário</option>
+                     </select>
                     <button className="btn btn-primary" onClick={() => { setEditingItem(null); setIsModalOpen(true); }}>
                         <Plus size={16} />
                         Adicionar Item
@@ -80,6 +109,7 @@ export function Inventory() {
                 <table className="table">
                     <thead>
                         <tr>
+                            <th style={{ width: '60px' }}>Img</th>
                             <th>Nome do Item / Material</th>
                             <th>Quantidade Atual</th>
                             <th>Estoque Mínimo</th>
@@ -89,8 +119,23 @@ export function Inventory() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredItems.map(item => (
-                            <tr key={item.id}>
+                        {sortedItems.map(item => (
+                            <tr 
+                                key={item.id} 
+                                onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
+                                style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--surface-hover)'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                                <td style={{ width: '60px' }}>
+                                    {item.image ? (
+                                        <img src={item.image} alt={item.name} style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)' }} />
+                                    ) : (
+                                        <div style={{ width: '48px', height: '48px', borderRadius: '8px', backgroundColor: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                            <Package size={24} />
+                                        </div>
+                                    )}
+                                </td>
                                 <td>
                                     <div style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{item.name}</div>
                                     <div className="flex gap-2 flex-wrap mt-1">
@@ -116,14 +161,14 @@ export function Inventory() {
                                     <div className="flex gap-1">
                                         <button 
                                             className="btn btn-icon" 
-                                            onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
+                                            onClick={(e) => { e.stopPropagation(); setEditingItem(item); setIsModalOpen(true); }}
                                             title="Editar"
                                         >
                                             <Edit2 size={16}/>
                                         </button>
                                         <button 
                                             className="btn btn-icon text-danger" 
-                                            onClick={() => handleDelete(item.id, item.name)}
+                                            onClick={(e) => { e.stopPropagation(); handleDelete(item.id, item.name); }}
                                             title="Excluir"
                                         >
                                             <Trash2 size={16}/>
@@ -132,7 +177,7 @@ export function Inventory() {
                                 </td>
                             </tr>
                         ))}
-                         {filteredItems.length === 0 && (
+                         {sortedItems.length === 0 && (
                             <tr>
                                 <td colSpan="6" className="text-center p-4 text-muted">
                                     Nenhum material de estoque encontrado.
@@ -153,6 +198,10 @@ export function Inventory() {
                 fetchItems();
                 setIsModalOpen(false);
                 setEditingItem(null);
+            }}
+            onItemCloned={(newItem) => {
+                fetchItems();
+                setEditingItem(newItem);
             }}
         />
     </div>

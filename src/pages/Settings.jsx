@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays, Palette } from 'lucide-react';
+import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays, Palette, Info } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { PromoBannerModal } from '../components/PromoBannerModal';
@@ -549,20 +549,33 @@ function SystemSettings() {
     const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
 
     useEffect(() => {
-        const saved = localStorage.getItem('stationery_config');
-        if (saved) {
-            setConfig(JSON.parse(saved));
-        } else {
-            setConfig({
-                companyName: 'Estúdio Criativo',
-                whatsapp: '',
-                instagram: '',
-                promoBanner: {},
-                document: '',
-                currency: 'BRL',
-                theme: 'light'
-            });
-        }
+        const loadGlobalConfig = async () => {
+             try {
+                 const dbConfig = await db.getById('settings', 'global');
+                 if (dbConfig && Object.keys(dbConfig).length > 0) {
+                     setConfig(dbConfig);
+                     localStorage.setItem('stationery_config', JSON.stringify(dbConfig));
+                     return;
+                 }
+             } catch(e) { console.warn("Erro ao buscar global config do DB", e); }
+             
+             // Fallback
+             const saved = localStorage.getItem('stationery_config');
+             if (saved) {
+                 setConfig(JSON.parse(saved));
+             } else {
+                 setConfig({
+                     companyName: 'Estúdio Criativo',
+                     whatsapp: '',
+                     instagram: '',
+                     promoBanner: {},
+                     document: '',
+                     currency: 'BRL',
+                     theme: 'light'
+                 });
+             }
+        };
+        loadGlobalConfig();
     }, []);
 
     const logoInputRef = React.useRef(null);
@@ -868,12 +881,193 @@ function SystemSettings() {
     );
 }
 
+function PricingSettings() {
+    const [fixedCosts, setFixedCosts] = useState([]);
+    const [bdiTaxes, setBdiTaxes] = useState([]);
+    const [capacity, setCapacity] = useState({ monthlyHours: 160 });
+    const [newFixedCost, setNewFixedCost] = useState({ name: '', value: '' });
+    const [newBdi, setNewBdi] = useState({ name: '', percentage: '', type: 'tax' });
+
+    useEffect(() => { loadData(); }, []);
+
+    const loadData = async () => {
+        try {
+            const trans = await db.getAll('transactions') || [];
+            const bi = await db.getAll('bdi_taxes') || [];
+            const cap = await db.getById('settings', 'capacity_planning') || { monthlyHours: 160 };
+            
+            // Extract current month's "Administrativo / Fixos" from financial module
+            const now = new Date();
+            const currentMonthFc = trans.filter(t => {
+                const d = new Date(t.date);
+                return d.getMonth() === now.getMonth() && 
+                       d.getFullYear() === now.getFullYear() && 
+                       t.type === 'expense' && 
+                       t.category === 'Administrativo / Fixos';
+            });
+
+            setFixedCosts(currentMonthFc);
+            setBdiTaxes(bi);
+            setCapacity(cap);
+        } catch (e) { console.error(e); }
+    };
+
+    const handleAddBdi = async (e) => {
+        e.preventDefault();
+        if (!newBdi.name) return;
+        await db.create('bdi_taxes', { name: newBdi.name, percentage: parseFloat(newBdi.percentage) || 0, type: newBdi.type || 'tax' });
+        setNewBdi({ name: '', percentage: '', type: 'tax' });
+        loadData();
+    };
+
+    const handleDeleteBdi = async (id) => {
+        if (window.confirm("Remover este imposto/taxa?")) {
+            await db.delete('bdi_taxes', id);
+            loadData();
+        }
+    };
+
+    const handleSaveCapacity = async () => {
+        await db.set('settings', 'capacity_planning', capacity);
+        alert('Capacidade produtiva salva!');
+    };
+
+    const totalFixed = fixedCosts.reduce((acc, fc) => acc + (parseFloat(fc.amount) || 0), 0);
+    const totalBdi = bdiTaxes.reduce((acc, tx) => acc + (tx.percentage || 0), 0);
+    const costPerHour = capacity.monthlyHours ? (totalFixed / capacity.monthlyHours) : 0;
+
+    return (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* CAPACITY PLANNER */}
+            <div className="card">
+                <div className="card-header">
+                    <div>
+                        <h3 className="card-title flex items-center gap-sm"><Activity size={20} /> Capacidade Produtiva (Rateio)</h3>
+                        <p className="text-muted text-sm">Defina sua capacidade mensal de produção. Os custos fixos serão divididos por estas horas para obter o R$/hora rateado da empresa.</p>
+                    </div>
+                </div>
+                <div className="p-4 flex gap-4 items-end bg-surface-hover rounded mt-2">
+                    <div className="input-group mb-0 flex-1">
+                        <label className="form-label">Horas Faturáveis / Produtivas Mensais</label>
+                        <input type="number" className="form-input" value={capacity.monthlyHours} onChange={e => setCapacity({...capacity, monthlyHours: e.target.value})} />
+                        <span className="text-xs text-muted mt-1">Ex: 1 funcionário x 8h x 20 dias = 160h.</span>
+                    </div>
+                    <button className="btn btn-primary" onClick={handleSaveCapacity}>Salvar</button>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '20px' }}>
+                {/* FIXED COSTS */}
+                <div className="card">
+                    <div className="card-header border-b">
+                        <div>
+                            <h3 className="card-title flex items-center gap-sm"><Landmark size={20} /> Custos Fixos (Financeiro)</h3>
+                            <p className="text-muted text-sm border-b pb-4 mb-2">Despesas deste mês categorizadas como "Administrativo / Fixos".</p>
+                        </div>
+                    </div>
+                    <div className="p-3 bg-blue-50 border-b border-blue-100 flex items-center gap-2 text-xs text-blue-700">
+                        <Info size={14} />
+                        Para adicionar mais custos, registre a despesa no módulo Financeiro com a categoria "Administrativo / Fixos".
+                    </div>
+                    <div className="px-4 pb-4 mt-2">
+                        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                            {fixedCosts.map(fc => (
+                                <div key={fc.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                                    <div className="text-sm font-semibold text-gray-700">{fc.description}</div>
+                                    <div className="flex gap-4 items-center">
+                                        <div className="text-sm">R$ {parseFloat(fc.amount).toFixed(2)}</div>
+                                        {fc.status === 'paid' ? 
+                                            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Pago</span> : 
+                                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">Pendente</span>
+                                        }
+                                    </div>
+                                </div>
+                            ))}
+                            {fixedCosts.length === 0 && (
+                                <div className="text-center py-4 text-sm text-gray-400">Nenhum custo fixo registrado neste mês ainda.</div>
+                            )}
+                        </div>
+                        <div className="mt-4 pt-3 border-t flex justify-between items-center text-sm font-bold text-gray-800 bg-gray-50 p-2 rounded">
+                            <span>TOTAL FIXO:</span>
+                            <span>R$ {totalFixed.toFixed(2)}/mês</span>
+                        </div>
+                        <div className="mt-2 text-center text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-100 font-semibold shadow-sm">
+                            Taxa de Absorção: R$ {costPerHour.toFixed(2)}/hora produzida
+                        </div>
+                    </div>
+                </div>
+
+                {/* BDI / TAXES */}
+                <div className="card">
+                    <div className="card-header border-b">
+                        <div>
+                            <h3 className="card-title flex items-center gap-sm"><Wallet size={20} /> Composição de BDI e Margens Sugeridas</h3>
+                            <p className="text-muted text-sm border-b pb-4 mb-2">Estrutura inteligente para sugerir Preço Ideal (Impostos, Taxas e Lucro Desejado).</p>
+                        </div>
+                    </div>
+                    <form onSubmit={handleAddBdi} className="p-4 flex gap-2 flex-wrap">
+                        <select className="form-input text-sm p-1.5 w-full sm:w-auto" value={newBdi.type} onChange={e => setNewBdi({...newBdi, type: e.target.value})}>
+                            <option value="tax">Imposto/Governo</option>
+                            <option value="fee">Taxa de Pgto/Cartão</option>
+                            <option value="profit">Lucro Líquido Alvo</option>
+                        </select>
+                        <input type="text" className="form-input text-sm p-1.5 flex-1" placeholder="Ex: DAS (Simples Nacional)" value={newBdi.name} onChange={e => setNewBdi({...newBdi, name: e.target.value})} />
+                        <input type="number" step="0.01" className="form-input text-sm p-1.5 w-24" placeholder="Taxa (%)" value={newBdi.percentage} onChange={e => setNewBdi({...newBdi, percentage: e.target.value})} />
+                        <button type="submit" className="btn btn-primary btn-icon" style={{ backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}><Plus size={16} /></button>
+                    </form>
+                    <div className="px-4 pb-4">
+                        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                            {bdiTaxes.map(tx => {
+                                const typeMap = {
+                                    'tax': { label: 'Imposto', color: 'bg-red-100 text-red-700' },
+                                    'fee': { label: 'Taxa', color: 'bg-orange-100 text-orange-700' },
+                                    'profit': { label: 'Lucro Alvo', color: 'bg-green-100 text-green-700' },
+                                    'other': { label: 'Outro', color: 'bg-gray-100 text-gray-700' }
+                                };
+                                const badge = typeMap[tx.type || 'tax'];
+                                return (
+                                    <div key={tx.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                                        <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                            {tx.name}
+                                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${badge.color}`}>{badge.label}</span>
+                                        </div>
+                                        <div className="flex gap-4 items-center">
+                                            <div className={`text-sm font-bold ${tx.type === 'profit' ? 'text-green-600' : 'text-[#8b5cf6]'}`}>{parseFloat(tx.percentage).toFixed(2)}%</div>
+                                            <button onClick={() => handleDeleteBdi(tx.id)} className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"><Trash2 size={16} /></button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {bdiTaxes.length === 0 && (
+                                <div className="text-center py-4 text-sm text-gray-400">Nenhum imposto ou taxa cadastrada.</div>
+                            )}
+                        </div>
+                        <div className="mt-4 pt-3 border-t flex justify-between items-center text-sm font-bold text-gray-800 bg-[#faf5ff] p-2 rounded border border-[#e9d5ff]">
+                            <span>CARGA TOTAL BDI:</span>
+                            <span className="text-[#8b5cf6]">{totalBdi.toFixed(2)}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [user, setUser] = useState({ name: '', role: '', avatar: '' });
 
   useEffect(() => {
     const loadProfile = async () => {
+        try {
+             const dbUser = await db.getById('settings', 'profile');
+             if (dbUser && Object.keys(dbUser).length > 0) {
+                 setUser(dbUser);
+                 localStorage.setItem('stationery_user', JSON.stringify(dbUser));
+                 return;
+             }
+        } catch(e) {}
+        
         try {
              const localUser = localStorage.getItem('stationery_user');
              if (localUser) setUser(JSON.parse(localUser));
@@ -882,9 +1076,10 @@ export function Settings() {
     loadProfile();
   }, []);
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
     localStorage.setItem('stationery_user', JSON.stringify(user));
+    try { await db.set('settings', 'profile', user); } catch(err) {}
     alert('Perfil atualizado!');
     window.location.reload(); 
   };
@@ -900,6 +1095,12 @@ export function Settings() {
             onClick={() => setActiveTab('profile')}
         >
             <User size={16} className="inline mr-2" /> Meu Perfil
+        </button>
+        <button 
+            className={`tab-item ${activeTab === 'pricing' ? 'active' : ''}`}
+            onClick={() => setActiveTab('pricing')}
+        >
+            <Wallet size={16} className="inline mr-2" /> Precificação & Gastos (BDI)
         </button>
         <button 
             className={`tab-item ${activeTab === 'roles' ? 'active' : ''}`}
@@ -941,6 +1142,7 @@ export function Settings() {
       
       {/* CONTENT */}
       {activeTab === 'profile' && <ProfileSettings user={user} setUser={setUser} onSave={handleSaveProfile} />}
+      {activeTab === 'pricing' && <PricingSettings />}
       {activeTab === 'roles' && <RolesSettings />}
       {activeTab === 'business_hours' && <BusinessHoursSettings />}
       {activeTab === 'categories' && <CategoriesSettings />}

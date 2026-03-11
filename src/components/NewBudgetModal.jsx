@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Trash2, Wrench } from 'lucide-react';
+import { X, Save, Plus, Trash2, Wrench, Package } from 'lucide-react';
 import db from '../services/database.js';
+import { calculateFractionalCost, getSubUnits } from '../utils/units';
 
 export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [equipments, setEquipments] = useState([]);
+  const [materials, setMaterials] = useState([]);
   
   const [formData, setFormData] = useState({
     customer: '',
@@ -26,6 +28,14 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
     hourCost: 0
   });
 
+  const [currentMaterial, setCurrentMaterial] = useState({
+      materialId: '',
+      quantity: 1,
+      usageUnit: 'un',
+      cost: 0,
+      baseUnit: 'un'
+  });
+
   useEffect(() => {
     const loadData = async () => {
         if (isOpen) {
@@ -33,10 +43,12 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                 const loadedCustomers = await db.getAll('customers');
                 const loadedProducts = await db.getAll('products');
                 const loadedEquips = await db.getAll('equipments');
+                const loadedInventory = await db.getAll('inventory');
                 
                 setCustomers(Array.isArray(loadedCustomers) ? loadedCustomers : []);
                 setProducts(Array.isArray(loadedProducts) ? loadedProducts : []);
                 setEquipments(Array.isArray(loadedEquips) ? loadedEquips : []);
+                setMaterials(Array.isArray(loadedInventory) ? loadedInventory.filter(i => i.type === 'material') : []);
 
                 const nextWeek = new Date();
                 nextWeek.setDate(nextWeek.getDate() + 7);
@@ -48,11 +60,13 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                 });
                 setCurrentItem({ productId: '', quantity: 1, price: 0 });
                 setCurrentMachine({ equipId: '', minutes: 30, hourCost: 0 });
+                setCurrentMaterial({ materialId: '', quantity: 1, usageUnit: 'un', cost: 0, baseUnit: 'un' });
             } catch (error) {
                 console.error("Error loading modal data:", error);
                 setCustomers([]);
                 setProducts([]);
                 setEquipments([]);
+                setMaterials([]);
             }
         }
     };
@@ -78,6 +92,22 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
           setCurrentMachine(prev => ({ ...prev, equipId: eId, hourCost: hrCost }));
       } else {
           setCurrentMachine(prev => ({ ...prev, equipId: '', hourCost: 0 }));
+      }
+  };
+
+  const handleMaterialSelect = (e) => {
+      const mId = e.target.value;
+      const material = materials.find(m => m.id === mId);
+      if (material) {
+          setCurrentMaterial({
+              materialId: mId,
+              quantity: 1,
+              usageUnit: material.unit || 'un',
+              cost: material.cost || 0,
+              baseUnit: material.unit || 'un'
+          });
+      } else {
+          setCurrentMaterial({ materialId: '', quantity: 1, usageUnit: 'un', cost: 0, baseUnit: 'un' });
       }
   };
 
@@ -122,6 +152,27 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
       }));
       
       setCurrentMachine({ equipId: '', minutes: 30, hourCost: 0 });
+  };
+
+  const addMaterialCost = () => {
+      if (!currentMaterial.materialId) return;
+      const material = materials.find(m => m.id === currentMaterial.materialId);
+      
+      const calcCost = calculateFractionalCost(currentMaterial.cost, currentMaterial.baseUnit, currentMaterial.usageUnit, currentMaterial.quantity);
+      
+      setFormData(prev => ({
+          ...prev,
+          items: [...prev.items, {
+              productId: `mat-${currentMaterial.materialId}-${Date.now()}`,
+              productName: `Material (Avulso): ${material.name} (${currentMaterial.quantity} ${currentMaterial.usageUnit})`,
+              quantity: 1,
+              price: calcCost,
+              total: calcCost,
+              isMaterialCost: true
+          }]
+      }));
+      
+      setCurrentMaterial({ materialId: '', quantity: 1, usageUnit: 'un', cost: 0, baseUnit: 'un' });
   };
 
   const calculateTotal = () => {
@@ -228,6 +279,70 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                     <button type="button" className="btn btn-secondary" onClick={addItem}>
                         <Plus size={16} />
                     </button>
+                </div>
+            </div>
+
+            {/* Injeção: Adicionar Material Fracionado no Orçamento */}
+            <div style={{ backgroundColor: '#fff7ed', border: '1px dashed #fdba74', padding: '16px', borderRadius: '8px', marginTop: '16px' }}>
+                <h4 style={{ marginBottom: '8px', fontSize: '0.9rem', color: '#c2410c', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Package size={14} color="#ea580c" /> Vender Fração de Material (Corte/Dose Custo Base)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 'var(--space-sm)', alignItems: 'end' }}>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                        <select 
+                            className="form-input"
+                            value={currentMaterial.materialId}
+                            onChange={handleMaterialSelect}
+                        >
+                            <option value="">Selecione o Material / Insumo...</option>
+                            {Object.entries(
+                                materials.reduce((acc, m) => {
+                                    const g = m.materialGroup || 'Outros / Sem Grupo';
+                                    if (!acc[g]) acc[g] = [];
+                                    acc[g].push(m);
+                                    return acc;
+                                }, {})
+                            )
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([group, mats]) => (
+                                <optgroup key={group} label={group}>
+                                    {mats.sort((a,b) => a.name.localeCompare(b.name)).map(m => (
+                                        <option key={m.id} value={m.id}>{m.name} (R$ {m.cost}/{m.unit})</option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                        <input 
+                            type="number" 
+                            step="any"
+                            className="form-input" 
+                            placeholder="Qtd Exata"
+                            value={currentMaterial.quantity}
+                            onChange={e => setCurrentMaterial({...currentMaterial, quantity: e.target.value})}
+                        />
+                    </div>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                         <select 
+                            className="form-input"
+                            value={currentMaterial.usageUnit}
+                            onChange={e => setCurrentMaterial({...currentMaterial, usageUnit: e.target.value})}
+                            disabled={!currentMaterial.materialId}
+                        >
+                            {getSubUnits(currentMaterial.baseUnit).map(u => (
+                                <option key={u} value={u}>{u}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <button type="button" className="btn btn-secondary" onClick={addMaterialCost} style={{ backgroundColor: '#fb923c', color: 'white', borderColor: '#fb923c' }}>
+                        <Plus size={16} />
+                    </button>
+                    {currentMaterial.materialId && (
+                        <div style={{ gridColumn: '1 / -1', fontSize: '0.8rem', color: '#c2410c', marginTop: '4px', textAlign: 'right' }}>
+                            Subtotal do Insumo calculado pelo sistema: <strong>R$ {calculateFractionalCost(currentMaterial.cost, currentMaterial.baseUnit, currentMaterial.usageUnit, currentMaterial.quantity).toFixed(2)}</strong> (Baseado em {currentMaterial.baseUnit} Original)
+                        </div>
+                    )}
                 </div>
             </div>
 
