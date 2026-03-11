@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckCircle, Printer, Play, Edit, AlertCircle, Clock, Share2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Printer, Play, Edit, AlertCircle, Clock, Share2, DollarSign, Package } from 'lucide-react';
 import db from '../services/database.js';
 
 import { NewOrderModal } from '../components/NewOrderModal';
 import { ConfirmOrderPaymentModal } from '../components/ConfirmOrderPaymentModal';
 import { ProductionSheetModal } from '../components/ProductionSheetModal';
+import { OrderDetailsModal } from '../components/OrderDetailsModal';
 
 export function Orders() {
   const [orders, setOrders] = useState([]);
@@ -33,6 +34,9 @@ export function Orders() {
   const [isProductionModalOpen, setIsProductionModalOpen] = useState(false);
   const [orderForProduction, setOrderForProduction] = useState(null);
 
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+
   const fetchOrders = async () => {
     const allOrders = await db.getAll('orders');
     setOrders(allOrders);
@@ -57,6 +61,19 @@ export function Orders() {
 
       return matchesSearch && matchesStatus;
     });
+    
+    // Sort from newest to oldest
+    results.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.date || 0).getTime();
+        const dateB = new Date(b.createdAt || b.date || 0).getTime();
+        // Fallback to id if dates are equal/missing
+        if (dateA === dateB) {
+            // Assume ID could be a reliable timestamp-like fallback or simply numeric/string sort Desc
+            return String(b.id).localeCompare(String(a.id));
+        }
+        return dateB - dateA;
+    });
+
     setFilteredOrders(results);
   }, [searchTerm, statusFilter, orders]);
 
@@ -360,6 +377,17 @@ export function Orders() {
       );
   };
 
+  const summary = {
+    count: filteredOrders.length,
+    revenue: filteredOrders.reduce((acc, order) => acc + (order.total || 0), 0),
+    items: filteredOrders.reduce((acc, order) => {
+      if (order.cartItems && order.cartItems.length > 0) {
+         return acc + order.cartItems.reduce((a, b) => a + (parseInt(b.quantity) || 1), 0);
+      }
+      return acc + (parseInt(order.items) || 0);
+    }, 0)
+  };
+
   return (
     <div className="animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: '1rem' }}>
@@ -396,6 +424,31 @@ export function Orders() {
         </button>
       </div>
 
+      {/* Summary Box */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-lg"><Clock size={24} /></div>
+              <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase">Pedidos Filtrados</p>
+                  <p className="text-xl font-bold text-gray-800">{summary.count}</p>
+              </div>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><DollarSign size={24} /></div>
+              <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase">Subtotal (Filtrado)</p>
+                  <p className="text-xl font-bold text-gray-800">R$ {summary.revenue.toFixed(2).replace('.', ',')}</p>
+              </div>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-purple-50 text-purple-600 rounded-lg"><Package size={24} /></div>
+              <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase">Itens Produzidos</p>
+                  <p className="text-xl font-bold text-gray-800">{summary.items}</p>
+              </div>
+          </div>
+      </div>
+
       <div className="card" style={{ overflowX: 'auto' }}>
         <div className="table-container">
           <table className="table">
@@ -414,7 +467,11 @@ export function Orders() {
             </thead>
             <tbody>
               {filteredOrders.map(order => (
-                <tr key={order.id}>
+                <tr 
+                    key={order.id} 
+                    onClick={() => { setSelectedOrderDetails(order); setIsDetailsModalOpen(true); }}
+                    className="hover:bg-gray-50/50 cursor-pointer transition-colors"
+                >
                   <td className="text-muted" title={order.id}>
                       <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', backgroundColor: 'var(--surface-hover)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
                           #{String(order.id).slice(-6).toUpperCase()}
@@ -442,7 +499,7 @@ export function Orders() {
                   <td>{getFinancialStatus(order)}</td>
                   <td>{order.items}</td>
                   <td style={{ fontWeight: 600 }}>R$ {((order.total || 0)).toFixed(2).replace('.', ',')}</td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', alignItems: 'center' }}>
                         <button 
                           className="btn btn-icon" 
@@ -529,6 +586,23 @@ export function Orders() {
         isOpen={isProductionModalOpen}
         onClose={() => setIsProductionModalOpen(false)}
         order={orderForProduction}
+      />
+
+      <OrderDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        order={selectedOrderDetails}
+        companyConfig={companyConfig}
+        onEdit={(o) => { setOrderToEdit(o); setIsModalOpen(true); }}
+        onDelete={(id) => handleDelete(id)}
+        onPrint={(o) => { setOrderForProduction(o); setIsProductionModalOpen(true); }}
+        onShare={(o) => {
+            const link = window.location.origin + window.location.pathname + "#/status/" + o.id;
+            const text = encodeURIComponent(`Olá ${o.customer.split(' ')[0]}!\n✨ Acompanhe em tempo real a mágica acontecendo no seu pedido com a ${companyConfig.companyName || 'nossa equipe'} pelo Link abaixo:\n\n${link}`);
+            window.open(`https://wa.me/?text=${text}`, '_blank');
+        }}
+        onStartProduction={(o) => handleSendToProduction(o)}
+        onComplete={(o) => handleCompleteOrder(o)}
       />
 
     </div>

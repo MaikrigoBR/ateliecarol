@@ -222,8 +222,8 @@ export function Dashboard() {
                     <div className="chart-header">
                         <BarChart2 size={20} color="var(--primary)" /> Desempenho Mensal
                     </div>
-                    <div style={{ width: '100%', height: '320px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div style={{ width: '100%', height: '320px', minWidth: 0, minHeight: 0 }}>
+                        <ResponsiveContainer width="99%" height="100%">
                             <ComposedChart data={salesData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorVendasBar" x1="0" y1="0" x2="0" y2="1">
@@ -268,8 +268,8 @@ export function Dashboard() {
                     <div className="chart-header">
                          Distribuição de Status
                     </div>
-                    <div style={{ width: '100%', height: '300px', position: 'relative' }}>
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div style={{ width: '100%', height: '300px', position: 'relative', minWidth: 0, minHeight: 0 }}>
+                        <ResponsiveContainer width="99%" height="100%">
                             <PieChart>
                                 <Pie
                                     data={statusData}

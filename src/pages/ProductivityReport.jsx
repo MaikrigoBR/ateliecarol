@@ -203,8 +203,8 @@ export function ProductivityReport() {
                     <div className="chart-header">
                         <TrendingUp size={20} color="var(--primary)" /> Produção vs Ociosidade (Horas)
                     </div>
-                    <div style={{ height: '300px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div style={{ height: '300px', width: '100%', minWidth: 0, minHeight: 0 }}>
+                        <ResponsiveContainer width="99%" height="100%">
                             <BarChart data={metrics.stepChartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="name" />
@@ -226,9 +226,9 @@ export function ProductivityReport() {
                             <CalendarCheck size={20} color="#10b981" /> Histórico de Eficiência (SLA)
                         </div>
                     </div>
-                    <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ height: '300px', width: '100%', minWidth: 0, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                          {(metrics.onTime > 0 || metrics.late > 0) ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="99%" height="100%">
                                 <PieChart>
                                     <Pie
                                         data={[
@@ -261,8 +261,8 @@ export function ProductivityReport() {
                     <div className="chart-header">
                         <Users size={20} color="#3b82f6" /> Ranking de Produção (Tarefas Concluídas)
                     </div>
-                    <div style={{ height: '300px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div style={{ height: '300px', width: '100%', minWidth: 0, minHeight: 0 }}>
+                        <ResponsiveContainer width="99%" height="100%">
                             <BarChart data={metrics.staffChartData} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                 <XAxis type="number" />
