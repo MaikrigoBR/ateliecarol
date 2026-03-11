@@ -545,20 +545,29 @@ export function Production() {
                     <h2>Controle de Produção</h2>
                     <div className="text-sm text-muted">Acompanhe gargalos, SLA e atue nas aprovações de qualidade.</div>
                 </div>
-                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 text-sm font-medium mr-2">
+                <div 
+                    className="flex items-center gap-4 bg-white border border-gray-200 shadow-sm px-4 py-2.5 rounded-2xl transition-all hover:shadow-md"
+                    title="Controle de Notificações Ativas do WhatsApp"
+                >
+                    <div className="flex flex-col">
+                        <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                            <MessageCircle size={14} className={notificationMode === 'all' ? 'text-[#25D366]' : 'text-gray-400'}/> 
+                            Automador WhatsApp
+                        </span>
+                        <span className="text-[10px] text-gray-400 mt-0.5" style={{ maxWidth: '160px', lineHeight: '1.2' }}>
+                            {notificationMode === 'all' ? 'Disparando mensagens a cada troca de coluna' : 'Silenciado: avisando apenas o Início e a Conclusão'}
+                        </span>
+                    </div>
+                    
                     <button 
-                        className={`px-3 py-1.5 flex items-center gap-2 rounded-md transition-colors ${notificationMode === 'all' ? 'bg-white shadow-sm border border-transparent text-[#25D366]' : 'text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => setNotificationMode('all')}
-                        title="Envia mensagem automática para o cliente a cada avanço no quadro."
+                        type="button"
+                        className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${notificationMode === 'all' ? 'bg-[#25D366]' : 'bg-gray-300'}`}
+                        onClick={() => setNotificationMode(prev => prev === 'all' ? 'endpoints' : 'all')}
                     >
-                        <MessageCircle size={14} /> Ativo em Todas
-                    </button>
-                    <button 
-                        className={`px-3 py-1.5 flex items-center gap-2 rounded-md transition-colors ${notificationMode === 'endpoints' ? 'bg-white shadow-sm border border-transparent text-[#25D366]' : 'text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => setNotificationMode('endpoints')}
-                        title="Envia mensagem automática apenas no Início da Produção e na Conclusão. As demais etapas não geram span visual, mas deixam o link atualizado em off."
-                    >
-                        <AlertCircle size={14} /> Somente Início/Fim
+                        <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${notificationMode === 'all' ? 'translate-x-5' : 'translate-x-0'}`}
+                        />
                     </button>
                 </div>
             </div>
