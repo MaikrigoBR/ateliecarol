@@ -49,3 +49,12 @@ export const calculateFractionalCost = (baseCost, baseUnit, usageUnit, usageQty)
     // O custo é $10 * (1 * 0.01) = 10 * 0.01 = 0.1
     return cost * (qty * conversionFactor);
 };
+
+export const convertToFractionalQty = (baseUnit, usageUnit, usageQty) => {
+    const qty = parseFloat(usageQty) || 0;
+    if (baseUnit === usageUnit || !unitConversions[baseUnit] || !unitConversions[baseUnit][usageUnit]) {
+        return qty;
+    }
+    const conversionFactor = unitConversions[baseUnit][usageUnit];
+    return qty * conversionFactor;
+};

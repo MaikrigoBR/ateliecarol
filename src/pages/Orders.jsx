@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle, Printer, Play, Edit, AlertCircle, Clock, Share2, DollarSign, Package } from 'lucide-react';
 import db from '../services/database.js';
+import { convertToFractionalQty } from '../utils/units.js';
 
 import { NewOrderModal } from '../components/NewOrderModal';
 import { ConfirmOrderPaymentModal } from '../components/ConfirmOrderPaymentModal';
@@ -211,9 +212,14 @@ export function Orders() {
               const product = await db.getById('products', item.productId);
               if (product && product.materials) {
                   product.materials.forEach(mat => {
-                      const requiredQty = parseFloat(mat.qty) * item.qty;
-                      if (deductions[mat.id]) deductions[mat.id] += requiredQty;
-                      else deductions[mat.id] = requiredQty;
+                      const stockItem = inventory.find(i => String(i.id) === String(mat.id));
+                      const baseUnit = stockItem ? stockItem.unit : 'un';
+                      const usageUnit = mat.usageUnit || baseUnit;
+                      
+                      const requiredBaseQty = convertToFractionalQty(baseUnit, usageUnit, parseFloat(mat.qty)) * item.qty;
+                      
+                      if (deductions[mat.id]) deductions[mat.id] += requiredBaseQty;
+                      else deductions[mat.id] = requiredBaseQty;
                   });
               }
           }
@@ -223,7 +229,8 @@ export function Orders() {
               const stockItem = inventory.find(i => String(i.id) === String(matId));
               const requiredTotal = deductions[matId];
               if (!stockItem || parseFloat(stockItem.quantity) < requiredTotal) {
-                  missingMaterials.push(`${stockItem?.name || 'Material ID '+matId} (Necessário: ${requiredTotal.toFixed(2)}, Disponível: ${stockItem ? parseFloat(stockItem.quantity).toFixed(2) : 0})`);
+                  const unitStr = stockItem ? stockItem.unit : 'un';
+                  missingMaterials.push(`${stockItem?.name || 'Material ID '+matId} (Necessário: ${requiredTotal.toFixed(2)}${unitStr}, Disponível: ${stockItem ? parseFloat(stockItem.quantity).toFixed(2) : 0}${unitStr})`);
               }
            });
 
