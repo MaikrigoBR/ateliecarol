@@ -101,43 +101,101 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
     { value: 'transfer', label: 'Transferência' }
   ];
 
+  // --- Inline Styles mapping to Theme Variables ---
+  const sOverlay = {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1050, padding: '1rem'
+  };
+
+  const sModal = {
+      backgroundColor: 'var(--surface)', 
+      width: '100%', maxWidth: '540px', maxHeight: '90vh',
+      borderRadius: 'var(--radius-lg)',
+      boxShadow: 'var(--shadow-lg)',
+      display: 'flex', flexDirection: 'column',
+      border: '1px solid var(--border)',
+      overflow: 'hidden',
+      color: 'var(--text-main)',
+      animation: 'slideUp 0.3s ease-out'
+  };
+
+  const sHeader = {
+      padding: '1.25rem 1.5rem',
+      borderBottom: '1px solid var(--border)',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      backgroundColor: 'var(--background)'
+  };
+
+  const sBody = {
+      padding: '1.5rem',
+      overflowY: 'auto',
+      display: 'flex', flexDirection: 'column', gap: '1rem'
+  };
+
+  const sFooter = {
+      padding: '1rem 1.5rem',
+      borderTop: '1px solid var(--border)',
+      backgroundColor: 'var(--background)',
+      display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center'
+  };
+
+  const sCardLinear = {
+      backgroundColor: 'var(--surface-hover)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
+      padding: '1rem',
+      display: 'flex', flexDirection: 'column', gap: '0.75rem'
+  };
+
+  const sInput = {
+      width: '100%', padding: '0.625rem 0.875rem', 
+      border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+      backgroundColor: 'var(--surface)', color: 'var(--text-main)',
+      fontSize: '0.875rem', height: '2.5rem'
+  };
+
   return (
-    <div className="modal-overlay">
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-        <div className="modal-header">
-          <h2 className="modal-title flex items-center gap-2">
-            <DollarSign size={20} className="text-primary"/> 
-            Registrar Pagamento
+    <div style={sOverlay} onClick={onClose}>
+      <div style={sModal} onClick={e => e.stopPropagation()}>
+        
+        {/* Header */}
+        <div style={sHeader}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <DollarSign size={22} color="var(--success)"/> 
+            Registrar Recebimento
           </h2>
-          <button className="btn btn-icon" onClick={onClose}>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.5rem' }}>
             <X size={20} />
           </button>
         </div>
         
-        <div className="modal-body space-y-4">
+        <div style={sBody} className="hide-scrollbar">
+            
             {/* Context */}
-            <div className="bg-gray-50 p-4 rounded-lg flex justify-between items-center text-sm">
+            <div style={{ ...sCardLinear, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderLeft: '3px solid var(--primary)' }}>
                 <div>
-                    <span className="text-muted block">Valor do Pedido</span>
-                    <strong className="text-gray-800 text-lg">R$ {totalOrderValue.toFixed(2)}</strong>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total do Pedido</span>
+                    <strong style={{ fontSize: '1.25rem', color: 'var(--text-main)' }}>R$ {totalOrderValue.toFixed(2).replace('.', ',')}</strong>
                 </div>
                 {amountPaidSoFar > 0 && (
-                     <div className="text-right">
-                        <span className="text-muted block">Já Pago</span>
-                        <span className="text-green-600 font-bold">R$ {amountPaidSoFar.toFixed(2)}</span>
+                     <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Já Pago Anteriormente</span>
+                        <span style={{ fontSize: '1.125rem', color: 'var(--success)', fontWeight: 700 }}>R$ {amountPaidSoFar.toFixed(2).replace('.', ',')}</span>
                     </div>
                 )}
             </div>
 
             {/* Amount Entry */}
-            <div className="input-group">
-                <label className="form-label">Valor a Receber Agora</label>
-                <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-gray-400">R$</span>
+            <div style={sCardLinear}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>Valor a Receber Agora</label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ position: 'absolute', left: '1rem', color: 'var(--text-muted)', fontWeight: 700 }}>R$</span>
                     <input 
                         type="number" 
                         step="0.01"
-                        className="form-input pl-8 text-lg font-bold text-gray-800"
+                        style={{ ...sInput, paddingLeft: '2.5rem', fontSize: '1.125rem', fontWeight: 700 }}
                         value={paymentAmount}
                         onChange={e => setPaymentAmount(e.target.value)}
                         max={initialBalanceDue}
@@ -145,28 +203,19 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
                 </div>
             </div>
 
-            {/* Method & Condition & Account */}
-            <div className="grid grid-cols-2 gap-4">
-                 <div className="input-group">
-                    <label className="form-label">Forma</label>
-                     <select 
-                        className="form-input"
-                        value={paymentMethod}
-                        onChange={e => setPaymentMethod(e.target.value)}
-                    >
+            {/* Method & Account */}
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                 <div style={{ flex: 1, minWidth: '200px' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Forma de Pagamento</label>
+                    <select style={sInput} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
                         {paymentMethods.map(method => (
                             <option key={method.value} value={method.value}>{method.label}</option>
                         ))}
                     </select>
                 </div>
-                <div className="input-group">
-                    <label className="form-label">Conta de Destino</label>
-                     <select 
-                        className="form-input cursor-pointer"
-                        value={selectedAccountId}
-                        onChange={e => setSelectedAccountId(e.target.value)}
-                        required
-                    >
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Conta de Destino (Caixa/Banco)</label>
+                    <select style={{ ...sInput, cursor: 'pointer' }} value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} required>
                         <option value="">Selecione...</option>
                         {accounts.map(acc => (
                             <option key={acc.id} value={acc.id}>{acc.name}</option>
@@ -175,14 +224,10 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div className="input-group">
-                    <label className="form-label">Condição</label>
-                    <select 
-                        className="form-input"
-                        value={paymentCondition}
-                        onChange={e => setPaymentCondition(e.target.value)}
-                    >
+            <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Condição</label>
+                    <select style={sInput} value={paymentCondition} onChange={e => setPaymentCondition(e.target.value)}>
                         <option value="spot">À Vista</option>
                         <option value="installment">Parcelado</option>
                     </select>
@@ -191,46 +236,29 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
 
             {/* Installments & Interest Logic */}
             {paymentCondition === 'installment' && (
-                <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="input-group">
-                            <label className="form-label text-xs uppercase tracking-wide text-blue-800">Parcelas</label>
-                            <input 
-                                type="number" 
-                                min="2" max="24"
-                                className="form-input bg-white"
-                                value={installments}
-                                onChange={e => setInstallments(e.target.value)}
-                            />
+                <div style={{ ...sCardLinear, borderLeft: '3px solid var(--info)', backgroundColor: 'transparent' }}>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--info)', textTransform: 'uppercase', display: 'block', marginBottom: '0.375rem' }}>Nº Parcelas</label>
+                            <input type="number" min="2" max="24" style={sInput} value={installments} onChange={e => setInstallments(e.target.value)} />
                         </div>
-                        <div className="flex items-center pt-6">
-                            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 font-medium">
-                                <input 
-                                    type="checkbox" 
-                                    checked={applyInterest}
-                                    onChange={e => setApplyInterest(e.target.checked)}
-                                    className="rounded text-primary focus:ring-primary"
-                                />
-                                Aplicar Juros?
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', paddingBottom: '0.5rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                <input type="checkbox" checked={applyInterest} onChange={e => setApplyInterest(e.target.checked)} style={{ width: '1.25rem', height: '1.25rem', accentColor: 'var(--primary)' }} />
+                                Adicionar Juros?
                             </label>
                         </div>
                     </div>
                     
                     {applyInterest && (
-                        <div className="flex gap-4 items-center animate-fadeIn">
-                             <div className="input-group flex-1">
-                                <label className="form-label text-xs">Taxa de Juros (%)</label>
-                                <input 
-                                    type="number" step="0.1"
-                                    className="form-input bg-white"
-                                    value={interestRate}
-                                    onChange={e => setInterestRate(e.target.value)}
-                                    placeholder="Ex: 5"
-                                />
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', animation: 'fadeIn 0.3s ease-out', marginTop: '0.5rem' }}>
+                             <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Taxa Acréscimo (%)</label>
+                                <input type="number" step="0.1" style={sInput} value={interestRate} onChange={e => setInterestRate(e.target.value)} placeholder="Ex: 5" />
                              </div>
-                             <div className="flex-1 text-right">
-                                 <span className="text-xs text-muted block">Valor Adicional</span>
-                                 <strong className="text-red-500">+ R$ {surchargeAmount.toFixed(2)}</strong>
+                             <div style={{ flex: 1, textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Custo do Parcelamento</span>
+                                 <strong style={{ color: 'var(--danger)', fontSize: '1rem' }}>+ R$ {surchargeAmount.toFixed(2).replace('.', ',')}</strong>
                              </div>
                         </div>
                     )}
@@ -238,50 +266,38 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
             )}
 
             {/* Summary of Transaction */}
-            <div className="border-t border-gray-100 pt-3">
-                 <div className="flex justify-between items-center mb-2">
-                     <span className="text-sm text-gray-600">Total desta Transação:</span>
-                     <span className="text-lg font-bold text-primary">R$ {(parsedPayment + surchargeAmount).toFixed(2)}</span>
+            <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                     <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Total lançado nesta transação:</span>
+                     <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>R$ {(parsedPayment + surchargeAmount).toFixed(2).replace('.', ',')}</span>
                  </div>
                  
                  {balanceRemaining > 0.05 ? (
-                     <div className="bg-orange-50 p-3 rounded border border-orange-100 mt-2">
-                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-orange-800 font-medium text-sm">Saldo Restante (Devedor)</span>
-                            <span className="text-orange-800 font-bold">R$ {balanceRemaining.toFixed(2)}</span>
+                     <div style={{ ...sCardLinear, backgroundColor: 'transparent', border: '1px solid var(--warning)', borderLeft: '4px solid var(--warning)', marginTop: '0.5rem' }}>
+                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <span style={{ color: 'var(--warning)', fontWeight: 700, fontSize: '0.875rem' }}>Dívida Restante Gerada</span>
+                            <span style={{ color: 'var(--warning)', fontWeight: 800, fontSize: '1.125rem' }}>R$ {balanceRemaining.toFixed(2).replace('.', ',')}</span>
                          </div>
-                         <div className="input-group">
-                             <label className="form-label text-xs text-orange-800">Vencimento do Restante</label>
-                             <input 
-                                type="date"
-                                className="form-input bg-white border-orange-200 focus:border-orange-400"
-                                value={nextDueDate}
-                                onChange={e => setNextDueDate(e.target.value)}
-                                required
-                             />
+                         <div>
+                             <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--warning)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Vencimento do Saldo Devedor</label>
+                             <input type="date" style={{ ...sInput, borderColor: 'var(--warning)' }} value={nextDueDate} onChange={e => setNextDueDate(e.target.value)} required />
                          </div>
                      </div>
                  ) : (
-                     <div className="text-center text-green-600 text-sm font-medium bg-green-50 p-2 rounded mt-2">
-                         <Check size={14} className="inline mr-1"/>
-                         Pedido será quitado integralmente.
+                     <div style={{ textAlign: 'center', color: '#fff', backgroundColor: 'var(--success)', padding: '0.5rem', borderRadius: 'var(--radius-md)', marginTop: '1rem', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                         <Check size={16} /> Parcela Final — Pedido Quitado.
                      </div>
                  )}
             </div>
             
         </div>
 
-        <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+        <div style={sFooter}>
+            <button type="button" className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>
                 Cancelar
             </button>
-            <button 
-                type="button" 
-                className="btn btn-primary" 
-                onClick={handleConfirm}
-                disabled={balanceRemaining > 0.05 && !nextDueDate} // Require due date if partial
-            >
-                Confirmar Pagamento
+            <button type="button" className="btn btn-primary" onClick={handleConfirm} disabled={balanceRemaining > 0.05 && !nextDueDate} style={{ flex: 1, backgroundColor: 'var(--success)' }}>
+                Liquidar
             </button>
         </div>
       </div>
