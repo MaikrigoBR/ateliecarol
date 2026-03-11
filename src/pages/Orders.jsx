@@ -425,26 +425,49 @@ export function Orders() {
       </div>
 
       {/* Summary Box */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-lg"><Clock size={24} /></div>
-              <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Pedidos Filtrados</p>
-                  <p className="text-xl font-bold text-gray-800">{summary.count}</p>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: 'var(--space-xl)', overflowX: 'auto', paddingBottom: '0.5rem' }} className="hide-scrollbar">
+          <div className="stat-card" style={{ borderLeftColor: '#3b82f6', minWidth: '240px', flex: 1, flexShrink: 0 }}>
+              <div className="flex-1">
+                  <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                      Pedidos Filtrados
+                  </p>
+                  <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
+                      {summary.count}
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Total listados abaixo</p>
+              </div>
+              <div className="stat-icon-wrapper" style={{ color: '#3b82f6', backgroundColor: '#3b82f61A' }}>
+                  <Clock size={24} />
               </div>
           </div>
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><DollarSign size={24} /></div>
-              <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Subtotal (Filtrado)</p>
-                  <p className="text-xl font-bold text-gray-800">R$ {summary.revenue.toFixed(2).replace('.', ',')}</p>
+
+          <div className="stat-card" style={{ borderLeftColor: '#10b981', minWidth: '240px', flex: 1, flexShrink: 0 }}>
+              <div className="flex-1">
+                  <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                      Subtotal (Filtrado)
+                  </p>
+                  <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
+                      R$ {summary.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Valor bruto projetado</p>
+              </div>
+              <div className="stat-icon-wrapper" style={{ color: '#10b981', backgroundColor: '#10b9811A' }}>
+                  <DollarSign size={24} />
               </div>
           </div>
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-purple-50 text-purple-600 rounded-lg"><Package size={24} /></div>
-              <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Itens Produzidos</p>
-                  <p className="text-xl font-bold text-gray-800">{summary.items}</p>
+
+          <div className="stat-card" style={{ borderLeftColor: '#8b5cf6', minWidth: '240px', flex: 1, flexShrink: 0 }}>
+              <div className="flex-1">
+                  <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                      Itens Físicos
+                  </p>
+                  <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
+                      {summary.items}
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Volumes a produzir/entregar</p>
+              </div>
+              <div className="stat-icon-wrapper" style={{ color: '#8b5cf6', backgroundColor: '#8b5cf61A' }}>
+                  <Package size={24} />
               </div>
           </div>
       </div>
