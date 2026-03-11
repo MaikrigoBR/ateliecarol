@@ -43,6 +43,15 @@ export function Production() {
     const [qcTargetStep, setQcTargetStep] = useState(null);
     const [qcChecks, setQcChecks] = useState({});
 
+    // WhatsApp Notification Mode: 'all' or 'endpoints'
+    const [notificationMode, setNotificationMode] = useState(() => {
+        return localStorage.getItem('stationery_notif_mode') || 'all';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('stationery_notif_mode', notificationMode);
+    }, [notificationMode]);
+
     const fetchOrders = async () => {
         setLoading(true);
         try {
@@ -219,6 +228,11 @@ export function Production() {
             if (num.length >= 10) {
                 const stepName = COLUMNS.find(c => c.id === stepId)?.label || 'Concluído';
                 
+                // Aborta disparo caso o usuário peça apenas Inicio e Fim, e a etapa for intermediária
+                if (notificationMode === 'endpoints' && stepId !== 'pending' && stepId !== 'completed' && stepId !== 'complete_order') {
+                    return; 
+                }
+
                 // --- Disparo pela API de WhatsApp Oculta ---
                 let companyName = 'nossa equipe';
                 try {
@@ -526,10 +540,26 @@ export function Production() {
 
     return (
         <div className="animate-fade-in" style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
-            <div className="card-header flex justify-between items-center">
+            <div className="card-header flex justify-between items-center flex-wrap gap-4">
                 <div>
                     <h2>Controle de Produção</h2>
                     <div className="text-sm text-muted">Acompanhe gargalos, SLA e atue nas aprovações de qualidade.</div>
+                </div>
+                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 text-sm font-medium mr-2">
+                    <button 
+                        className={`px-3 py-1.5 flex items-center gap-2 rounded-md transition-colors ${notificationMode === 'all' ? 'bg-white shadow-sm border border-transparent text-[#25D366]' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setNotificationMode('all')}
+                        title="Envia mensagem automática para o cliente a cada avanço no quadro."
+                    >
+                        <MessageCircle size={14} /> Ativo em Todas
+                    </button>
+                    <button 
+                        className={`px-3 py-1.5 flex items-center gap-2 rounded-md transition-colors ${notificationMode === 'endpoints' ? 'bg-white shadow-sm border border-transparent text-[#25D366]' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setNotificationMode('endpoints')}
+                        title="Envia mensagem automática apenas no Início da Produção e na Conclusão. As demais etapas não geram span visual, mas deixam o link atualizado em off."
+                    >
+                        <AlertCircle size={14} /> Somente Início/Fim
+                    </button>
                 </div>
             </div>
 
