@@ -74,7 +74,16 @@ export function Orders() {
         return dateB - dateA;
     });
 
-    setFilteredOrders(results);
+    // Deduplicate mathematically identical orders from database (in case of double imports)
+    const seen = new Set();
+    const dedupedResults = results.filter(item => {
+        const key = `${item.customer}_${item.date||item.createdAt}_${item.total}_${item.status}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    setFilteredOrders(dedupedResults);
   }, [searchTerm, statusFilter, orders]);
 
   const handleOrderCreated = () => {

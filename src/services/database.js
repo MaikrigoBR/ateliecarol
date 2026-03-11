@@ -14,14 +14,26 @@ const COLLECTIONS = {
 };
 
 export const database = {
-    // 1. GET ALL
     async getAll(collectionName) {
         try {
             if (!db) return []; // Guard if init failed
             const q = query(collection(db, collectionName));
             // You can add orderBy here if needed, e.g. orderBy('date', 'desc')
             const querySnapshot = await getDocs(q);
-            return snapshotToArray(querySnapshot);
+            const rawArray = snapshotToArray(querySnapshot);
+            
+            // Global Deduplication:
+            // Prevent accidental double-imports from bloating the entire application
+            const seen = new Set();
+            const uniqueArray = rawArray.filter(item => {
+                // Strip ID for comparison so exact same content counts as duplicate
+                const { id, ...contentProps } = item;
+                const key = JSON.stringify(contentProps);
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            return uniqueArray;
         } catch (error) {
             console.error(`Error getting ${collectionName}:`, error);
             // Fallback for demo/empty state

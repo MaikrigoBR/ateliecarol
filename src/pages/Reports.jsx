@@ -101,7 +101,25 @@ export function Reports() {
               });
               break;
       }
-      setFilteredData(result);
+      
+      // Deduplicate result to fix "items multiplied several times" bug
+      const seen = new Set();
+      const dedupedResult = result.filter(item => {
+          // Identify essentially duplicate entries even with different DB IDs if we want strict deduplication.
+          // In case 'arquivos' (records) were accidentally duplicated in DB syncs.
+          let key;
+          if (activeTab === 'sales') key = `${item.customer}_${item.date||item.createdAt}_${item.total}`;
+          else if (activeTab === 'inventory') key = `${item.name}_${item.type}_${item.quantity}`;
+          else if (activeTab === 'finance') key = `${item.description}_${item.date}_${item.amount}`;
+          else if (activeTab === 'customers') key = `${item.name}_${item.email}`;
+          else key = item.id ? String(item.id) : JSON.stringify(item);
+          
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+      });
+
+      setFilteredData(dedupedResult);
   };
 
   /* --- EXPORT --- */
