@@ -364,7 +364,8 @@ export function Orders() {
   const getFinancialStatus = (order) => {
       const total = order.total || 0;
       const paid = order.amountPaid || 0;
-      const balance = order.balanceDue || 0;
+      // If balanceDue is missing in older/newer records, mathematically infer it 
+      const balance = order.balanceDue !== undefined ? parseFloat(order.balanceDue) : Math.max(0, total - paid);
       const isOverdue = order.nextDueDate && new Date(order.nextDueDate) < new Date();
 
       if (balance <= 0.05 && total > 0) return <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Pago</span>;
