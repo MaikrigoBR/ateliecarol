@@ -565,7 +565,8 @@ function SystemSettings() {
         }
     }, []);
 
-    const fileInputRef = React.useRef(null);
+    const logoInputRef = React.useRef(null);
+    const importInputRef = React.useRef(null);
 
     const handleSave = async (e) => {
         e.preventDefault();
@@ -663,7 +664,7 @@ function SystemSettings() {
         reader.readAsDataURL(file);
     };
 
-    const handleImportClick = () => fileInputRef.current.click();
+    const handleImportClick = () => importInputRef.current?.click();
 
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
@@ -777,14 +778,14 @@ function SystemSettings() {
                                     <button 
                                         type="button" 
                                         className="btn btn-outline border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 flex-1 justify-center whitespace-nowrap overflow-hidden text-ellipsis"
-                                        onClick={() => fileInputRef.current?.click()}
+                                        onClick={() => logoInputRef.current?.click()}
                                     >
                                         {config.logoBase64 ? 'Trocar Imagem...' : 'Fazer Upload do Logo...'}
                                     </button>
                                     <input 
                                         type="file" 
                                         accept="image/png, image/jpeg, image/webp" 
-                                        ref={fileInputRef} 
+                                        ref={logoInputRef} 
                                         style={{ display: 'none' }} 
                                         onChange={handleLogoUpload} 
                                     />
@@ -836,7 +837,7 @@ function SystemSettings() {
                             </button>
                             <input 
                                 type="file" 
-                                ref={fileInputRef} 
+                                ref={importInputRef} 
                                 style={{ display: 'none' }} 
                                 accept=".json" 
                                 onChange={handleFileChange} 
