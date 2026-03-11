@@ -546,27 +546,59 @@ export function Production() {
                     <div className="text-sm text-muted">Acompanhe gargalos, SLA e atue nas aprovações de qualidade.</div>
                 </div>
                 <div 
-                    className="flex items-center gap-4 bg-white border border-gray-200 shadow-sm px-4 py-2.5 rounded-2xl transition-all hover:shadow-md"
                     title="Controle de Notificações Ativas do WhatsApp"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px',
+                        backgroundColor: '#fff',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        padding: '10px 16px',
+                        borderRadius: '16px',
+                        transition: 'all 0.3s ease',
+                    }}
                 >
-                    <div className="flex flex-col">
-                        <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                            <MessageCircle size={14} className={notificationMode === 'all' ? 'text-[#25D366]' : 'text-gray-400'}/> 
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <MessageCircle size={14} color={notificationMode === 'all' ? '#25D366' : '#9ca3af'}/> 
                             Automador WhatsApp
                         </span>
-                        <span className="text-[10px] text-gray-400 mt-0.5" style={{ maxWidth: '160px', lineHeight: '1.2' }}>
+                        <span style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px', maxWidth: '160px', lineHeight: '1.2' }}>
                             {notificationMode === 'all' ? 'Disparando mensagens a cada troca de coluna' : 'Silenciado: avisando apenas o Início e a Conclusão'}
                         </span>
                     </div>
                     
                     <button 
                         type="button"
-                        className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${notificationMode === 'all' ? 'bg-[#25D366]' : 'bg-gray-300'}`}
                         onClick={() => setNotificationMode(prev => prev === 'all' ? 'endpoints' : 'all')}
+                        style={{
+                            position: 'relative',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            width: '44px',
+                            height: '24px',
+                            flexShrink: 0,
+                            cursor: 'pointer',
+                            borderRadius: '9999px',
+                            border: '2px solid transparent',
+                            transition: 'background-color 0.2s ease-in-out',
+                            backgroundColor: notificationMode === 'all' ? '#25D366' : '#d1d5db',
+                            outline: 'none',
+                        }}
                     >
                         <span
                             aria-hidden="true"
-                            className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${notificationMode === 'all' ? 'translate-x-5' : 'translate-x-0'}`}
+                            style={{
+                                display: 'inline-block',
+                                width: '20px',
+                                height: '20px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '50%',
+                                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                                transition: 'transform 0.2s ease-in-out',
+                                transform: notificationMode === 'all' ? 'translateX(20px)' : 'translateX(0)',
+                            }}
                         />
                     </button>
                 </div>
