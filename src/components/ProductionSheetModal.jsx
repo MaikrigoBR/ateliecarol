@@ -177,17 +177,16 @@ export function ProductionSheetModal({ isOpen, onClose, order }) {
             visibility: visible;
           }
           .modal-content-print {
-            position: absolute;
-            left: 0;
-            top: 0;
+            position: relative !important;
             width: 100%;
-            height: 100%;
+            height: auto !important;
             max-width: none !important;
             box-shadow: none !important;
             border: none !important;
             background: white !important;
             padding: 0 !important;
             color: black !important; /* Force black text for printing */
+            overflow: visible !important;
           }
           .modal-content-print p, .modal-content-print span, .modal-content-print div, .modal-content-print h1 {
               color: black !important;
@@ -199,12 +198,16 @@ export function ProductionSheetModal({ isOpen, onClose, order }) {
           }
           .modal-overlay-print {
             background: white !important;
-            position: absolute;
+            position: absolute !important;
+            top: 0;
+            left: 0;
             z-index: 9999;
-            width: 100vw;
+            width: 100%;
+            height: auto !important;
             min-height: 100vh;
             padding: 0 !important;
             margin: 0 !important;
+            overflow: visible !important;
           }
           .print-hidden, .sidebar-wrapper, .header, .sidebar-overlay {
               display: none !important;
