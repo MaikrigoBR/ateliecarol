@@ -20,6 +20,7 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
   const [cartItems, setCartItems] = useState([]);
   const [currentProductId, setCurrentProductId] = useState('');
   const [currentQuantity, setCurrentQuantity] = useState(1);
+  const [productSearch, setProductSearch] = useState('');
 
   const paymentMethods = [
     { value: 'pix', label: 'Pix' },
@@ -79,6 +80,7 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
                 setCartItems([]);
                 setCurrentProductId('');
                 setCurrentQuantity(1);
+                setProductSearch('');
             }
         }
     };
@@ -89,6 +91,22 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
 
   const total = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const totalItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+
+  const sortedCustomers = [...customers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  const filteredProducts = products.filter(p => !productSearch || (p.name || '').toLowerCase().includes(productSearch.toLowerCase()) || (p.category || '').toLowerCase().includes(productSearch.toLowerCase()));
+
+  const groupedProducts = filteredProducts.reduce((acc, product) => {
+      const category = product.category || 'Sem Categoria';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(product);
+      return acc;
+  }, {});
+
+  const sortedCategories = Object.keys(groupedProducts).sort();
+  for (const cat of sortedCategories) {
+      groupedProducts[cat].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
 
   const handleAddToCart = () => {
       const selectedProduct = products.find(p => p.id == currentProductId);
@@ -104,6 +122,7 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
       setCartItems([...cartItems, newItem]);
       setCurrentProductId('');
       setCurrentQuantity(1);
+      setProductSearch('');
   };
 
   const handleRemoveFromCart = (index) => {
@@ -195,7 +214,7 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
                 autoFocus
               >
                   <option value="">Selecione um cliente...</option>
-                  {customers.map(c => (
+                  {sortedCustomers.map(c => (
                       <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
               </select>
@@ -203,20 +222,34 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
 
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mt-4 mb-4">
                 <h4 className="text-sm font-bold text-gray-700 mb-2">Produtos do Pedido</h4>
+
+                <div className="mb-3">
+                    <input 
+                        type="text" 
+                        placeholder="Pesquisar produto ou categoria..." 
+                        className="form-input text-sm w-full bg-white"
+                        value={productSearch}
+                        onChange={e => setProductSearch(e.target.value)}
+                    />
+                </div>
                 
                 <div className="flex gap-2 items-end mb-4">
                     <div className="flex-1">
                         <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Produto</label>
                         <select 
-                            className="form-input text-sm"
+                            className="form-input text-sm bg-white"
                             value={currentProductId}
                             onChange={e => setCurrentProductId(e.target.value)}
                         >
-                            <option value="">Selecione um produto...</option>
-                            {products.map(product => (
-                            <option key={product.id} value={product.id}>
-                                {product.name} (R$ {Number(product.price || 0).toFixed(2)})
-                            </option>
+                            <option value="">Selecione um produto da lista...</option>
+                            {sortedCategories.map(category => (
+                                <optgroup key={category} label={category}>
+                                    {groupedProducts[category].map(product => (
+                                        <option key={product.id} value={product.id}>
+                                            {product.name} (R$ {Number(product.price || 0).toFixed(2)})
+                                        </option>
+                                    ))}
+                                </optgroup>
                             ))}
                         </select>
                     </div>
