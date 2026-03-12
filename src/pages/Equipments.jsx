@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { calculateFractionalCost, getSubUnits } from '../utils/units';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 export function Equipments() {
   const { currentUser } = useAuth();
@@ -330,7 +330,7 @@ export function Equipments() {
           ];
       });
 
-      doc.autoTable({
+      autoTable(doc, {
           startY: 38,
           head: [['Equipamento', 'Patrimônio', 'Status', 'Data Compra', 'Valor Compra', 'Valor Atual(Deprec.)', 'Custo Manut.', 'Disponibilidade(OEE)']],
           body: tableData,
