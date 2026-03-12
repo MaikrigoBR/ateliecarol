@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Hammer, Wrench, Calendar, DollarSign, Activity, Plus, Trash2, Edit2, AlertCircle, Link as LinkIcon, Download, Package, QrCode } from 'lucide-react';
+import { Hammer, Wrench, Calendar, DollarSign, Activity, Plus, Trash2, Edit2, AlertCircle, Link as LinkIcon, Download, Package, QrCode, Search, Filter, FileText } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { calculateFractionalCost, getSubUnits } from '../utils/units';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 export function Equipments() {
   const { currentUser } = useAuth();
@@ -25,6 +27,11 @@ export function Equipments() {
   const [activeEquipForConsumable, setActiveEquipForConsumable] = useState(null);
 
   const [qrCodeEquip, setQrCodeEquip] = useState(null);
+
+  // Filters State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
 
   // Form State - Equipment
   const [equipForm, setEquipForm] = useState({
@@ -49,7 +56,8 @@ export function Equipments() {
     date: new Date().toISOString().split('T')[0],
     description: '',
     cost: '',
-    technician: ''
+    technician: '',
+    downtimeHours: ''
   });
 
   // Form State - Consumable
@@ -151,7 +159,8 @@ export function Equipments() {
               date: maintForm.date,
               description: maintForm.description,
               cost: parseFloat(maintForm.cost) || 0,
-              technician: maintForm.technician
+              technician: maintForm.technician,
+              downtimeHours: parseFloat(maintForm.downtimeHours) || 0
           });
 
           await db.update('equipments', activeEquipForMaintenance.id, { maintenanceHistory: history });
@@ -200,7 +209,8 @@ export function Equipments() {
           date: new Date().toISOString().split('T')[0],
           description: '',
           cost: '',
-          technician: ''
+          technician: '',
+          downtimeHours: ''
       });
       setIsMaintenanceModalOpen(true);
   };
@@ -270,11 +280,69 @@ export function Equipments() {
   };
 
   // KPIs
-  const totalEquipmentsValue = equipments.reduce((acc, eq) => acc + (eq.purchasePrice || 0), 0);
-  const totalMaintenanceCost = equipments.reduce((acc, eq) => {
+  const filteredEquipments = equipments.filter(eq => {
+      const matchSearch = eq.name?.toLowerCase().includes(searchTerm.toLowerCase()) || eq.brand?.toLowerCase().includes(searchTerm.toLowerCase()) || eq.patrimonyId?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchStatus = !statusFilter || eq.status === statusFilter;
+      const matchGroup = !groupFilter || eq.equipmentGroup === groupFilter;
+      return matchSearch && matchStatus && matchGroup;
+  });
+
+  const totalEquipmentsValue = filteredEquipments.reduce((acc, eq) => acc + (eq.purchasePrice || 0), 0);
+  const totalMaintenanceCost = filteredEquipments.reduce((acc, eq) => {
       const historyCost = (eq.maintenanceHistory || []).reduce((sum, h) => sum + (h.cost || 0), 0);
       return acc + historyCost;
   }, 0);
+
+  const handleExportPDF = () => {
+      const doc = new jsPDF('landscape');
+      
+      doc.setFontSize(18);
+      doc.setTextColor(30, 41, 59);
+      doc.text('Relatório de Máquinas e Ferramentas (Gestão de Ativos)', 14, 22);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Data do Relatório: ${new Date().toLocaleDateString()} | Total Filtrado: ${filteredEquipments.length} Ativo(s)`, 14, 30);
+
+      const tableData = filteredEquipments.map(eq => {
+          const monthsPassed = Math.floor((new Date() - new Date(eq.purchaseDate)) / (1000 * 60 * 60 * 24 * 30));
+          const deprecMonthly = (eq.purchasePrice || 0) / (eq.lifespanMonths || 1);
+          const currentValor = Math.max(0, (eq.purchasePrice || 0) - (deprecMonthly * Math.max(0, monthsPassed)));
+          const maintTotal = (eq.maintenanceHistory || []).reduce((sum, h) => sum + (h.cost || 0), 0);
+          
+          let downtime = (eq.maintenanceHistory || []).reduce((sum, h) => sum + (parseFloat(h.downtimeHours) || 0), 0);
+          const totalExpectedHours = (Math.max(1, monthsPassed) * (eq.monthlyHours || 160));
+          const availability = Math.max(0, ((totalExpectedHours - downtime) / totalExpectedHours) * 100);
+
+          return [
+              eq.name,
+              eq.patrimonyId || '-',
+              eq.status,
+              `${new Date(eq.purchaseDate).toLocaleDateString()}`,
+              `R$ ${(eq.purchasePrice || 0).toFixed(2)}`,
+              `R$ ${currentValor.toFixed(2)}`,
+              `R$ ${maintTotal.toFixed(2)}`,
+              `${availability.toFixed(1)}%`
+          ];
+      });
+
+      doc.autoTable({
+          startY: 38,
+          head: [['Equipamento', 'Patrimônio', 'Status', 'Data Compra', 'Valor Compra', 'Valor Atual(Deprec.)', 'Custo Manut.', 'Disponibilidade(OEE)']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { fillColor: [59, 130, 246] },
+          styles: { fontSize: 8 }
+      });
+
+      const finalY = doc.lastAutoTable.finalY + 10;
+      doc.setFontSize(10);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`Valor Total Investido (Ativos Filtrados): R$ ${totalEquipmentsValue.toFixed(2)}`, 14, finalY);
+      doc.text(`Custo Total de Manutenções (Geral): R$ ${totalMaintenanceCost.toFixed(2)}`, 14, finalY + 6);
+
+      doc.save(`relatorio_equipamentos_${new Date().getTime()}.pdf`);
+  };
 
   return (
     <div className="animate-fade-in" style={{ paddingBottom: '40px' }}>
@@ -287,9 +355,47 @@ export function Equipments() {
                     Gerencie o ciclo de vida, manutenções e o custo de hora-máquina para compor prazos e preços de personalizados.
                 </p>
             </div>
-            <button className="btn btn-primary" onClick={() => openEquipModal(null)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Plus size={20} /> Adicionar Máquina
-            </button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+                <button className="btn btn-secondary" onClick={handleExportPDF} style={{ display: 'flex', alignItems: 'center', gap: '8px' }} title="Gerar Relatório em PDF">
+                    <FileText size={18} /> Relatório
+                </button>
+                <button className="btn btn-primary" onClick={() => openEquipModal(null)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Plus size={20} /> Adicionar Máquina
+                </button>
+            </div>
+        </div>
+
+        {/* Filters */}
+        <div className="card" style={{ padding: '16px', marginBottom: '24px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 300px' }}>
+                <Search size={18} color="#64748b" />
+                <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Buscar por Nome, Marca ou Patrimônio..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ marginBottom: 0, flex: 1 }}
+                />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 200px' }}>
+                <Filter size={18} color="#64748b" />
+                <select className="form-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ marginBottom: 0, flex: 1 }}>
+                    <option value="">Todos os Status</option>
+                    <option value="Ativo">Ativo</option>
+                    <option value="Manutenção">Em Manutenção</option>
+                    <option value="Inativo">Inativo / Aposentado</option>
+                </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 200px' }}>
+                <Package size={18} color="#64748b" />
+                <select className="form-input" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} style={{ marginBottom: 0, flex: 1 }}>
+                    <option value="">Qualquer Grupo</option>
+                    {existingGroups.map(g => (
+                        <option key={g} value={g}>{g}</option>
+                    ))}
+                </select>
+            </div>
         </div>
 
         {/* Dashboards KPI */}
@@ -322,10 +428,10 @@ export function Equipments() {
                         </tr>
                     </thead>
                     <tbody>
-                        {equipments.map(eq => {
+                        {filteredEquipments.map(eq => {
                             const monthsPassed = Math.floor((new Date() - new Date(eq.purchaseDate)) / (1000 * 60 * 60 * 24 * 30));
                             const deprecMonthly = (eq.purchasePrice || 0) / (eq.lifespanMonths || 1);
-                            const currentValor = Math.max(0, (eq.purchasePrice || 0) - (deprecMonthly * monthsPassed));
+                            const currentValor = Math.max(0, (eq.purchasePrice || 0) - (deprecMonthly * Math.max(0,monthsPassed)));
                             
                             let hrConsumableCost = 0;
                             if (eq.consumables && eq.consumables.length > 0) {
@@ -343,6 +449,10 @@ export function Equipments() {
                             
                             const hourCost = (deprecMonthly / (eq.monthlyHours || 160)) + hrConsumableCost;
                             const maintTotal = (eq.maintenanceHistory || []).reduce((sum, h) => sum + (h.cost || 0), 0);
+                            
+                            let downtime = (eq.maintenanceHistory || []).reduce((sum, h) => sum + (parseFloat(h.downtimeHours) || 0), 0);
+                            const totalExpectedHours = (Math.max(1, monthsPassed) * (eq.monthlyHours || 160));
+                            const availability = Math.max(0, ((totalExpectedHours - downtime) / totalExpectedHours) * 100);
 
                             return (
                                 <tr key={eq.id}>
@@ -380,9 +490,12 @@ export function Equipments() {
                                             <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                                                 {eq.maintenanceHistory?.length || 0} registro(s) no log
                                             </span>
-                                            <span style={{ fontSize: '0.75rem', color: '#8b5cf6', fontWeight: 600, marginTop: '4px' }}>
-                                                {eq.consumables?.length || 0} insumo(s) / refil(s)
-                                            </span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                                <div style={{ flex: 1, backgroundColor: '#e2e8f0', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                                                    <div style={{ backgroundColor: availability >= 90 ? '#10b981' : availability >= 70 ? '#f59e0b' : '#ef4444', height: '100%', width: `${availability}%` }}></div>
+                                                </div>
+                                                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#475569' }}>Disp. {availability.toFixed(0)}%</span>
+                                            </div>
                                         </div>
                                     </td>
                                     <td>
@@ -420,8 +533,8 @@ export function Equipments() {
                                 </tr>
                             );
                         })}
-                        {equipments.length === 0 && (
-                            <tr><td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Nenhum equipamento cadastrado.</td></tr>
+                        {filteredEquipments.length === 0 && (
+                            <tr><td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Nenhum equipamento cadastrado ou encontrado.</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -431,13 +544,15 @@ export function Equipments() {
         {/* MODAL: EQUIPAMENTO CRUD */}
         {isEquipModalOpen && (
             <div className="modal-overlay" onClick={() => setIsEquipModalOpen(false)}>
-                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-                    <div className="modal-header">
-                        <h2>{editingEquip ? 'Editar Equipamento' : 'Novo Equipamento'}</h2>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', padding: 0, overflow: 'hidden' }}>
+                    <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', backgroundColor: '#f8fafc' }}>
+                        <div>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>{editingEquip ? 'Editar Equipamento' : 'Novo Ativo/Máquina'}</h2>
+                        </div>
                         <button className="btn btn-icon text-muted" onClick={() => setIsEquipModalOpen(false)}>✕</button>
                     </div>
-                    <form onSubmit={handleSaveEquipment} className="modal-body">
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px', marginBottom: '16px' }}>
+                    <form onSubmit={handleSaveEquipment}>
+                        <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Nome do Equipamento (Ex: Plotter Cameo 4, Impressora L1800)</label>
                                 <input type="text" className="form-input" required value={equipForm.name} onChange={e => setEquipForm({...equipForm, name: e.target.value})} />
@@ -499,8 +614,8 @@ export function Equipments() {
                             </div>
                         </div>
 
-                        <div className="modal-footer" style={{ marginTop: '20px' }}>
-                            <button type="button" className="btn" onClick={() => setIsEquipModalOpen(false)}>Cancelar</button>
+                        <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: '#f8fafc' }}>
+                            <button type="button" className="btn btn-secondary" onClick={() => setIsEquipModalOpen(false)}>Cancelar</button>
                             <button type="submit" className="btn btn-primary">Salvar Equipamento</button>
                         </div>
                     </form>
@@ -534,7 +649,10 @@ export function Equipments() {
                                                 <span style={{ color: '#ef4444', fontWeight: 700, backgroundColor: '#fef2f2', padding: '2px 8px', borderRadius: '4px' }}>R$ {(req.cost || 0).toFixed(2)}</span>
                                             </div>
                                             <div style={{ color: '#475569', lineHeight: '1.4' }}>{req.description}</div>
-                                            {req.technician && <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><span>👨‍🔧 Técnico/Local:</span> {req.technician}</div>}
+                                            <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                                                {req.technician && <div style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}><span>👨‍🔧 Técnico/Local:</span> {req.technician}</div>}
+                                                {req.downtimeHours > 0 && <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600 }}>Parada: {req.downtimeHours}h</div>}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -558,8 +676,12 @@ export function Equipments() {
                                         <input type="number" step="0.01" min="0" className="form-input" required value={maintForm.cost} onChange={e => setMaintForm({...maintForm, cost: e.target.value})} />
                                     </div>
                                     <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Técnico / Fornecedor</label>
-                                        <input type="text" className="form-input" placeholder="Opcional (Ex: Assistência Epson)" value={maintForm.technician} onChange={e => setMaintForm({...maintForm, technician: e.target.value})} />
+                                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f59e0b', marginBottom: '6px', display: 'block' }}>Tempo de Parada Estimado (H)</label>
+                                        <input type="number" step="any" className="form-input border-amber-200" placeholder="Ex: 5" value={maintForm.downtimeHours} onChange={e => setMaintForm({...maintForm, downtimeHours: e.target.value})} />
+                                    </div>
+                                    <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Técnico / Fornecedor (Opcional)</label>
+                                        <input type="text" className="form-input" placeholder="Ex: Assistência Epson" value={maintForm.technician} onChange={e => setMaintForm({...maintForm, technician: e.target.value})} />
                                     </div>
                                 </div>
                             </div>
