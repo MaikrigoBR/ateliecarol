@@ -16,7 +16,8 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
     status: 'active',
     instagram: '',
     birthDate: '',
-    tags: ''
+    tags: '',
+    photoUrl: ''
   });
 
   if (!isOpen) return null;
@@ -35,6 +36,7 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
       instagram: formData.instagram || '',
       birthDate: formData.birthDate || '',
       tags: formData.tags || '',
+      photoUrl: formData.photoUrl || '',
       totalOrders: 0,
       totalSpent: 0,
       createdAt: new Date().toISOString()
@@ -58,7 +60,8 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
       status: 'active',
       instagram: '',
       birthDate: '',
-      tags: ''
+      tags: '',
+      photoUrl: ''
     });
     
     onClose();
@@ -139,6 +142,16 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
 
             <div className="grid grid-cols-2 gap-md">
                 <div className="input-group">
+                  <label className="form-label">Link da Foto (Ex: Avatar do Instagram)</label>
+                  <input 
+                    type="url" 
+                    className="form-input" 
+                    placeholder="https://..."
+                    value={formData.photoUrl}
+                    onChange={e => setFormData({...formData, photoUrl: e.target.value})}
+                  />
+                </div>
+                <div className="input-group">
                   <label className="form-label">Instagram (@)</label>
                   <input 
                     type="text" 
@@ -148,6 +161,9 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
                     onChange={e => setFormData({...formData, instagram: e.target.value})}
                   />
                 </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-md">
                 <div className="input-group">
                   <label className="form-label">Data de Nasc. / Aniversário</label>
                   <input 
@@ -157,17 +173,16 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
                     onChange={e => setFormData({...formData, birthDate: e.target.value})}
                   />
                 </div>
-            </div>
-
-            <div className="input-group">
-                <label className="form-label">Tags (Segmentação p/ Campanhas)</label>
-                <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="Ex: Noiva, Recorrente, Brindes (separado por vírgula)"
-                    value={formData.tags}
-                    onChange={e => setFormData({...formData, tags: e.target.value})}
-                />
+                <div className="input-group">
+                    <label className="form-label">Tags (Segmentação p/ Campanhas)</label>
+                    <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="Ex: Noiva, Recorrente"
+                        value={formData.tags}
+                        onChange={e => setFormData({...formData, tags: e.target.value})}
+                    />
+                </div>
             </div>
 
           </div>

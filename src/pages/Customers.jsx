@@ -4,6 +4,7 @@ import db from '../services/database.js';
 import { NewCustomerModal } from '../components/NewCustomerModal.jsx';
 import { EditCustomerModal } from '../components/EditCustomerModal.jsx';
 import { MarketingCampaignModal } from '../components/MarketingCampaignModal.jsx';
+import { CustomerDetailsModal } from '../components/CustomerDetailsModal.jsx';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,6 +16,7 @@ export function Customers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   const fetchCustomers = async () => {
@@ -98,7 +100,14 @@ export function Customers() {
             <tbody>
               {filteredCustomers.length > 0 ? (
                 filteredCustomers.map(customer => (
-                  <tr key={customer.id}>
+                  <tr 
+                    key={customer.id} 
+                    className="cursor-pointer hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                        setSelectedCustomer(customer);
+                        setIsDetailsModalOpen(true);
+                    }}
+                  >
                     <td>
                       <div style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--text-main)' }}>{customer.name}</div>
                       {customer.instagram && (
@@ -160,7 +169,8 @@ export function Customers() {
                         <button 
                             className="btn btn-icon" 
                             style={{ color: 'var(--primary)' }}
-                            onClick={() => {
+                            onClick={(e) => {
+                                e.stopPropagation();
                                 setSelectedCustomer(customer);
                                 setIsEditModalOpen(true);
                             }}
@@ -171,7 +181,10 @@ export function Customers() {
                         <button 
                             className="btn btn-icon" 
                             style={{ color: 'var(--danger)' }}
-                            onClick={() => handleDelete(customer.id, customer.name)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(customer.id, customer.name);
+                            }}
                             title="Remover Cliente"
                         >
                             <Trash2 size={16} />
@@ -214,6 +227,23 @@ export function Customers() {
         isOpen={isCampaignModalOpen}
         onClose={() => setIsCampaignModalOpen(false)}
         customers={customers}
+      />
+
+      <CustomerDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => { setIsDetailsModalOpen(false); setSelectedCustomer(null); }}
+        customer={selectedCustomer}
+        onEdit={(customerToEdit) => {
+            setSelectedCustomer(customerToEdit);
+            setIsEditModalOpen(true);
+        }}
+        onDelete={(id, name) => {
+            handleDelete(id, name);
+            setIsDetailsModalOpen(false);
+        }}
+        onMessage={(c) => {
+            window.open(`https://wa.me/55${c.phone.replace(/\D/g, '')}?text=Olá ${c.name}, temos novidades no atelier!`, '_blank');
+        }}
       />
     </div>
   );

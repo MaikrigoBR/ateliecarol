@@ -16,7 +16,8 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
     status: 'active',
     instagram: '',
     birthDate: '',
-    tags: ''
+    tags: '',
+    photoUrl: ''
   });
 
   useEffect(() => {
@@ -30,7 +31,8 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
             status: customer.status || 'active',
             instagram: customer.instagram || '',
             birthDate: customer.birthDate || '',
-            tags: customer.tags || ''
+            tags: customer.tags || '',
+            photoUrl: customer.photoUrl || ''
         });
     }
   }, [customer]);
@@ -50,7 +52,8 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
       status: formData.status || 'active',
       instagram: formData.instagram || '',
       birthDate: formData.birthDate || '',
-      tags: formData.tags || ''
+      tags: formData.tags || '',
+      photoUrl: formData.photoUrl || ''
     };
 
     const updatedCustomer = await db.update('customers', customer.id, updatedData);
@@ -150,6 +153,16 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
 
             <div className="grid grid-cols-2 gap-md">
                 <div className="input-group">
+                  <label className="form-label">Link da Foto (Ex: Avatar do Instagram)</label>
+                  <input 
+                    type="url" 
+                    className="form-input" 
+                    placeholder="https://..."
+                    value={formData.photoUrl}
+                    onChange={e => setFormData({...formData, photoUrl: e.target.value})}
+                  />
+                </div>
+                <div className="input-group">
                   <label className="form-label">Instagram (@)</label>
                   <input 
                     type="text" 
@@ -159,6 +172,9 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
                     onChange={e => setFormData({...formData, instagram: e.target.value})}
                   />
                 </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-md">
                 <div className="input-group">
                   <label className="form-label">Data de Nasc. / Aniversário</label>
                   <input 
@@ -168,18 +184,19 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
                     onChange={e => setFormData({...formData, birthDate: e.target.value})}
                   />
                 </div>
+                <div className="input-group">
+                    <label className="form-label">Tags (Segmentação p/ Campanhas)</label>
+                    <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="Ex: Noiva, Recorrente"
+                        value={formData.tags}
+                        onChange={e => setFormData({...formData, tags: e.target.value})}
+                    />
+                </div>
             </div>
 
-            <div className="input-group">
-                <label className="form-label">Tags (Segmentação p/ Campanhas)</label>
-                <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="Ex: Noiva, Recorrente, Brindes (separado por vírgula)"
-                    value={formData.tags}
-                    onChange={e => setFormData({...formData, tags: e.target.value})}
-                />
-            </div>
+
 
           </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingBag, Star, Image as ImageIcon, MessageCircle, PlayCircle } from 'lucide-react';
+import { ShoppingBag, Star, Image as ImageIcon, MessageCircle, PlayCircle, Heart, Send } from 'lucide-react';
 import db from '../services/database';
 
 export function ProductView() {
@@ -22,10 +22,38 @@ export function ProductView() {
                 }
             } catch(e) { console.error("Could not fetch settings", e); }
 
+            const fetchedComments = await db.getAll('productComments') || [];
+            setComments(fetchedComments.filter(c => c.productId === id).sort((a,b) => new Date(b.date) - new Date(a.date)));
+
             setLoading(false);
         };
         load();
     }, [id]);
+
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState({ name: '', instagram: '', message: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handlePostComment = async (e) => {
+        e.preventDefault();
+        if (!newComment.name || !newComment.message) return;
+        setIsSubmitting(true);
+        
+        const commentObj = {
+            productId: id,
+            name: newComment.name,
+            instagram: newComment.instagram ? newComment.instagram.replace('@', '') : '',
+            message: newComment.message,
+            date: new Date().toISOString()
+        };
+
+        const created = await db.create('productComments', commentObj);
+        if (created) {
+            setComments([created, ...comments]);
+            setNewComment({ name: '', instagram: '', message: '' });
+        }
+        setIsSubmitting(false);
+    };
 
     if (loading) {
         return <div style={{ display: 'flex', justifyContent: 'center', padding: '40px', color: '#64748b' }}>Carregando configuração do produto...</div>;
@@ -203,6 +231,96 @@ export function ProductView() {
                             <MessageCircle size={24} />
                             Fazer Pedido por WhatsApp
                         </button>
+                    </div>
+                </div>
+
+                {/* Comentários / Feed Interativo (Estilo Instagram) */}
+                <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 6px -4px rgba(0,0,0,0.05)', marginTop: '24px', padding: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+                        <Heart fill="#e11d48" color="#e11d48" size={24} />
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>O que dizem sobre este produto</h3>
+                    </div>
+
+                    {/* Formulário de Novo Comentário */}
+                    <form onSubmit={handlePostComment} style={{ marginBottom: '32px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ marginBottom: '12px' }}>
+                            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <MessageCircle size={14} /> Deixe seu comentário público
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                                <input 
+                                    type="text" 
+                                    placeholder="Seu Nome completo *" 
+                                    style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                                    value={newComment.name}
+                                    onChange={e => setNewComment({...newComment, name: e.target.value})}
+                                    required
+                                />
+                                <input 
+                                    type="text" 
+                                    placeholder="Seu @Instagram" 
+                                    style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                                    value={newComment.instagram}
+                                    onChange={e => setNewComment({...newComment, instagram: e.target.value})}
+                                />
+                            </div>
+                            <textarea 
+                                placeholder="Adorei o trabalho! Queria saber se faz em outras cores..."
+                                rows="3"
+                                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }}
+                                value={newComment.message}
+                                onChange={e => setNewComment({...newComment, message: e.target.value})}
+                                required
+                            />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button 
+                                type="submit" 
+                                disabled={isSubmitting}
+                                style={{ 
+                                    backgroundColor: '#0f172a', color: 'white', border: 'none', padding: '10px 24px', 
+                                    borderRadius: '24px', fontWeight: 700, fontSize: '0.9rem', cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: '6px', opacity: isSubmitting ? 0.7 : 1
+                                }}
+                            >
+                                <Send size={14} /> {isSubmitting ? 'Enviando...' : 'Publicar'}
+                            </button>
+                        </div>
+                    </form>
+
+                    {/* Lista de Comentários */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {comments.length > 0 ? comments.map(c => {
+                            const avatarUrl = c.instagram 
+                                ? `https://unavatar.io/instagram/${c.instagram}`
+                                : `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=random&color=fff`;
+
+                            return (
+                                <div key={c.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                    <img src={avatarUrl} alt={c.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid transparent', background: c.instagram ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' : 'none', padding: c.instagram ? '2px' : '0' }} onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}`; }} />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                            <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>{c.name}</span>
+                                            {c.instagram && (
+                                                <a href={`https://instagram.com/${c.instagram}`} target="_blank" rel="noopener noreferrer" style={{ color: '#E1306C', fontSize: '0.8rem', textDecoration: 'none', fontWeight: 600 }}>@{c.instagram}</a>
+                                            )}
+                                        </div>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#334155', lineHeight: 1.5 }}>
+                                            {c.message}
+                                        </p>
+                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                                            {new Date(c.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
+                                    <Heart size={14} color="#cbd5e1" style={{ cursor: 'pointer', marginTop: '4px' }} />
+                                </div>
+                            );
+                        }) : (
+                            <div style={{ textAlign: 'center', padding: '32px 0', color: '#94a3b8' }}>
+                                <MessageCircle size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                                <p style={{ fontSize: '0.95rem' }}>Nenhum comentário ainda. Seja o primeiro a avaliar!</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </main>
