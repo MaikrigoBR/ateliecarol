@@ -79,11 +79,11 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
           </button>
         </div>
         
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem', maxHeight: '70vh', overflowY: 'auto' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div className="modal-body hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem', overflowY: 'auto' }}>
             
             {/* Avatar Preview Section */}
-            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ flexShrink: 0, display: 'flex', gap: '1.5rem', alignItems: 'center', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
                 <div style={{ width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', backgroundColor: 'var(--surface-hover)', border: '2px solid var(--border)', flexShrink: 0 }}>
                     <img src={avatarUrl} alt="Avatar Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || '?')}`; }} />
                 </div>
@@ -96,7 +96,7 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
             </div>
 
             {/* Dados Pessoais */}
-            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
                 <div style={{ backgroundColor: 'var(--surface-hover)', padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Briefcase size={16} /> Identificação e Dados Fiscais
                 </div>
@@ -122,7 +122,7 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
             </div>
 
             {/* Contato */}
-            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
                 <div style={{ backgroundColor: 'var(--surface-hover)', padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <PhoneIcon size={16} /> Canais de Contato
                 </div>
@@ -141,7 +141,7 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
             </div>
 
             {/* Redes e CRM */}
-            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
                 <div style={{ backgroundColor: 'var(--surface-hover)', padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Tag size={16} /> Marketing e Segmentação
                 </div>
