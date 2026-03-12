@@ -1,10 +1,10 @@
 import React from 'react';
 import { 
     X, Edit, Trash2, Tag, PieChart, Package, 
-    Share2, QrCode, Image as ImageIcon, CheckCircle, AlertCircle, ShoppingBag, Globe, EyeOff
+    Share2, QrCode, Image as ImageIcon, CheckCircle, AlertCircle, ShoppingBag, Globe, EyeOff, Copy
 } from 'lucide-react';
 
-export function ProductDetailsModal({ isOpen, onClose, product, onEdit, onDelete, onShareQrCode }) {
+export function ProductDetailsModal({ isOpen, onClose, product, onEdit, onDelete, onShareQrCode, onDuplicate }) {
     if (!isOpen || !product) return null;
 
     // Financial calculations
@@ -228,6 +228,10 @@ export function ProductDetailsModal({ isOpen, onClose, product, onEdit, onDelete
 
                     {/* Primary Actions */}
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button onClick={() => { onClose(); onDuplicate(product); }} className="btn btn-outline" style={{ border: '1px solid var(--border)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Copy size={16} /> Duplicar 
+                        </button>
+
                         <button onClick={() => { onClose(); onEdit(product); }} className="btn btn-secondary">
                             <Edit size={16} /> Editar Completamente
                         </button>

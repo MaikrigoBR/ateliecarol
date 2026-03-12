@@ -413,6 +413,22 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
     
     setIsSubmitting(true);
 
+    try {
+        const allProducts = await db.getAll('products');
+        const isDuplicateName = allProducts.some(p => 
+            p.name.trim().toLowerCase() === values.name.trim().toLowerCase() && 
+            p.id !== (productToEdit?.id || null)
+        );
+
+        if (isDuplicateName) {
+            alert("Atenção: Já existe um produto cadastrado com este nome exato! Escolha um nome diferente para evitar duplicidade no sistema.");
+            setIsSubmitting(false);
+            return;
+        }
+    } catch (err) {
+        console.warn("Name validation check failed", err);
+    }
+
     const laborCost = calculateTotalLaborCost();
     const materialCost = calculateTotalMaterialCost();
     const equipmentCost = calculateTotalEquipmentCost();
@@ -452,7 +468,7 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
 
     try {
         let result;
-        if (productToEdit) {
+        if (productToEdit && productToEdit.id) {
             result = await db.update('products', productToEdit.id, productData);
             AuditService.log(currentUser, 'UPDATE', 'Product', productToEdit.id, `Atualizou produto: ${values.name}`);
         } else {

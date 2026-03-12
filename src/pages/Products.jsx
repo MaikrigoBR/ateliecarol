@@ -316,6 +316,11 @@ export function Products() {
           onClose={() => { setIsDetailsModalOpen(false); setViewingProduct(null); }}
           product={viewingProduct}
           onEdit={(p) => handleEdit(p)}
+          onDuplicate={(p) => {
+            setEditingProduct({ ...p, id: null, name: `${p.name} (Cópia)` });
+            setIsDetailsModalOpen(false);
+            setIsModalOpen(true);
+          }}
           onDelete={(id, name) => {
               handleDelete(id, name);
               setIsDetailsModalOpen(false);
