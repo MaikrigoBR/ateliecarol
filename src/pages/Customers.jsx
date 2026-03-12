@@ -110,9 +110,9 @@ export function Customers() {
                   >
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', backgroundColor: 'var(--surface-hover)', flexShrink: 0 }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', backgroundColor: 'var(--surface-hover)', flexShrink: 0, border: '1px solid var(--border)' }}>
                               <img 
-                                src={customer.photoUrl || (customer.instagram ? `https://unavatar.io/instagram/${customer.instagram.replace('@', '')}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`)} 
+                                src={customer.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`} 
                                 alt={customer.name} 
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                                 onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`; }}

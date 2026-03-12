@@ -66,12 +66,12 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
     onClose();
   };
 
-  const avatarUrl = formData.photoUrl || (formData.instagram && formData.instagram.trim() !== '' ? `https://unavatar.io/instagram/${formData.instagram.replace('@', '')}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || 'Cliente')}&background=random&color=fff`);
+  const avatarUrl = formData.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || 'Cliente')}&background=random&color=fff`;
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', backgroundColor: '#f8fafc' }}>
-        <div className="modal-header" style={{ backgroundColor: 'white' }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', backgroundColor: 'var(--background)' }}>
+        <div className="modal-header" style={{ backgroundColor: 'var(--surface)' }}>
           <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><User size={20} /> Editar Cliente</h2>
           <button className="btn btn-icon" onClick={onClose} type="button">
             <X size={20} />
@@ -79,24 +79,24 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
         </div>
         
         <form onSubmit={handleSubmit}>
-          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem' }}>
+          <div className="modal-body hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem', maxHeight: '70vh', overflowY: 'auto' }}>
             
             {/* Avatar Preview Section */}
-            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', backgroundColor: 'white', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                <div style={{ width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', backgroundColor: '#f1f5f9', border: '2px solid #e2e8f0', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', backgroundColor: 'var(--surface-hover)', border: '2px solid var(--border)', flexShrink: 0 }}>
                     <img src={avatarUrl} alt="Avatar Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || '?')}`; }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.25rem 0', color: '#1e293b' }}>Foto do Perfil</h4>
-                     <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
-                         Preencha o <strong>@Instagram</strong> abaixo para foto automática, ou cole um link em "Link da Foto".
+                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.25rem 0', color: 'var(--text-main)' }}>Foto do Perfil</h4>
+                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                         Insira um "Link da Foto" abaixo para personalizar. O Instagram bloqueou a sincronização automática de fotos.
                      </p>
                 </div>
             </div>
 
             {/* Dados Pessoais */}
-            <div style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                <div style={{ backgroundColor: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ backgroundColor: 'var(--surface-hover)', padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Briefcase size={16} /> Identificação e Dados Fiscais
                 </div>
                 <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -128,8 +128,8 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
             </div>
 
             {/* Contato */}
-            <div style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                <div style={{ backgroundColor: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ backgroundColor: 'var(--surface-hover)', padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <PhoneIcon size={16} /> Canais de Contato
                 </div>
                 <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -147,8 +147,8 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
             </div>
 
             {/* Redes e CRM */}
-            <div style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                <div style={{ backgroundColor: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ backgroundColor: 'var(--surface-hover)', padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Tag size={16} /> Marketing e Segmentação
                 </div>
                 <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -177,7 +177,7 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
 
           </div>
 
-          <div className="modal-footer" style={{ backgroundColor: 'white' }}>
+          <div className="modal-footer" style={{ backgroundColor: 'var(--surface)' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancelar
             </button>

@@ -9,7 +9,7 @@ export function CustomerDetailsModal({ isOpen, onClose, customer, onEdit, onDele
 
     // Media
     const defaultAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`;
-    const avatarUrl = customer.photoUrl || (customer.instagram && customer.instagram.trim() !== '' ? `https://unavatar.io/instagram/${customer.instagram.replace('@', '')}` : defaultAvatarUrl);
+    const avatarUrl = customer.photoUrl || defaultAvatarUrl;
 
     // --- Inline Styles mapping to Theme Variables ---
     const sOverlay = {
@@ -167,7 +167,7 @@ export function CustomerDetailsModal({ isOpen, onClose, customer, onEdit, onDele
                                 </div>
                                 <div className="flex flex-wrap gap-1">
                                     {customer.tags ? customer.tags.split(',').map(t => t.trim()).filter(Boolean).map((tag, i) => (
-                                        <span key={i} className="badge" style={{ backgroundColor: 'white', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
+                                        <span key={i} className="badge" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
                                             {tag}
                                         </span>
                                     )) : <span className="text-sm text-muted italic">Nenhuma tag atribuída</span>}

@@ -291,9 +291,7 @@ export function ProductView() {
                     {/* Lista de Comentários */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {comments.length > 0 ? comments.map(c => {
-                            const avatarUrl = c.instagram 
-                                ? `https://unavatar.io/instagram/${c.instagram}`
-                                : `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=random&color=fff`;
+                            const avatarUrl = c.photoUrl ? c.photoUrl : `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=random&color=fff`;
 
                             return (
                                 <div key={c.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
