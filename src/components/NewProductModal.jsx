@@ -251,16 +251,19 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
           const deprecMonthly = (parseFloat(equip.purchasePrice) || 0) / (parseInt(equip.lifespanMonths) || 1);
           const hrCost = deprecMonthly / (parseInt(equip.monthlyHours) || 160);
           
-          // Consumables Cost (assuming generic cost mapped to the hour)
+          // Consumables Cost
           let hrConsumableCost = 0;
           if (equip.consumables && equip.consumables.length > 0) {
               hrConsumableCost = equip.consumables.reduce((sum, c) => {
-                  return sum + (c.cost / (c.yield || 1));
+                  if (c.inventoryId && Array.isArray(materialsList)) {
+                      const invItem = materialsList.find(m => m.id === c.inventoryId);
+                      if (invItem) {
+                          const costPerAction = calculateFractionalCost(invItem.cost, invItem.unit, c.usedUnit, c.usedQuantity);
+                          return sum + ((costPerAction * parseFloat(c.actionsPerHour || 1)) || 0);
+                      }
+                  }
+                  return sum + ((c.cost || 0) / (c.yield || 1));
               }, 0);
-              // if yieldUnit is pages/cuts, this translates roughly as cost per minute or hour if we multiply. 
-              // To keep it proportional to "Serviços de Produção", if one unit = 1 hour, that's fine. 
-              // If it's a "fast" print, maybe we just treat the sum as an hourly consumable load. 
-              // We'll treat `hrConsumableCost` as the cost per hour of using all its consumables continuously.
           }
           
           const totalHr = hrCost + hrConsumableCost;
@@ -840,7 +843,16 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                                             const hrCost = deprecMonthly / (parseInt(eq.monthlyHours) || 160);
                                             let hrConsumableCost = 0;
                                             if (eq.consumables && eq.consumables.length > 0) {
-                                                hrConsumableCost = eq.consumables.reduce((sum, c) => sum + (c.cost / (c.yield || 1)), 0);
+                                                hrConsumableCost = eq.consumables.reduce((sum, c) => {
+                                                    if (c.inventoryId && Array.isArray(materialsList)) {
+                                                        const invItem = materialsList.find(m => m.id === c.inventoryId);
+                                                        if (invItem) {
+                                                            const costPerAction = calculateFractionalCost(invItem.cost, invItem.unit, c.usedUnit, c.usedQuantity);
+                                                            return sum + ((costPerAction * parseFloat(c.actionsPerHour || 1)) || 0);
+                                                        }
+                                                    }
+                                                    return sum + ((c.cost || 0) / (c.yield || 1));
+                                                }, 0);
                                             }
                                             return (
                                                 <option key={eq.id} value={eq.id}>

@@ -4,6 +4,7 @@ import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { calculateFractionalCost, getSubUnits } from '../utils/units';
 
 export function Equipments() {
   const { currentUser } = useAuth();
@@ -11,6 +12,8 @@ export function Equipments() {
   const navigate = useNavigate();
   const [equipments, setEquipments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [materialsList, setMaterialsList] = useState([]);
+  const [existingGroups, setExistingGroups] = useState([]);
   
   // Modals state
   const [isEquipModalOpen, setIsEquipModalOpen] = useState(false);
@@ -26,6 +29,7 @@ export function Equipments() {
   // Form State - Equipment
   const [equipForm, setEquipForm] = useState({
     name: '',
+    equipmentGroup: '',
     brand: '',
     model: '',
     description: '',
@@ -50,7 +54,12 @@ export function Equipments() {
 
   // Form State - Consumable
   const [consForm, setConsForm] = useState({
+    inventoryId: '',
     name: '',
+    usedQuantity: '',
+    usedUnit: '',
+    actionName: 'página colorida',
+    actionsPerHour: '600',
     cost: '',
     yield: '',
     yieldUnit: 'páginas'
@@ -79,8 +88,15 @@ export function Equipments() {
   const fetchEquipments = async () => {
     setLoading(true);
     try {
-        const all = await db.getAll('equipments');
-        setEquipments(all || []);
+        const allEq = await db.getAll('equipments');
+        const allInv = await db.getAll('inventory');
+        setEquipments(allEq || []);
+        if (allInv) {
+            const mats = allInv.filter(i => i.type === 'material');
+            setMaterialsList(mats);
+            const groups = [...new Set((allEq || []).map(e => e.equipmentGroup).filter(Boolean))];
+            setExistingGroups(groups.sort());
+        }
     } catch (e) {
         console.error("Error fetching equipments", e);
     } finally {
@@ -154,6 +170,7 @@ export function Equipments() {
           setEditingEquip(equip);
           setEquipForm({
               name: equip.name,
+              equipmentGroup: equip.equipmentGroup || '',
               brand: equip.brand || '',
               model: equip.model || '',
               description: equip.description || '',
@@ -170,7 +187,7 @@ export function Equipments() {
       } else {
           setEditingEquip(null);
           setEquipForm({
-            name: '', brand: '', model: '', description: '', photoUrl: '', patrimonyId: '', purchaseDate: new Date().toISOString().split('T')[0],
+            name: '', equipmentGroup: '', brand: '', model: '', description: '', photoUrl: '', patrimonyId: '', purchaseDate: new Date().toISOString().split('T')[0],
             purchasePrice: '', lifespanMonths: '60', monthlyHours: '160', status: 'Ativo', maintenanceHistory: [], consumables: []
           });
       }
@@ -196,7 +213,12 @@ export function Equipments() {
           const arr = [...(activeEquipForConsumable.consumables || [])];
           arr.push({
               id: Date.now().toString(),
+              inventoryId: consForm.inventoryId,
               name: consForm.name,
+              usedQuantity: parseFloat(consForm.usedQuantity) || 0,
+              usedUnit: consForm.usedUnit,
+              actionName: consForm.actionName,
+              actionsPerHour: parseInt(consForm.actionsPerHour) || 1,
               cost: parseFloat(consForm.cost) || 0,
               yield: parseInt(consForm.yield) || 1,
               yieldUnit: consForm.yieldUnit
@@ -210,7 +232,7 @@ export function Equipments() {
           
           // reset form
           setConsForm({
-              name: '', cost: '', yield: '', yieldUnit: 'páginas'
+              inventoryId: '', name: '', usedQuantity: '', usedUnit: '', actionName: 'página colorida', actionsPerHour: '600', cost: '', yield: '', yieldUnit: 'páginas'
           });
       } catch (err) {
           alert("Erro ao salvar insumo.");
@@ -234,7 +256,12 @@ export function Equipments() {
   const openConsumablesModal = (equip) => {
       setActiveEquipForConsumable(equip);
       setConsForm({
+          inventoryId: '',
           name: '',
+          usedQuantity: '',
+          usedUnit: '',
+          actionName: 'página colorida',
+          actionsPerHour: '600',
           cost: '',
           yield: '',
           yieldUnit: 'páginas'
@@ -300,7 +327,21 @@ export function Equipments() {
                             const deprecMonthly = (eq.purchasePrice || 0) / (eq.lifespanMonths || 1);
                             const currentValor = Math.max(0, (eq.purchasePrice || 0) - (deprecMonthly * monthsPassed));
                             
-                            const hourCost = deprecMonthly / (eq.monthlyHours || 160);
+                            let hrConsumableCost = 0;
+                            if (eq.consumables && eq.consumables.length > 0) {
+                                hrConsumableCost = eq.consumables.reduce((sum, c) => {
+                                    if (c.inventoryId && Array.isArray(materialsList)) {
+                                        const invItem = materialsList.find(m => m.id === c.inventoryId);
+                                        if (invItem) {
+                                            const costPerAction = calculateFractionalCost(invItem.cost, invItem.unit, c.usedUnit, c.usedQuantity);
+                                            return sum + ((costPerAction * parseFloat(c.actionsPerHour || 1)) || 0);
+                                        }
+                                    }
+                                    return sum + ((c.cost || 0) / (c.yield || 1));
+                                }, 0);
+                            }
+                            
+                            const hourCost = (deprecMonthly / (eq.monthlyHours || 160)) + hrConsumableCost;
                             const maintTotal = (eq.maintenanceHistory || []).reduce((sum, h) => sum + (h.cost || 0), 0);
 
                             return (
@@ -401,10 +442,19 @@ export function Equipments() {
                                 <label>Nome do Equipamento (Ex: Plotter Cameo 4, Impressora L1800)</label>
                                 <input type="text" className="form-input" required value={equipForm.name} onChange={e => setEquipForm({...equipForm, name: e.target.value})} />
                             </div>
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label className="text-orange-600 font-semibold">Grupo ou Tag (Ex: Impressão, Recorte, Máquinas Grandes)</label>
+                                <input type="text" list="equip-groups-list" className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" value={equipForm.equipmentGroup} onChange={e => setEquipForm({...equipForm, equipmentGroup: e.target.value})} />
+                                <datalist id="equip-groups-list">
+                                    {existingGroups.map(g => <option key={g} value={g} />)}
+                                </datalist>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Usado para associar e pesquisar esta máquina mais facilmente.</span>
+                            </div>
                             <div className="form-group">
                                 <label>Marca / Fabricante</label>
                                 <input type="text" className="form-input" value={equipForm.brand} onChange={e => setEquipForm({...equipForm, brand: e.target.value})} />
                             </div>
+
                             <div className="form-group">
                                 <label>Modelo</label>
                                 <input type="text" className="form-input" value={equipForm.model} onChange={e => setEquipForm({...equipForm, model: e.target.value})} />
@@ -542,15 +592,24 @@ export function Equipments() {
                                 <div style={{ color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', backgroundColor: '#ffffff', padding: '16px', borderRadius: '6px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>Nenhum insumo (Ex: Toner, Tinta, Lâmina) vinculado.</div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {activeEquipForConsumable.consumables.map(cons => (
+                                    {activeEquipForConsumable.consumables.map(cons => {
+                                        let costDisplay = '';
+                                        let yieldDisplay = '';
+                                        if (cons.inventoryId) {
+                                            costDisplay = `Uso: ${cons.usedQuantity} ${cons.usedUnit} por ${cons.actionName || 'ação'}`;
+                                            yieldDisplay = `Rendimento Parametrizado`;
+                                        } else {
+                                            costDisplay = `Preço do Refil: R$ ${cons.cost?.toFixed(2)}`;
+                                            yieldDisplay = `Rendimento: ${cons.yield} ${cons.yieldUnit}`;
+                                        }
+                                        return (
                                         <div key={cons.id} style={{ backgroundColor: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', boxShadow: '0 1px 2px rgba(0,0,0,0.01)', display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1.5fr) auto', gap: '16px', alignItems: 'center' }}>
                                             <div>
-                                                <div style={{ fontWeight: 600, color: '#334155' }}>{cons.name}</div>
-                                                <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}>Preço do Refil: <strong>R$ {cons.cost?.toFixed(2)}</strong></div>
+                                                <div style={{ fontWeight: 600, color: '#334155' }}>{cons.name} {cons.inventoryId ? <span className="badge badge-success ml-1" style={{fontSize: '9px'}}>Vinculado</span> : ''}</div>
+                                                <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}><strong>{costDisplay}</strong></div>
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Rendimento: {cons.yield} {cons.yieldUnit}</span>
-                                                <span style={{ fontWeight: 700, color: '#0ea5e9' }}>Custo: R$ {(cons.cost / cons.yield).toFixed(3)} / {cons.yieldUnit === 'páginas' ? 'pág' : 'un'}</span>
+                                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{yieldDisplay}</span>
                                             </div>
                                             <div>
                                                 <button className="btn btn-icon text-danger" onClick={() => handleDeleteConsumable(cons.id)} title="Remover Insumo">
@@ -558,34 +617,82 @@ export function Equipments() {
                                                 </button>
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             )}
                         </div>
 
                         <form onSubmit={handleSaveConsumable} style={{ padding: '24px' }}>
                             <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginBottom: '16px' }}>Adicionar Insumo ou Acessório</h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-                                <div className="form-group" style={{ marginBottom: 0, gridColumn: 'span 2' }}>
-                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Nome do Insumo (Ex: Toner Preto, Lâmina de Corte Premium)</label>
-                                    <input type="text" className="form-input" required value={consForm.name} onChange={e => setConsForm({...consForm, name: e.target.value})} />
-                                </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Custo Médio / Valor (R$)</label>
-                                    <input type="number" step="0.01" min="0" className="form-input" required value={consForm.cost} onChange={e => setConsForm({...consForm, cost: e.target.value})} />
+                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Vincular Insumo Dinâmico (Estoque)</label>
+                                    <select 
+                                        className="form-input border-blue-200 focus:ring-blue-500" 
+                                        value={consForm.inventoryId} 
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            if (val) {
+                                                const m = materialsList.find(x => x.id === val);
+                                                setConsForm({...consForm, inventoryId: val, name: m?.name || '', usedUnit: m?.unit || 'un'});
+                                            } else {
+                                                setConsForm({...consForm, inventoryId: '', name: ''});
+                                            }
+                                        }}
+                                    >
+                                        <option value="">Nenhum (Cadastrar Avulso)</option>
+                                        {materialsList.map(m => <option key={m.id} value={m.id}>{m.name} (R${m.cost}/{m.unit})</option>)}
+                                    </select>
                                 </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Rendimento Estimado</label>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <input type="number" className="form-input" style={{ flex: 2 }} required value={consForm.yield} onChange={e => setConsForm({...consForm, yield: e.target.value})} />
-                                        <select className="form-input" style={{ flex: 1, padding: '0 8px' }} value={consForm.yieldUnit} onChange={e => setConsForm({...consForm, yieldUnit: e.target.value})}>
-                                            <option value="páginas">Pág</option>
-                                            <option value="cortes">Cortes</option>
-                                            <option value="unidades">Unid</option>
-                                            <option value="dias">Dias</option>
-                                        </select>
+                                {!consForm.inventoryId ? (
+                                    <>
+                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Nome do Insumo (Avulso)</label>
+                                            <input type="text" className="form-input" required={!consForm.inventoryId} value={consForm.name} onChange={e => setConsForm({...consForm, name: e.target.value})} />
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Custo Médio (R$)</label>
+                                                <input type="number" step="0.01" min="0" className="form-input" required={!consForm.inventoryId} value={consForm.cost} onChange={e => setConsForm({...consForm, cost: e.target.value})} />
+                                            </div>
+                                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>Rendimento Estimado</label>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <input type="number" className="form-input" style={{ flex: 2 }} required={!consForm.inventoryId} value={consForm.yield} onChange={e => setConsForm({...consForm, yield: e.target.value})} />
+                                                    <select className="form-input" style={{ flex: 1, padding: '0 8px' }} value={consForm.yieldUnit} onChange={e => setConsForm({...consForm, yieldUnit: e.target.value})}>
+                                                        <option value="páginas">Pág</option>
+                                                        <option value="cortes">Cortes</option>
+                                                        <option value="unidades">Unid</option>
+                                                        <option value="dias">Dias</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', backgroundColor: '#f0f9ff', padding: '16px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '16px' }}>
+                                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0369a1', marginBottom: '6px', display: 'block' }}>Media Consumida por Ação</label>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <input type="number" step="any" className="form-input" required value={consForm.usedQuantity} onChange={e => setConsForm({...consForm, usedQuantity: e.target.value})} placeholder="Ex: 0.02" />
+                                                    <select className="form-input" style={{ flex: 1, padding: '0 8px' }} value={consForm.usedUnit} onChange={e => setConsForm({...consForm, usedUnit: e.target.value})}>
+                                                        {getSubUnits(materialsList.find(m => m.id === consForm.inventoryId)?.unit).map(u => <option key={u} value={u}>{u}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0369a1', marginBottom: '6px', display: 'block' }}>Refere-se a que Ação?</label>
+                                                <input type="text" className="form-input" required value={consForm.actionName} onChange={e => setConsForm({...consForm, actionName: e.target.value})} placeholder="Ex: página colorida, corte..." />
+                                            </div>
+                                        </div>
+                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0369a1', marginBottom: '6px', display: 'block' }}>Volume: Quantas ações dessa esta máquina faz por HORA?</label>
+                                            <input type="number" className="form-input" required value={consForm.actionsPerHour} onChange={e => setConsForm({...consForm, actionsPerHour: e.target.value})} placeholder="Ex: 600 impressões/h" />
+                                            <span style={{ fontSize: '0.75rem', color: '#0284c7', marginTop: '4px', display: 'block' }}>Isso diluirá o custo da tinta no custo de hora-máquina.</span>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             <div className="modal-footer" style={{ marginTop: '24px', padding: 0, border: 'none' }}>

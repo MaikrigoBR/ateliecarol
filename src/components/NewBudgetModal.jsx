@@ -83,12 +83,31 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
     });
   };
 
+  const getEquipHourlyCost = (equip) => {
+      if (!equip) return 0;
+      const deprecMonthly = (parseFloat(equip.purchasePrice) || 0) / (parseInt(equip.lifespanMonths) || 1);
+      const hrCost = deprecMonthly / (parseInt(equip.monthlyHours) || 160);
+      let hrConsumableCost = 0;
+      if (equip.consumables && equip.consumables.length > 0) {
+          hrConsumableCost = equip.consumables.reduce((sum, c) => {
+              if (c.inventoryId && Array.isArray(materials)) {
+                  const invItem = materials.find(m => m.id === c.inventoryId);
+                  if (invItem) {
+                      const costPerAction = calculateFractionalCost(invItem.cost, invItem.unit, c.usedUnit, c.usedQuantity);
+                      return sum + ((costPerAction * parseFloat(c.actionsPerHour || 1)) || 0);
+                  }
+              }
+              return sum + ((c.cost || 0) / (c.yield || 1));
+          }, 0);
+      }
+      return hrCost + hrConsumableCost;
+  };
+
   const handleMachineSelect = (e) => {
       const eId = e.target.value;
       const equip = equipments.find(eq => eq.id === eId);
       if (equip) {
-          const deprecMonthly = (parseFloat(equip.purchasePrice) || 0) / (parseInt(equip.lifespanMonths) || 1);
-          const hrCost = deprecMonthly / (parseInt(equip.monthlyHours) || 160);
+          const hrCost = getEquipHourlyCost(equip);
           setCurrentMachine(prev => ({ ...prev, equipId: eId, hourCost: hrCost }));
       } else {
           setCurrentMachine(prev => ({ ...prev, equipId: '', hourCost: 0 }));
@@ -359,9 +378,11 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                             onChange={handleMachineSelect}
                         >
                             <option value="">Selecione o Equipamento...</option>
-                            {equipments.map(eq => (
-                                <option key={eq.id} value={eq.id}>{eq.name} (R$ {((parseFloat(eq.purchasePrice)/(parseInt(eq.lifespanMonths)||1))/(parseInt(eq.monthlyHours)||160)).toFixed(2)}/h)</option>
-                            ))}
+                            {equipments.map(eq => {
+                                const hrCost = getEquipHourlyCost(eq);
+                                return (
+                                <option key={eq.id} value={eq.id}>{eq.name} (R$ {hrCost.toFixed(2)}/h)</option>
+                            )})}
                         </select>
                     </div>
                     <div className="input-group" style={{ marginBottom: 0 }}>
