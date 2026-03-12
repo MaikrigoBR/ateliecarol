@@ -109,21 +109,33 @@ export function Customers() {
                     }}
                   >
                     <td>
-                      <div style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--text-main)' }}>{customer.name}</div>
-                      {customer.instagram && (
-                          <div className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                              <Instagram size={12} style={{ color: '#E1306C' }} /> 
-                              <a href={`https://instagram.com/${customer.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>
-                                  {customer.instagram}
-                              </a>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', backgroundColor: 'var(--surface-hover)', flexShrink: 0 }}>
+                              <img 
+                                src={customer.photoUrl || (customer.instagram ? `https://unavatar.io/instagram/${customer.instagram.replace('@', '')}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`)} 
+                                alt={customer.name} 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`; }}
+                              />
                           </div>
-                      )}
-                      {customer.birthDate && (
-                          <div className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                              <Gift size={12} style={{ color: '#f59e0b' }} /> 
-                              {new Date(customer.birthDate).toLocaleDateString()}
+                          <div>
+                              <div style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--text-main)' }}>{customer.name}</div>
+                              {customer.instagram && (
+                                  <div className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                      <Instagram size={12} style={{ color: '#E1306C' }} /> 
+                                      <a href={`https://instagram.com/${customer.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }} onClick={e => e.stopPropagation()}>
+                                          {customer.instagram}
+                                      </a>
+                                  </div>
+                              )}
+                              {customer.birthDate && (
+                                  <div className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                      <Gift size={12} style={{ color: '#f59e0b' }} /> 
+                                      {new Date(customer.birthDate).toLocaleDateString()}
+                                  </div>
+                              )}
                           </div>
-                      )}
+                      </div>
                     </td>
                     <td>
                       <div className="flex items-center gap-sm text-sm" style={{ marginBottom: '4px' }}>
@@ -234,6 +246,7 @@ export function Customers() {
         onClose={() => { setIsDetailsModalOpen(false); setSelectedCustomer(null); }}
         customer={selectedCustomer}
         onEdit={(customerToEdit) => {
+            setIsDetailsModalOpen(false); // Close DetailsModal properly
             setSelectedCustomer(customerToEdit);
             setIsEditModalOpen(true);
         }}

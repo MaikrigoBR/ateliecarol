@@ -194,7 +194,7 @@ export function CustomerDetailsModal({ isOpen, onClose, customer, onEdit, onDele
                                 <MessageCircle size={16} /> Enviar Mensagem
                             </button>
                         )}
-                        <button onClick={() => { onEdit(customer); onClose(); }} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <button onClick={() => { onEdit(customer); }} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Edit size={16} /> Editar Perfil
                         </button>
                     </div>
