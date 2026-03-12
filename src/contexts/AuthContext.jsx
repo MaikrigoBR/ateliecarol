@@ -2,6 +2,7 @@
 import React, { useContext, useState, useEffect, createContext } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { auth } from '../services/firebase';
+import db from '../services/database';
 
 const AuthContext = createContext();
 
@@ -31,8 +32,19 @@ export function AuthProvider({ children }) {
         setLoading(false);
         return;
     }
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      
+      // Auto-Sync system's global settings from Database to ensure they never blank out due to local cache loss
+      try {
+        const dbConfig = await db.getById('settings', 'global');
+        if (dbConfig && Object.keys(dbConfig).length > 0) {
+            localStorage.setItem('stationery_config', JSON.stringify(dbConfig));
+        }
+      } catch (e) {
+        console.warn("AuthContext: Erro ao sincronizar configurações globais do banco", e);
+      }
+
       setLoading(false);
     });
 
