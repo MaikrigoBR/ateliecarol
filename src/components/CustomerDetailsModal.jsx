@@ -9,7 +9,12 @@ export function CustomerDetailsModal({ isOpen, onClose, customer, onEdit, onDele
 
     // Media
     const defaultAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`;
-    const avatarUrl = customer.photoUrl || defaultAvatarUrl;
+    let parsedPhotoUrl = customer.photoUrl;
+    if (parsedPhotoUrl && parsedPhotoUrl.includes('instagram.com') && (parsedPhotoUrl.includes('/p/') || parsedPhotoUrl.includes('/reel/'))) {
+        const cleanUrl = parsedPhotoUrl.split('?')[0].replace(/\/$/, "");
+        parsedPhotoUrl = `${cleanUrl}/media/?size=l`;
+    }
+    const avatarUrl = parsedPhotoUrl || defaultAvatarUrl;
 
     // --- Inline Styles mapping to Theme Variables ---
     const sOverlay = {

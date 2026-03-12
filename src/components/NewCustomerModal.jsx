@@ -67,7 +67,13 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
     onClose();
   };
 
-  const avatarUrl = formData.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || 'Novo Cliente')}&background=random&color=fff`;
+  let parsedPhotoUrl = formData.photoUrl;
+  if (parsedPhotoUrl && parsedPhotoUrl.includes('instagram.com') && (parsedPhotoUrl.includes('/p/') || parsedPhotoUrl.includes('/reel/'))) {
+      const cleanUrl = parsedPhotoUrl.split('?')[0].replace(/\/$/, "");
+      parsedPhotoUrl = `${cleanUrl}/media/?size=l`;
+  }
+
+  const avatarUrl = parsedPhotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || 'Novo Cliente')}&background=random&color=fff`;
 
   return (
     <div className="modal-overlay">
@@ -90,7 +96,7 @@ export function NewCustomerModal({ isOpen, onClose, onCustomerCreated }) {
                 <div style={{ flex: 1 }}>
                      <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.25rem 0', color: 'var(--text-main)' }}>Foto do Perfil</h4>
                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
-                         Insira um "Link da Foto" abaixo para personalizar. O Instagram bloqueou a sincronização automática de fotos.
+                         Você pode testar colar o link de uma <strong>postagem</strong> do Instagram, ou clicar com o botão direito na foto original e copiar o <strong>Endereço da Imagem</strong> direto.
                      </p>
                 </div>
             </div>

@@ -99,7 +99,14 @@ export function Customers() {
             </thead>
             <tbody>
               {filteredCustomers.length > 0 ? (
-                filteredCustomers.map(customer => (
+                filteredCustomers.map(customer => {
+                  let parsedPhotoUrl = customer.photoUrl;
+                  if (parsedPhotoUrl && parsedPhotoUrl.includes('instagram.com') && (parsedPhotoUrl.includes('/p/') || parsedPhotoUrl.includes('/reel/'))) {
+                      const cleanUrl = parsedPhotoUrl.split('?')[0].replace(/\/$/, "");
+                      parsedPhotoUrl = `${cleanUrl}/media/?size=l`;
+                  }
+                  
+                  return (
                   <tr 
                     key={customer.id} 
                     className="cursor-pointer hover:bg-gray-50 transition-colors"
@@ -112,7 +119,7 @@ export function Customers() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', backgroundColor: 'var(--surface-hover)', flexShrink: 0, border: '1px solid var(--border)' }}>
                               <img 
-                                src={customer.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`} 
+                                src={parsedPhotoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`} 
                                 alt={customer.name} 
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                                 onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random&color=fff`; }}
@@ -203,7 +210,8 @@ export function Customers() {
                         </button>
                     </td>
                   </tr>
-                ))
+                );
+                })
               ) : (
                 <tr>
                   <td colSpan="5" style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--text-muted)' }}>
