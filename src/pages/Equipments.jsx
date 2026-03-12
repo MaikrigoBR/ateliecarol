@@ -20,6 +20,8 @@ export function Equipments() {
   // Modals state
   const [isEquipModalOpen, setIsEquipModalOpen] = useState(false);
   const [editingEquip, setEditingEquip] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingEquip, setViewingEquip] = useState(null);
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
   const [activeEquipForMaintenance, setActiveEquipForMaintenance] = useState(null);
   
@@ -133,6 +135,7 @@ export function Equipments() {
           }
 
           setIsEquipModalOpen(false);
+          setIsViewModalOpen(false);
           setEditingEquip(null);
           fetchEquipments();
       } catch (err) {
@@ -144,6 +147,7 @@ export function Equipments() {
       if (window.confirm(`Tem certeza que deseja excluir o equipamento "${name}" e todo seu histórico de manutenção irreversivelmente?`)) {
           await db.delete('equipments', id);
           AuditService.log(currentUser, 'DELETE', 'Equipments', id, `Removeu equipamento: ${name}`);
+          setIsViewModalOpen(false);
           fetchEquipments();
       }
   };
@@ -427,11 +431,10 @@ export function Equipments() {
                 <table className="table">
                     <thead>
                         <tr>
-                            <th>Identificação</th>
+                            <th>Ativo / Identificação</th>
                             <th>Saúde & Histórico</th>
                             <th>Cálculo Depreciação / ROI</th>
                             <th>Custo Hora-Máq.</th>
-                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -462,7 +465,13 @@ export function Equipments() {
                             const availability = Math.max(0, ((totalExpectedHours - downtime) / totalExpectedHours) * 100);
 
                             return (
-                                <tr key={eq.id}>
+                                <tr 
+                                    key={eq.id} 
+                                    onClick={() => { setViewingEquip(eq); setIsViewModalOpen(true); }}
+                                    style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--surface-hover)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
                                     <td>
                                         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                             {eq.photoUrl ? (
@@ -518,35 +527,190 @@ export function Equipments() {
                                         </div>
                                         <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: '#94a3b8' }}>*Sugerido para precificação</p>
                                     </td>
-                                    <td>
-                                        <div className="flex gap-2">
-                                            <button className="btn btn-icon" style={{ backgroundColor: '#f1f5f9' }} title="Gerar QR / Patrimônio" onClick={() => setQrCodeEquip(eq)}>
-                                                <QrCode size={16} color="#0f172a" />
-                                            </button>
-                                            <button className="btn btn-icon" style={{ backgroundColor: '#faf5ff', color: '#9333ea' }} title="Insumos e Refis" onClick={() => openConsumablesModal(eq)}>
-                                                <Package size={16} />
-                                            </button>
-                                            <button className="btn btn-icon" style={{ backgroundColor: '#fef2f2', color: '#ef4444' }} title="Registrar Manutenção" onClick={() => openMaintenanceModal(eq)}>
-                                                <Wrench size={16} />
-                                            </button>
-                                            <button className="btn btn-icon" title="Editar Equipamento" onClick={() => openEquipModal(eq)}>
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button className="btn btn-icon text-danger" title="Excluir" onClick={() => handleDeleteEquipment(eq.id, eq.name)}>
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
                                 </tr>
                             );
                         })}
                         {filteredEquipments.length === 0 && (
-                            <tr><td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Nenhum equipamento cadastrado ou encontrado.</td></tr>
+                            <tr><td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Nenhum equipamento cadastrado ou encontrado.</td></tr>
                         )}
                     </tbody>
                 </table>
             </div>
         </div>
+
+        {/* MODAL: VIEW DETAILS */}
+        {isViewModalOpen && viewingEquip && (
+            <div className="modal-overlay" onClick={() => setIsViewModalOpen(false)}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', padding: 0, overflow: 'hidden' }}>
+                    
+                    {/* Header */}
+                    <div style={{ padding: '24px 24px 20px 24px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                            {viewingEquip.photoUrl ? (
+                                <img src={viewingEquip.photoUrl} alt="Equip" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '12px', border: '2px solid white', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+                            ) : (
+                                <div style={{ width: '80px', height: '80px', backgroundColor: '#e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                                    <Hammer size={32} color="#94a3b8" />
+                                </div>
+                            )}
+                            <div>
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    {viewingEquip.name}
+                                    <span style={{ fontSize: '0.75rem', padding: '4px 8px', borderRadius: '12px', backgroundColor: viewingEquip.status === 'Ativo' ? '#dcfce7' : viewingEquip.status === 'Manutenção' ? '#fef3c7' : '#fee2e2', color: viewingEquip.status === 'Ativo' ? '#166534' : viewingEquip.status === 'Manutenção' ? '#92400e' : '#991b1b', fontWeight: 600 }}>
+                                        {viewingEquip.status}
+                                    </span>
+                                </h2>
+                                <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '0.95rem' }}>
+                                    {viewingEquip.brand} {viewingEquip.model && `• ${viewingEquip.model}`}
+                                </p>
+                                {(viewingEquip.patrimonyId || viewingEquip.equipmentGroup) && (
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                        {viewingEquip.equipmentGroup && <span style={{ fontSize: '0.75rem', padding: '2px 8px', backgroundColor: '#e0f2fe', color: '#0369a1', borderRadius: '4px', border: '1px solid #bae6fd' }}>Grupo: {viewingEquip.equipmentGroup}</span>}
+                                        {viewingEquip.patrimonyId && <span style={{ fontSize: '0.75rem', padding: '2px 8px', backgroundColor: '#f1f5f9', color: '#475569', borderRadius: '4px', border: '1px solid #cbd5e1' }}>Patrimônio: {viewingEquip.patrimonyId}</span>}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <button className="btn btn-icon text-muted" onClick={() => setIsViewModalOpen(false)}>✕</button>
+                    </div>
+
+                    {/* Toolbar / Actions */}
+                    <div style={{ display: 'flex', gap: '12px', padding: '16px 24px', backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                        <button className="btn" style={{ flex: 1, backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: 600, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center' }} onClick={() => { setIsViewModalOpen(false); openEquipModal(viewingEquip); }}>
+                            <Edit2 size={16} /> Editar Informações
+                        </button>
+                        <button className="btn" style={{ flex: 1, backgroundColor: '#f5f3ff', color: '#7c3aed', fontWeight: 600, border: '1px solid #ede9fe', display: 'flex', justifyContent: 'center' }} onClick={() => { setIsViewModalOpen(false); openConsumablesModal(viewingEquip); }}>
+                            <Package size={16} /> Insumos & Refis
+                        </button>
+                        <button className="btn" style={{ flex: 1, backgroundColor: '#fef2f2', color: '#dc2626', fontWeight: 600, border: '1px solid #fee2e2', display: 'flex', justifyContent: 'center' }} onClick={() => { setIsViewModalOpen(false); openMaintenanceModal(viewingEquip); }}>
+                            <Wrench size={16} /> Add Manutenção
+                        </button>
+                        <button className="btn btn-icon" style={{ backgroundColor: '#f1f5f9' }} title="Gerar QR / Patrimônio" onClick={() => { setIsViewModalOpen(false); setQrCodeEquip(viewingEquip); }}>
+                            <QrCode size={18} color="#0f172a" />
+                        </button>
+                        <button className="btn btn-icon" style={{ backgroundColor: '#fff1f2', color: '#e11d48' }} title="Excluir Equipamento" onClick={() => handleDeleteEquipment(viewingEquip.id, viewingEquip.name)}>
+                            <Trash2 size={18} />
+                        </button>
+                    </div>
+
+                    {/* Content Details */}
+                    <div style={{ padding: '24px', maxHeight: '50vh', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '24px' }}>
+                            {/* Panel 1: Info e Histórico Saudável */}
+                            <div>
+                                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px' }}>Estatísticas e Custos</h3>
+                                <div style={{ display: 'grid', gap: '12px' }}>
+                                    <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Investimento Inicial</div>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>R$ {(viewingEquip.purchasePrice || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                                        </div>
+                                        <Calendar size={24} color="#94a3b8" />
+                                    </div>
+
+                                    {(() => {
+                                        const monthsPassed = Math.floor((new Date() - new Date(viewingEquip.purchaseDate)) / (1000 * 60 * 60 * 24 * 30));
+                                        const deprecMonthly = (viewingEquip.purchasePrice || 0) / (viewingEquip.lifespanMonths || 1);
+                                        const currentValor = Math.max(0, (viewingEquip.purchasePrice || 0) - (deprecMonthly * Math.max(0, monthsPassed)));
+                                        const maintTotal = (viewingEquip.maintenanceHistory || []).reduce((sum, h) => sum + (h.cost || 0), 0);
+                                        let downtime = (viewingEquip.maintenanceHistory || []).reduce((sum, h) => sum + (parseFloat(h.downtimeHours) || 0), 0);
+                                        const totalExpectedHours = (Math.max(1, monthsPassed) * (viewingEquip.monthlyHours || 160));
+                                        const availability = Math.max(0, ((totalExpectedHours - downtime) / totalExpectedHours) * 100);
+
+                                        let hrConsumableCost = 0;
+                                        if (viewingEquip.consumables && viewingEquip.consumables.length > 0) {
+                                            hrConsumableCost = viewingEquip.consumables.reduce((sum, c) => {
+                                                if (c.inventoryId && Array.isArray(materialsList)) {
+                                                    const invItem = materialsList.find(m => m.id === c.inventoryId);
+                                                    if (invItem) {
+                                                        const costPerAction = calculateFractionalCost(invItem.cost, invItem.unit, c.usedUnit, c.usedQuantity);
+                                                        return sum + ((costPerAction * parseFloat(c.actionsPerHour || 1)) || 0);
+                                                    }
+                                                }
+                                                return sum + ((c.cost || 0) / (c.yield || 1));
+                                            }, 0);
+                                        }
+                                        const hourCost = (deprecMonthly / (viewingEquip.monthlyHours || 160)) + hrConsumableCost;
+
+                                        return (
+                                            <>
+                                                <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div>
+                                                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Valor Atual do Bem (Depreciado)</div>
+                                                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0ea5e9' }}>R$ {currentValor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                                                    </div>
+                                                    <DollarSign size={24} color="#38bdf8" />
+                                                </div>
+
+                                                <div style={{ backgroundColor: availability >= 90 ? '#f0fdf4' : availability >= 70 ? '#fefce8' : '#fef2f2', padding: '16px', borderRadius: '8px', border: `1px solid ${availability >= 90 ? '#bbf7d0' : availability >= 70 ? '#fef08a' : '#fecaca'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div>
+                                                        <div style={{ fontSize: '0.75rem', color: availability >= 90 ? '#166534' : availability >= 70 ? '#854d0e' : '#991b1b', fontWeight: 600, textTransform: 'uppercase' }}>Disponibilidade & OEE</div>
+                                                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: availability >= 90 ? '#15803d' : availability >= 70 ? '#a16207' : '#b91c1c' }}>{availability.toFixed(1)}% ({downtime}h Paradas)</div>
+                                                    </div>
+                                                    <Activity size={24} color={availability >= 90 ? '#16a34a' : availability >= 70 ? '#ca8a04' : '#dc2626'} />
+                                                </div>
+
+                                                <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px', border: '2px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div>
+                                                        <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600, textTransform: 'uppercase' }}>Custo Sugerido da Hora-Máquina</div>
+                                                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>R$ {hourCost.toFixed(2)} <span style={{fontSize: '0.8rem', fontWeight: 400}}>/hora</span></div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+
+                            {/* Panel 2: Insumos e Log */}
+                            <div>
+                                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px' }}>Log e Estrutura</h3>
+                                <div style={{ display: 'grid', gap: '16px' }}>
+                                    <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>Insumos Cadastrados</div>
+                                        {viewingEquip.consumables && viewingEquip.consumables.length > 0 ? (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                {viewingEquip.consumables.map(c => (
+                                                    <span key={c.id} style={{ backgroundColor: '#f3e8ff', color: '#6b21a8', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600, border: '1px solid #e9d5ff' }}>
+                                                        {c.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Nenhum insumo dinâmico.</span>
+                                        )}
+                                    </div>
+                                    <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>Manutenções: R$ {((viewingEquip.maintenanceHistory || []).reduce((sum, h) => sum + (h.cost || 0), 0)).toFixed(2)}</div>
+                                        {viewingEquip.maintenanceHistory && viewingEquip.maintenanceHistory.length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
+                                                {viewingEquip.maintenanceHistory.slice().reverse().map(h => (
+                                                    <div key={h.id} style={{ fontSize: '0.8rem', padding: '8px', backgroundColor: '#f8fafc', borderRadius: '4px' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                            <strong>{new Date(h.date + 'T12:00:00').toLocaleDateString()}</strong>
+                                                            <span style={{ color: '#dc2626', fontWeight: 600 }}>R$ {h.cost.toFixed(2)}</span>
+                                                        </div>
+                                                        <div style={{ color: '#475569' }}>{h.description}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Ativo Saudável (Sem log de reparos).</span>
+                                        )}
+                                    </div>
+                                    {viewingEquip.description && (
+                                        <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Anotações</div>
+                                            <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>{viewingEquip.description}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* MODAL: EQUIPAMENTO CRUD */}
         {isEquipModalOpen && (
