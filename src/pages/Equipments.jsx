@@ -366,30 +366,37 @@ export function Equipments() {
         </div>
 
         {/* Filters */}
-        <div className="card" style={{ padding: '16px', marginBottom: '24px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 300px' }}>
-                <Search size={18} color="#64748b" />
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '24px', backgroundColor: 'var(--surface)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 250px', backgroundColor: 'var(--background)', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <Search size={16} color="var(--text-muted)" />
                 <input 
                     type="text" 
-                    className="form-input" 
                     placeholder="Buscar por Nome, Marca ou Patrimônio..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ marginBottom: 0, flex: 1 }}
+                    style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', padding: '10px 0', color: 'var(--text-main)' }}
                 />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 200px' }}>
-                <Filter size={18} color="#64748b" />
-                <select className="form-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ marginBottom: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 180px' }}>
+                <Filter size={16} color="var(--text-muted)" />
+                <select 
+                    value={statusFilter} 
+                    onChange={(e) => setStatusFilter(e.target.value)} 
+                    style={{ flex: 1, border: '1px solid var(--border)', background: 'var(--background)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', outline: 'none', color: 'var(--text-main)' }}
+                >
                     <option value="">Todos os Status</option>
                     <option value="Ativo">Ativo</option>
                     <option value="Manutenção">Em Manutenção</option>
                     <option value="Inativo">Inativo / Aposentado</option>
                 </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 200px' }}>
-                <Package size={18} color="#64748b" />
-                <select className="form-input" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} style={{ marginBottom: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 180px' }}>
+                <Package size={16} color="var(--text-muted)" />
+                <select 
+                    value={groupFilter} 
+                    onChange={(e) => setGroupFilter(e.target.value)} 
+                    style={{ flex: 1, border: '1px solid var(--border)', background: 'var(--background)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', outline: 'none', color: 'var(--text-main)' }}
+                >
                     <option value="">Qualquer Grupo</option>
                     {existingGroups.map(g => (
                         <option key={g} value={g}>{g}</option>
