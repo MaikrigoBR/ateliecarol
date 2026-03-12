@@ -36,6 +36,10 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
       baseUnit: 'un'
   });
 
+  const [productSearch, setProductSearch] = useState('');
+  const [materialSearch, setMaterialSearch] = useState('');
+  const [equipSearch, setEquipSearch] = useState('');
+
   useEffect(() => {
     const loadData = async () => {
         if (isOpen) {
@@ -61,6 +65,10 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                 setCurrentItem({ productId: '', quantity: 1, price: 0 });
                 setCurrentMachine({ equipId: '', minutes: 30, hourCost: 0 });
                 setCurrentMaterial({ materialId: '', quantity: 1, usageUnit: 'un', cost: 0, baseUnit: 'un' });
+                
+                setProductSearch('');
+                setMaterialSearch('');
+                setEquipSearch('');
             } catch (error) {
                 console.error("Error loading modal data:", error);
                 setCustomers([]);
@@ -144,6 +152,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
     }));
     
     setCurrentItem({ productId: '', quantity: 1, price: 0 });
+    setProductSearch('');
   };
 
   const removeItem = (index) => {
@@ -171,6 +180,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
       }));
       
       setCurrentMachine({ equipId: '', minutes: 30, hourCost: 0 });
+      setEquipSearch('');
   };
 
   const addMaterialCost = () => {
@@ -192,11 +202,40 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
       }));
       
       setCurrentMaterial({ materialId: '', quantity: 1, usageUnit: 'un', cost: 0, baseUnit: 'un' });
+      setMaterialSearch('');
   };
 
   const calculateTotal = () => {
       return formData.items.reduce((acc, curr) => acc + curr.total, 0);
   };
+
+  const sortedCustomers = [...customers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  const filteredProducts = products.filter(p => !productSearch || (p.name || '').toLowerCase().includes(productSearch.toLowerCase()) || (p.category || '').toLowerCase().includes(productSearch.toLowerCase()));
+  const groupedProducts = filteredProducts.reduce((acc, product) => {
+      const category = product.category || 'Sem Categoria';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(product);
+      return acc;
+  }, {});
+  const sortedCategories = Object.keys(groupedProducts).sort();
+  for (const cat of sortedCategories) {
+      groupedProducts[cat].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+
+  const filteredMaterials = materials.filter(m => !materialSearch || (m.name || '').toLowerCase().includes(materialSearch.toLowerCase()) || (m.materialGroup || '').toLowerCase().includes(materialSearch.toLowerCase()));
+  const groupedMaterials = filteredMaterials.reduce((acc, m) => {
+      const g = m.materialGroup || 'Outros / Sem Grupo';
+      if (!acc[g]) acc[g] = [];
+      acc[g].push(m);
+      return acc;
+  }, {});
+  const sortedMaterialGroups = Object.keys(groupedMaterials).sort((a, b) => a.localeCompare(b));
+  for (const group of sortedMaterialGroups) {
+      groupedMaterials[group].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const filteredEquips = equipments.filter(e => !equipSearch || (e.name || '').toLowerCase().includes(equipSearch.toLowerCase())).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -243,7 +282,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                 required
               >
                   <option value="">Selecione...</option>
-                  {customers.map(c => (
+                  {sortedCustomers.map(c => (
                       <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
               </select>
@@ -262,6 +301,17 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-md)', marginTop: 'var(--space-md)' }}>
                 <h4 style={{ marginBottom: 'var(--space-sm)' }}>Adicionar Novo Produto</h4>
+                
+                <div className="mb-3">
+                    <input 
+                        type="text" 
+                        placeholder="Pesquisar produto ou categoria..." 
+                        className="form-input text-sm w-full bg-white"
+                        value={productSearch}
+                        onChange={e => setProductSearch(e.target.value)}
+                    />
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 'var(--space-sm)', alignItems: 'end' }}>
                     <div className="input-group" style={{ marginBottom: 0 }}>
                         <select 
@@ -270,8 +320,14 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                             onChange={handleProductSelect}
                         >
                             <option value="">Produto (Catálogo)...</option>
-                            {products.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
+                            {sortedCategories.map(category => (
+                                <optgroup key={category} label={category}>
+                                    {groupedProducts[category].map(product => (
+                                        <option key={product.id} value={product.id}>
+                                            {product.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
                             ))}
                         </select>
                     </div>
@@ -306,26 +362,28 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                 <h4 style={{ marginBottom: '8px', fontSize: '0.9rem', color: '#c2410c', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Package size={14} color="#ea580c" /> Vender Fração de Material (Corte/Dose Custo Base)
                 </h4>
+                
+                <div className="mb-3">
+                    <input 
+                        type="text" 
+                        placeholder="Pesquisar material ou tipo..." 
+                        className="form-input text-sm w-full bg-white"
+                        value={materialSearch}
+                        onChange={e => setMaterialSearch(e.target.value)}
+                    />
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 'var(--space-sm)', alignItems: 'end' }}>
                     <div className="input-group" style={{ marginBottom: 0 }}>
                         <select 
-                            className="form-input"
+                            className="form-input text-sm"
                             value={currentMaterial.materialId}
                             onChange={handleMaterialSelect}
                         >
                             <option value="">Selecione o Material / Insumo...</option>
-                            {Object.entries(
-                                materials.reduce((acc, m) => {
-                                    const g = m.materialGroup || 'Outros / Sem Grupo';
-                                    if (!acc[g]) acc[g] = [];
-                                    acc[g].push(m);
-                                    return acc;
-                                }, {})
-                            )
-                            .sort(([a], [b]) => a.localeCompare(b))
-                            .map(([group, mats]) => (
+                            {sortedMaterialGroups.map(group => (
                                 <optgroup key={group} label={group}>
-                                    {mats.sort((a,b) => a.name.localeCompare(b.name)).map(m => (
+                                    {groupedMaterials[group].map(m => (
                                         <option key={m.id} value={m.id}>{m.name} (R$ {m.cost}/{m.unit})</option>
                                     ))}
                                 </optgroup>
@@ -370,15 +428,26 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                 <h4 style={{ marginBottom: '8px', fontSize: '0.9rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Wrench size={14} color="#64748b" /> Embutir Custo de Hora-Máquina (Desgaste/Depreciação)
                 </h4>
+                
+                <div className="mb-3">
+                    <input 
+                        type="text" 
+                        placeholder="Pesquisar máquina..." 
+                        className="form-input text-sm w-full bg-white"
+                        value={equipSearch}
+                        onChange={e => setEquipSearch(e.target.value)}
+                    />
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: 'var(--space-sm)', alignItems: 'end' }}>
                     <div className="input-group" style={{ marginBottom: 0 }}>
                         <select 
-                            className="form-input"
+                            className="form-input text-sm"
                             value={currentMachine.equipId}
                             onChange={handleMachineSelect}
                         >
                             <option value="">Selecione o Equipamento...</option>
-                            {equipments.map(eq => {
+                            {filteredEquips.map(eq => {
                                 const hrCost = getEquipHourlyCost(eq);
                                 return (
                                 <option key={eq.id} value={eq.id}>{eq.name} (R$ {hrCost.toFixed(2)}/h)</option>
