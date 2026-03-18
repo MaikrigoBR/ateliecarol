@@ -124,61 +124,61 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
 
     return (
         <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
-            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', padding: '0', backgroundColor: '#f8fafc', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', padding: '0', backgroundColor: 'var(--background)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh', border: '1px solid var(--border)' }}>
                 
-                <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <DollarSign className="text-green-600" size={24} />
                             Financeiro Vinculado
                         </h2>
-                        <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0 0 0' }}>{entityName}</p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{entityName}</p>
                     </div>
-                    <button className="btn btn-icon text-muted" onClick={onClose}>
+                    <button className="btn btn-icon" onClick={onClose} style={{ color: 'var(--text-muted)' }}>
                         <X size={20} />
                     </button>
                 </div>
 
-                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1, backgroundColor: 'var(--background)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#334155', margin: 0 }}>Lançamentos Associados</h3>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>Lançamentos Associados</h3>
                         <button className="btn btn-primary" onClick={() => setNewTrans({...newTrans, isAdding: !newTrans.isAdding, description: `Ref: ${entityName}`})} style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
                             <Plus size={14} /> Novo Lançamento
                         </button>
                     </div>
 
                     {newTrans.isAdding && (
-                        <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
-                            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e3a8a', marginBottom: '12px' }}>Adicionar Despesa Referente a {entityName}</h4>
+                        <div style={{ backgroundColor: 'var(--surface-hover)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '20px' }}>
+                            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '12px' }}>Adicionar Despesa Referente a {entityName}</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                                 <div className="form-group mb-0 col-span-2">
-                                    <label className="text-xs text-blue-900">Descrição</label>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Descrição</label>
                                     <input type="text" className="form-input text-sm" value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} />
                                 </div>
                                 <div className="form-group mb-0">
-                                    <label className="text-xs text-blue-900">Valor (R$)</label>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Valor (R$)</label>
                                     <input type="number" step="0.01" className="form-input text-sm" value={newTrans.amount} onChange={e => setNewTrans({...newTrans, amount: e.target.value})} />
                                 </div>
                                 <div className="form-group mb-0">
-                                    <label className="text-xs text-blue-900">Data (Venc./Pag.)</label>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Data (Venc./Pag.)</label>
                                     <input type="date" className="form-input text-sm" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} />
                                 </div>
                                 <div className="form-group mb-0 md:col-span-2">
-                                    <label className="text-xs text-blue-900">Conta/Caixa</label>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Conta/Caixa</label>
                                     <select className="form-input text-sm" value={newTrans.accountId} onChange={e => setNewTrans({...newTrans, accountId: e.target.value})}>
                                         <option value="">Selecione...</option>
                                         {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="form-group mb-0">
-                                    <label className="text-xs text-blue-900">Situação</label>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Situação</label>
                                     <select className="form-input text-sm" value={newTrans.status} onChange={e => setNewTrans({...newTrans, status: e.target.value})}>
                                         <option value="pending">A Pagar</option>
                                         <option value="paid">Já Pago</option>
                                     </select>
                                 </div>
                                 <div className="form-group mb-0">
-                                    <label className="text-xs text-blue-900">Meio</label>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Meio</label>
                                     <select className="form-input text-sm" value={newTrans.paymentMethod} onChange={e => setNewTrans({...newTrans, paymentMethod: e.target.value})}>
                                         <option value="pix">PIX</option>
                                         <option value="credit">Cartão Crédito</option>
@@ -196,70 +196,70 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
                     )}
 
                     {loading ? (
-                        <div className="text-center py-8 text-slate-500">Carregando financeiro vinculado...</div>
+                        <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>Carregando financeiro vinculado...</div>
                     ) : transactions.length === 0 ? (
-                        <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
-                            <DollarSign className="mx-auto text-slate-300 mb-2" size={32} />
-                            <p className="text-slate-500 text-sm">Nenhum lançamento financeiro atrelado encontrado.</p>
-                            <p className="text-slate-400 text-xs mt-1">Lançamentos gerados a partir de agora aparecerão aqui.</p>
+                        <div className="text-center py-12" style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+                            <DollarSign className="mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.5 }} size={32} />
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nenhum lançamento financeiro atrelado encontrado.</p>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', opacity: 0.7 }}>Lançamentos gerados a partir de agora aparecerão aqui.</p>
                         </div>
                     ) : (
-                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                        <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
                             <table className="table">
-                                <thead className="bg-slate-50">
+                                <thead style={{ backgroundColor: 'var(--surface-hover)', borderBottom: '1px solid var(--border)' }}>
                                     <tr>
-                                        <th style={{ width: '100px' }}>Data</th>
-                                        <th>Descrição</th>
-                                        <th style={{ width: '120px' }}>Conta</th>
-                                        <th style={{ width: '100px' }}>Situação</th>
-                                        <th style={{ width: '120px', textAlign: 'right' }}>Valor</th>
-                                        <th style={{ width: '80px', textAlign: 'center' }}>Ação</th>
+                                        <th style={{ width: '100px', padding: '12px' }}>Data</th>
+                                        <th style={{ padding: '12px' }}>Descrição</th>
+                                        <th style={{ width: '120px', padding: '12px' }}>Conta</th>
+                                        <th style={{ width: '100px', padding: '12px' }}>Situação</th>
+                                        <th style={{ width: '120px', textAlign: 'right', padding: '12px' }}>Valor</th>
+                                        <th style={{ width: '80px', textAlign: 'center', padding: '12px' }}>Ação</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {transactions.map(t => (
-                                        <tr key={t.id}>
+                                        <tr key={t.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                             {editingTrans?.id === t.id ? (
                                                 <>
-                                                    <td><input type="date" className="form-input text-xs p-1 h-7" value={editingTrans.date} onChange={e => setEditingTrans({...editingTrans, date: e.target.value})} /></td>
-                                                    <td>
+                                                    <td style={{ padding: '8px' }}><input type="date" className="form-input text-xs p-1 h-7" value={editingTrans.date} onChange={e => setEditingTrans({...editingTrans, date: e.target.value})} /></td>
+                                                    <td style={{ padding: '8px' }}>
                                                         <input type="text" className="form-input text-xs p-1 h-7 w-full" value={editingTrans.description} onChange={e => setEditingTrans({...editingTrans, description: e.target.value})} />
                                                     </td>
-                                                    <td>
+                                                    <td style={{ padding: '8px' }}>
                                                         <select className="form-input text-xs p-1 h-7 w-full" value={editingTrans.accountId} onChange={e => setEditingTrans({...editingTrans, accountId: e.target.value})}>
                                                             <option value="">Conta...</option>
                                                             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                                         </select>
                                                     </td>
-                                                    <td>
+                                                    <td style={{ padding: '8px' }}>
                                                         <select className="form-input text-xs p-1 h-7 w-full" value={editingTrans.status} onChange={e => setEditingTrans({...editingTrans, status: e.target.value})}>
                                                             <option value="pending">A Pagar</option>
                                                             <option value="paid">Pago</option>
                                                         </select>
                                                     </td>
-                                                    <td><input type="number" step="0.01" className="form-input text-xs p-1 h-7 w-full text-right" value={editingTrans.amount} onChange={e => setEditingTrans({...editingTrans, amount: e.target.value})} /></td>
-                                                    <td className="text-center">
+                                                    <td style={{ padding: '8px' }}><input type="number" step="0.01" className="form-input text-xs p-1 h-7 w-full text-right" value={editingTrans.amount} onChange={e => setEditingTrans({...editingTrans, amount: e.target.value})} /></td>
+                                                    <td className="text-center" style={{ padding: '8px' }}>
                                                         <div className="flex gap-1 justify-center">
-                                                            <button title="Salvar" onClick={() => handleSaveEdit(t.id, editingTrans)} className="text-green-600 hover:text-green-800 bg-green-50 p-1.5 rounded"><Check size={14} /></button>
-                                                            <button title="Cancelar" onClick={() => setEditingTrans(null)} className="text-slate-500 hover:text-slate-700 bg-slate-100 p-1.5 rounded"><X size={14} /></button>
+                                                            <button title="Salvar" onClick={() => handleSaveEdit(t.id, editingTrans)} style={{ color: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.1)', padding: '6px', borderRadius: '4px' }}><Check size={14} /></button>
+                                                            <button title="Cancelar" onClick={() => setEditingTrans(null)} style={{ color: 'var(--text-muted)', backgroundColor: 'var(--surface-hover)', padding: '6px', borderRadius: '4px' }}><X size={14} /></button>
                                                         </div>
                                                     </td>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <td className="text-xs text-slate-600">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
-                                                    <td className="text-sm font-medium text-slate-800">{t.description}</td>
-                                                    <td className="text-xs text-slate-600">{accounts.find(a => a.id === t.accountId)?.name || 'N/A'}</td>
-                                                    <td>
-                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${t.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '12px' }}>{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                                                    <td style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', padding: '12px' }}>{t.description}</td>
+                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '12px' }}>{accounts.find(a => a.id === t.accountId)?.name || 'N/A'}</td>
+                                                    <td style={{ padding: '12px' }}>
+                                                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 700, backgroundColor: t.status === 'paid' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: t.status === 'paid' ? '#15803d' : '#b91c1c' }}>
                                                             {t.status === 'paid' ? 'PAGO' : 'A PAGAR'}
                                                         </span>
                                                     </td>
-                                                    <td className="text-sm font-bold text-red-600 text-right">R$ {parseFloat(t.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                                                    <td className="text-center">
+                                                    <td style={{ fontSize: '0.85rem', fontWeight: 700, color: '#dc2626', textAlign: 'right', padding: '12px' }}>R$ {parseFloat(t.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                    <td className="text-center" style={{ padding: '12px' }}>
                                                         <div className="flex gap-1 justify-center">
-                                                            <button onClick={() => setEditingTrans(t)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-1.5 rounded transition-colors" title="Editar"><Edit2 size={14} /></button>
-                                                            <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded transition-colors" title="Excluir"><Trash2 size={14} /></button>
+                                                            <button onClick={() => setEditingTrans(t)} style={{ color: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }} title="Editar"><Edit2 size={14} /></button>
+                                                            <button onClick={() => handleDelete(t.id)} style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }} title="Excluir"><Trash2 size={14} /></button>
                                                         </div>
                                                     </td>
                                                 </>
