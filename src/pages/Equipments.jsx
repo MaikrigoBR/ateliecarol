@@ -144,19 +144,44 @@ export function Equipments() {
               
               if (equipForm.launchFinance && equipForm.accountId && equipForm.purchasePrice > 0) {
                   const amt = parseFloat(equipForm.purchasePrice);
-                  const newTrans = await db.create('transactions', {
-                      description: `Aquisição de Ativo: ${payload.name} (${payload.brand})`,
-                      amount: amt,
-                      type: 'expense',
-                      category: 'Investimento / Equipamentos',
-                      date: payload.purchaseDate,
-                      status: 'paid',
-                      paymentMethod: equipForm.paymentMethod || 'pix',
-                      accountId: equipForm.accountId
-                  });
-                  const targetAcc = accounts.find(a => a.id === equipForm.accountId);
-                  if (targetAcc) {
-                      await db.update('accounts', targetAcc.id, { balance: parseFloat(targetAcc.balance) - amt });
+                  const installments = parseInt(equipForm.installments) || 1;
+                  const isCredit = equipForm.paymentMethod === 'credit';
+                  
+                  if (installments > 1) {
+                      const instAmt = amt / installments;
+                      for (let i = 0; i < installments; i++) {
+                          const nd = new Date(payload.purchaseDate);
+                          nd.setMonth(nd.getMonth() + i);
+                          await db.create('transactions', {
+                              description: `Aquisição: ${payload.name} (${i+1}/${installments})`,
+                              amount: instAmt,
+                              type: 'expense',
+                              category: 'Investimento / Equipamentos',
+                              date: nd.toISOString().split('T')[0],
+                              status: 'pending', // Parcelas vão para 'a pagar'
+                              paymentMethod: equipForm.paymentMethod || 'pix',
+                              accountId: equipForm.accountId,
+                              installmentNumber: i + 1,
+                              installmentsTotal: installments
+                          });
+                      }
+                  } else {
+                      await db.create('transactions', {
+                          description: `Aquisição de Ativo: ${payload.name} (${payload.brand})`,
+                          amount: amt,
+                          type: 'expense',
+                          category: 'Investimento / Equipamentos',
+                          date: payload.purchaseDate,
+                          status: isCredit ? 'pending' : 'paid',
+                          paymentMethod: equipForm.paymentMethod || 'pix',
+                          accountId: equipForm.accountId
+                      });
+                      if (!isCredit) {
+                          const targetAcc = accounts.find(a => a.id === equipForm.accountId);
+                          if (targetAcc) {
+                              await db.update('accounts', targetAcc.id, { balance: parseFloat(targetAcc.balance) - amt });
+                          }
+                      }
                   }
               }
           }
@@ -199,19 +224,44 @@ export function Equipments() {
           
           if (maintForm.launchFinance && maintForm.accountId && parseFloat(maintForm.cost) > 0) {
               const amt = parseFloat(maintForm.cost);
-              await db.create('transactions', {
-                  description: `Manut.: ${activeEquipForMaintenance.name} - ${maintForm.description}`,
-                  amount: amt,
-                  type: 'expense',
-                  category: 'Manutenção de Equipamentos',
-                  date: maintForm.date,
-                  status: 'paid',
-                  paymentMethod: maintForm.paymentMethod || 'pix',
-                  accountId: maintForm.accountId
-              });
-              const targetAcc = accounts.find(a => a.id === maintForm.accountId);
-              if (targetAcc) {
-                  await db.update('accounts', targetAcc.id, { balance: parseFloat(targetAcc.balance) - amt });
+              const installments = parseInt(maintForm.installments) || 1;
+              const isCredit = maintForm.paymentMethod === 'credit';
+
+              if (installments > 1) {
+                  const instAmt = amt / installments;
+                  for (let i = 0; i < installments; i++) {
+                      const nd = new Date(maintForm.date);
+                      nd.setMonth(nd.getMonth() + i);
+                      await db.create('transactions', {
+                          description: `Manut: ${activeEquipForMaintenance.name} (${i+1}/${installments})`,
+                          amount: instAmt,
+                          type: 'expense',
+                          category: 'Manutenção de Equipamentos',
+                          date: nd.toISOString().split('T')[0],
+                          status: 'pending',
+                          paymentMethod: maintForm.paymentMethod || 'pix',
+                          accountId: maintForm.accountId,
+                          installmentNumber: i + 1,
+                          installmentsTotal: installments
+                      });
+                  }
+              } else {
+                  await db.create('transactions', {
+                      description: `Manut.: ${activeEquipForMaintenance.name} - ${maintForm.description}`,
+                      amount: amt,
+                      type: 'expense',
+                      category: 'Manutenção de Equipamentos',
+                      date: maintForm.date,
+                      status: isCredit ? 'pending' : 'paid',
+                      paymentMethod: maintForm.paymentMethod || 'pix',
+                      accountId: maintForm.accountId
+                  });
+                  if (!isCredit) {
+                      const targetAcc = accounts.find(a => a.id === maintForm.accountId);
+                      if (targetAcc) {
+                          await db.update('accounts', targetAcc.id, { balance: parseFloat(targetAcc.balance) - amt });
+                      }
+                  }
               }
           }
 
@@ -760,15 +810,15 @@ export function Equipments() {
         {/* MODAL: EQUIPAMENTO CRUD */}
         {isEquipModalOpen && (
             <div className="modal-overlay" onClick={() => setIsEquipModalOpen(false)}>
-                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', padding: 0, overflow: 'hidden' }}>
-                    <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', backgroundColor: '#f8fafc' }}>
+                <div className="modal-content flex flex-col" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', padding: 0, overflow: 'hidden', maxHeight: '92vh' }}>
+                    <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', backgroundColor: '#f8fafc', flexShrink: 0 }}>
                         <div>
                             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>{editingEquip ? 'Editar Equipamento' : 'Novo Ativo/Máquina'}</h2>
                         </div>
                         <button className="btn btn-icon text-muted" onClick={() => setIsEquipModalOpen(false)}>✕</button>
                     </div>
-                    <form onSubmit={handleSaveEquipment}>
-                        <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
+                    <form onSubmit={handleSaveEquipment} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                        <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px', overflowY: 'auto' }}>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Nome do Equipamento (Ex: Plotter Cameo 4, Impressora L1800)</label>
                                 <input type="text" className="form-input" required value={equipForm.name} onChange={e => setEquipForm({...equipForm, name: e.target.value})} />
@@ -847,20 +897,28 @@ export function Equipments() {
                                         </div>
                                         <div className="form-group" style={{ marginBottom: 0 }}>
                                             <label style={{ color: '#1e3a8a', fontSize: '0.8rem' }}>Meio de Pagamento *</label>
-                                            <select className="form-input" style={{ borderColor: '#93c5fd' }} required value={equipForm.paymentMethod} onChange={e => setEquipForm({...equipForm, paymentMethod: e.target.value})}>
+                                            <select className="form-input" style={{ borderColor: '#93c5fd' }} required value={equipForm.paymentMethod} onChange={e => setEquipForm({...equipForm, paymentMethod: e.target.value, installments: 1})}>
                                                 <option value="pix">PIX</option>
                                                 <option value="credit">Cartão de Crédito</option>
                                                 <option value="debit">Cartão de Débito</option>
-                                                <option value="cash">Dinheiro em Espécie</option>
+                                                <option value="boleto">Boleto Bancário</option>
                                                 <option value="transfer">Transferência Bancária</option>
                                             </select>
                                         </div>
+                                        {(equipForm.paymentMethod === 'credit' || equipForm.paymentMethod === 'boleto') && (
+                                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                                <label style={{ color: '#1e3a8a', fontSize: '0.8rem' }}>Parcelamento</label>
+                                                <select className="form-input" style={{ borderColor: '#93c5fd' }} value={equipForm.installments || 1} onChange={e => setEquipForm({...equipForm, installments: parseInt(e.target.value)})}>
+                                                    {[1,2,3,4,5,6,7,8,9,10,11,12,18,24,36].map(n => <option key={n} value={n}>{n}x</option>)}
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: '#f8fafc' }}>
+                        <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: '#f8fafc', flexShrink: 0 }}>
                             <button type="button" className="btn btn-secondary" onClick={() => setIsEquipModalOpen(false)}>Cancelar</button>
                             <button type="submit" className="btn btn-primary">Salvar Equipamento</button>
                         </div>
@@ -947,14 +1005,21 @@ export function Equipments() {
                                             </div>
                                             <div className="form-group" style={{ marginBottom: 0 }}>
                                                 <label style={{ color: '#991b1b', fontSize: '0.8rem' }}>Meio de Pagamento *</label>
-                                                <select className="form-input" style={{ borderColor: '#fca5a5' }} required={maintForm.launchFinance} value={maintForm.paymentMethod} onChange={e => setMaintForm({...maintForm, paymentMethod: e.target.value})}>
+                                                <select className="form-input" style={{ borderColor: '#fca5a5' }} required={maintForm.launchFinance} value={maintForm.paymentMethod} onChange={e => setMaintForm({...maintForm, paymentMethod: e.target.value, installments: 1})}>
                                                     <option value="pix">PIX</option>
                                                     <option value="credit">Cartão de Crédito</option>
                                                     <option value="debit">Cartão de Débito</option>
-                                                    <option value="cash">Dinheiro em Espécie</option>
-                                                    <option value="transfer">Transferência Bancária</option>
+                                                    <option value="boleto">Boleto / A Prazo</option>
                                                 </select>
                                             </div>
+                                            {(maintForm.paymentMethod === 'credit' || maintForm.paymentMethod === 'boleto') && (
+                                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                                    <label style={{ color: '#991b1b', fontSize: '0.8rem' }}>Parcelamento</label>
+                                                    <select className="form-input" style={{ borderColor: '#fca5a5' }} value={maintForm.installments || 1} onChange={e => setMaintForm({...maintForm, installments: parseInt(e.target.value)})}>
+                                                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

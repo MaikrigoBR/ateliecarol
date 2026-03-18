@@ -29,6 +29,8 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
   const [financeAccountId, setFinanceAccountId] = useState('');
   const [financeDate, setFinanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [financeStatus, setFinanceStatus] = useState('pending');
+  const [financePaymentMethod, setFinancePaymentMethod] = useState('pix');
+  const [financeInstallments, setFinanceInstallments] = useState(1);
   const [accounts, setAccounts] = useState([]);
   const [existingGroups, setExistingGroups] = useState([]);
   
@@ -87,6 +89,8 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
           setFinanceAccountId('');
           setFinanceDate(new Date().toISOString().split('T')[0]);
           setFinanceStatus('pending');
+          setFinancePaymentMethod('pix');
+          setFinanceInstallments(1);
           setReplenishMode(false);
           setReplenishQty('');
           setReplenishCost('');
@@ -191,18 +195,53 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
     // --- Integração Financeira Automática (Nova Entrada ou Reposição) ---
     if (createFinance && transactionAmount > 0 && financeAccountId) {
         const category = formData.type === 'equipment' ? 'Equipamentos & Ativos' : 'Materiais & Insumos';
-        await db.create('transactions', {
-            description: `Compra de ${formData.type === 'equipment' ? 'Equipamento' : 'Estoque'}: ${formData.name}`,
-            amount: transactionAmount,
-            type: 'expense',
-            category: category,
-            accountId: financeAccountId,
-            date: financeDate,
-            status: financeStatus,
-            installments: 1,
-            isRecurring: false,
-            createdAt: new Date().toISOString()
-        });
+        const installments = parseInt(financeInstallments) || 1;
+        const isCredit = financePaymentMethod === 'credit';
+        
+        if (installments > 1) {
+            const instAmt = transactionAmount / installments;
+            for (let i = 0; i < installments; i++) {
+                const nd = new Date(financeDate);
+                nd.setMonth(nd.getMonth() + i);
+                await db.create('transactions', {
+                    description: `Compra: ${formData.name} (${i+1}/${installments})`,
+                    amount: instAmt,
+                    type: 'expense',
+                    category: category,
+                    accountId: financeAccountId,
+                    date: nd.toISOString().split('T')[0],
+                    status: 'pending',
+                    paymentMethod: financePaymentMethod || 'pix',
+                    installments: 1, // for backward compatibility in some models, or put total
+                    installmentNumber: i + 1,
+                    installmentsTotal: installments,
+                    isRecurring: false,
+                    createdAt: new Date().toISOString()
+                });
+            }
+        } else {
+            const tStatus = isCredit ? 'pending' : financeStatus;
+            await db.create('transactions', {
+                description: `Compra de ${formData.type === 'equipment' ? 'Equipamento' : 'Estoque'}: ${formData.name}`,
+                amount: transactionAmount,
+                type: 'expense',
+                category: category,
+                accountId: financeAccountId,
+                date: financeDate,
+                status: tStatus,
+                paymentMethod: financePaymentMethod || 'pix',
+                installments: 1,
+                isRecurring: false,
+                createdAt: new Date().toISOString()
+            });
+            // Update balance if paid and not credit
+            if (tStatus === 'paid' && !isCredit) {
+                const targetAcc = accounts.find(a => a.id === financeAccountId);
+                if (targetAcc) {
+                    await db.update('accounts', targetAcc.id, { balance: parseFloat(targetAcc.balance) - transactionAmount });
+                }
+            }
+        }
     }
     
     if (onItemSaved) onItemSaved();
@@ -681,37 +720,40 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="input-group">
                                             <label className="form-label text-xs">Vínculo de Conta *</label>
-                                            <select 
-                                                className="form-input text-sm" 
-                                                value={financeAccountId} 
-                                                onChange={e => setFinanceAccountId(e.target.value)}
-                                                required={createFinance}
-                                            >
+                                            <select className="form-input text-sm" value={financeAccountId} onChange={e => setFinanceAccountId(e.target.value)} required={createFinance}>
                                                 <option value="">Selecione uma conta...</option>
                                                 {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                             </select>
                                         </div>
                                         <div className="input-group">
-                                            <label className="form-label text-xs">Data de Vencimento/Pagamento</label>
-                                            <input 
-                                                type="date" 
-                                                className="form-input text-sm" 
-                                                value={financeDate}
-                                                onChange={e => setFinanceDate(e.target.value)}
-                                                required={createFinance}
-                                            />
+                                            <label className="form-label text-xs">Data Receb./Competência</label>
+                                            <input type="date" className="form-input text-sm" value={financeDate} onChange={e => setFinanceDate(e.target.value)} required={createFinance} />
                                         </div>
-                                    </div>
-                                    <div className="input-group">
-                                        <label className="form-label text-xs">Situação do Pagamento</label>
-                                        <select 
-                                            className="form-input text-sm" 
-                                            value={financeStatus} 
-                                            onChange={e => setFinanceStatus(e.target.value)}
-                                        >
-                                            <option value="pending">A Pagar (Provisionado)</option>
-                                            <option value="paid">Já Pago (Debita Imediatamente)</option>
-                                        </select>
+                                        <div className="input-group">
+                                            <label className="form-label text-xs">Meio de Pagamento *</label>
+                                            <select className="form-input text-sm" required={createFinance} value={financePaymentMethod} onChange={e => { setFinancePaymentMethod(e.target.value); setFinanceInstallments(1); }}>
+                                                <option value="pix">PIX</option>
+                                                <option value="credit">Cartão de Crédito</option>
+                                                <option value="debit">Cartão de Débito</option>
+                                                <option value="boleto">Boleto / A Prazo</option>
+                                            </select>
+                                        </div>
+                                        {(financePaymentMethod === 'credit' || financePaymentMethod === 'boleto') ? (
+                                            <div className="input-group">
+                                                <label className="form-label text-xs">Parcelamento</label>
+                                                <select className="form-input text-sm" value={financeInstallments} onChange={e => setFinanceInstallments(parseInt(e.target.value))}>
+                                                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}
+                                                </select>
+                                            </div>
+                                        ) : (
+                                            <div className="input-group">
+                                                <label className="form-label text-xs">Situação do Pagamento</label>
+                                                <select className="form-input text-sm" value={financeStatus} onChange={e => setFinanceStatus(e.target.value)}>
+                                                    <option value="pending">A Pagar (Provisionado)</option>
+                                                    <option value="paid">Já Pago (Debita Imediatamente)</option>
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
