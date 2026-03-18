@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     TrendingUp, Users, ShoppingBag, DollarSign, 
-    Calendar, ArrowUpRight, ArrowDownRight, Activity, BarChart2, Wallet, AlertCircle 
+    Calendar, ArrowUpRight, ArrowDownRight, Activity, BarChart2, Wallet, AlertCircle, MessageCircle 
 } from 'lucide-react';
 import db from '../services/database';
 import { 
@@ -74,6 +74,8 @@ export function Dashboard() {
     const [salesData, setSalesData] = useState([]);
     const [statusData, setStatusData] = useState([]);
     const [recentOrders, setRecentOrders] = useState([]);
+    const [opportunities, setOpportunities] = useState([]);
+    const [stylesData, setStylesData] = useState([]);
 
     // Recalculate stats whenever context data changes
     useEffect(() => {
@@ -150,7 +152,62 @@ export function Dashboard() {
         
         setStatusData(pieData);
 
-        // 4. Recent Orders
+        // 4. Opportunities Radar (Next 30 days) AND Styles Data
+        const today = new Date();
+        const opps = [];
+        const styleCounts = {};
+
+        customers.forEach(customer => {
+            // Count styles
+            if (customer.styles && Array.isArray(customer.styles)) {
+                customer.styles.forEach(style => {
+                    styleCounts[style] = (styleCounts[style] || 0) + 1;
+                });
+            }
+
+            // Check milestones
+            if (customer.milestones && Array.isArray(customer.milestones)) {
+                customer.milestones.forEach(ms => {
+                    if (!ms.date) return;
+                    const msDate = new Date(ms.date);
+                    if (isNaN(msDate)) return;
+
+                    const todayYear = today.getFullYear();
+                    const nextMsDate = new Date(msDate);
+                    nextMsDate.setFullYear(todayYear);
+                    if (nextMsDate < today) {
+                        nextMsDate.setFullYear(todayYear + 1);
+                    }
+                    
+                    const diffTime = nextMsDate - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays >= 0 && diffDays <= 30) {
+                        opps.push({
+                            customerName: customer.name,
+                            customerPhone: customer.phone,
+                            msName: ms.name,
+                            msType: ms.type,
+                            date: ms.date,
+                            daysLeft: diffDays
+                        });
+                    }
+                });
+            }
+        });
+
+        opps.sort((a, b) => a.daysLeft - b.daysLeft);
+        setOpportunities(opps);
+
+        const COLORS = ['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'];
+        const sData = Object.keys(styleCounts).map((key, idx) => ({
+            name: key,
+            value: styleCounts[key],
+            color: COLORS[idx % COLORS.length]
+        })).sort((a, b) => b.value - a.value);
+        setStylesData(sData);
+
+        // 5. Recent Orders
         const recent = orders
             .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
             .slice(0, 5)
@@ -296,6 +353,86 @@ export function Dashboard() {
                                 <span style={{ fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* OPORTUNIDADES & AUDIÊNCIA */}
+            <div className="charts-layout" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+                {/* Radar de Oportunidades */}
+                <div className="chart-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div className="chart-header">
+                        <Activity size={20} color="#8b5cf6" /> Radar de Oportunidades (Próximos 30 dias)
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', maxHeight: '350px', paddingRight: '0.5rem' }} className="hide-scrollbar">
+                        {opportunities.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                Nenhuma oportunidade iminente encontrada.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {opportunities.map((opp, idx) => {
+                                    const message = `Oi ${opp.customerName}, vi que o ${opp.msType === 'aniversario_filho' ? 'aniversário do(a)' : opp.msType} ${opp.msName} está chegando! Vamos preparar algo especial?`;
+                                    return (
+                                        <div key={idx} style={{ padding: '1rem', background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.2)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600 }}>{opp.customerName}</h4>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                    {opp.msType === 'aniversario' ? 'Aniversário de' : opp.msType === 'aniversario_filho' ? 'Aniv. de' : opp.msType}: <strong>{opp.msName}</strong>
+                                                </p>
+                                                <span style={{ fontSize: '0.7rem', display: 'inline-block', padding: '2px 8px', marginTop: '0.5rem', borderRadius: '12px', background: opp.daysLeft <= 7 ? '#ef4444' : '#f59e0b', color: 'white', fontWeight: 'bold' }}>
+                                                    Faltam {opp.daysLeft} dias
+                                                </span>
+                                            </div>
+                                            {opp.customerPhone && (
+                                                <button 
+                                                    onClick={() => window.open(`https://wa.me/55${opp.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')}
+                                                    style={{ border: 'none', background: '#25D366', color: 'white', padding: '0.5rem', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                    title="Abordar no WhatsApp"
+                                                >
+                                                    <MessageCircle size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Raio-X de Audiência */}
+                <div className="chart-card">
+                    <div className="chart-header">
+                        <Users size={20} color="#ec4899" /> Raio-X da Audiência (Estilos)
+                    </div>
+                    <div style={{ width: '100%', minHeight: '300px', position: 'relative' }}>
+                        {stylesData.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                Nenhum estilo de cliente registrado ainda.
+                            </div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={stylesData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={90}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                        animationDuration={1500}
+                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    >
+                                        {stylesData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
                 </div>
             </div>

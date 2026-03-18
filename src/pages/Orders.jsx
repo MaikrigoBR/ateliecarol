@@ -503,7 +503,7 @@ export function Orders() {
                 <th>Financeiro</th>
                 <th>Itens</th>
                 <th>Total</th>
-                <th>Ações</th>
+                <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -540,8 +540,8 @@ export function Orders() {
                   <td>{getFinancialStatus(order)}</td>
                   <td>{order.items}</td>
                   <td style={{ fontWeight: 600 }}>R$ {((order.total || 0)).toFixed(2).replace('.', ',')}</td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', alignItems: 'center' }}>
+                  <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap', width: '1%' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', alignItems: 'center', minWidth: 'max-content' }}>
                         <button 
                           className="btn btn-icon" 
                           title="Excluir"

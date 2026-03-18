@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Phone, ShoppingBag, Plus, Trash2, Edit, MessageCircle, Instagram, Tag, Gift } from 'lucide-react';
+import { Mail, Phone, ShoppingBag, Plus, Trash2, Edit, MessageCircle, Instagram, Tag, Gift, Flame, Snowflake, Sun } from 'lucide-react';
 import db from '../services/database.js';
 import { NewCustomerModal } from '../components/NewCustomerModal.jsx';
 import { EditCustomerModal } from '../components/EditCustomerModal.jsx';
@@ -12,7 +12,17 @@ export function Customers() {
   const { currentUser } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
   const [filteredCustomers, setFilteredCustomers] = useState([]);
+
+  const getTemperatureIcon = (temp) => {
+    switch(temp) {
+        case 'quente': return <Flame size={16} color="#ef4444" title="VIP (Quente)" />;
+        case 'morno': return <Sun size={16} color="#f59e0b" title="Engajada (Morna)" />;
+        case 'frio': return <Snowflake size={16} color="#3b82f6" title="Inativa (Fria)" />;
+        default: return null;
+    }
+  };
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
@@ -42,12 +52,17 @@ export function Customers() {
   }, []);
 
   useEffect(() => {
-    const results = customers.filter(customer => 
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const results = customers.filter(customer => {
+      const matchSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) || customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+      if (!matchSearch) return false;
+      
+      if (filterType === 'vip') return customer.temperature === 'quente';
+      if (filterType === 'morno') return customer.temperature === 'morno';
+      if (filterType === 'frio') return customer.temperature === 'frio';
+      return true;
+    });
     setFilteredCustomers(results);
-  }, [searchTerm, customers]);
+  }, [searchTerm, filterType, customers]);
 
   const handleDelete = async (id, name) => {
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
@@ -60,14 +75,26 @@ export function Customers() {
   return (
     <div className="animate-fade-in">
       <div className="card-header">
-        <div className="input-group" style={{ marginBottom: 0, width: '300px' }}>
+        <div className="input-group" style={{ marginBottom: 0, width: '380px', display: 'flex', gap: '8px' }}>
           <input 
             type="text" 
-            placeholder="Buscar clientes..." 
+            placeholder="Buscar..." 
             className="form-input" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ flex: 1 }}
           />
+          <select 
+            className="form-input" 
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            style={{ width: '130px', padding: '0.5rem' }}
+          >
+            <option value="all">Todos</option>
+            <option value="vip">🔥 Quentes</option>
+            <option value="morno">☀️ Mornas</option>
+            <option value="frio">❄️ Frias</option>
+          </select>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
            <button 
@@ -119,7 +146,9 @@ export function Customers() {
                               />
                           </div>
                           <div>
-                              <div style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--text-main)' }}>{customer.name}</div>
+                              <div style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {customer.name} {getTemperatureIcon(customer.temperature)}
+                              </div>
                               {customer.instagram && (
                                   <div className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
                                       <Instagram size={12} style={{ color: '#E1306C' }} /> 
