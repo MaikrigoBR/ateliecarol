@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, Truck, Activity, Hammer, Plus, Edit2, Trash2 } from 'lucide-react';
 import db from '../services/database.js';
 import { NewInventoryItemModal } from '../components/NewInventoryItemModal.jsx';
+import { LinkedTransactionsModal } from '../components/LinkedTransactionsModal.jsx';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -11,6 +12,8 @@ export function Inventory() {
   const [items, setItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [linkedEntityId, setLinkedEntityId] = useState(null);
+  const [linkedEntityName, setLinkedEntityName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name_asc');
 
@@ -167,6 +170,14 @@ export function Inventory() {
                                             <Edit2 size={16}/>
                                         </button>
                                         <button 
+                                            className="btn btn-icon" 
+                                            style={{ color: '#10b981' }}
+                                            onClick={(e) => { e.stopPropagation(); setLinkedEntityId(item.id); setLinkedEntityName(item.name); }}
+                                            title="Lançamentos Financeiros Associados"
+                                        >
+                                            <span style={{ fontSize: '12px', fontWeight: 'bold' }}>R$</span>
+                                        </button>
+                                        <button 
                                             className="btn btn-icon text-danger" 
                                             onClick={(e) => { e.stopPropagation(); handleDelete(item.id, item.name); }}
                                             title="Excluir"
@@ -203,6 +214,14 @@ export function Inventory() {
                 fetchItems();
                 setEditingItem(newItem);
             }}
+        />
+
+        <LinkedTransactionsModal 
+            isOpen={!!linkedEntityId}
+            onClose={() => setLinkedEntityId(null)}
+            entityId={linkedEntityId}
+            entityName={linkedEntityName}
+            entityType="Inventory"
         />
     </div>
   );

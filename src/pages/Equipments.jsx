@@ -7,6 +7,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { calculateFractionalCost, getSubUnits } from '../utils/units';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { LinkedTransactionsModal } from '../components/LinkedTransactionsModal.jsx';
 
 export function Equipments() {
   const { currentUser } = useAuth();
@@ -17,6 +18,8 @@ export function Equipments() {
   const [materialsList, setMaterialsList] = useState([]);
   const [existingGroups, setExistingGroups] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [linkedEntityId, setLinkedEntityId] = useState(null);
+  const [linkedEntityName, setLinkedEntityName] = useState('');
   
   // Modals state
   const [isEquipModalOpen, setIsEquipModalOpen] = useState(false);
@@ -674,6 +677,9 @@ export function Equipments() {
                         <button className="btn" style={{ flex: 1, backgroundColor: 'var(--surface)', color: 'var(--text-main)', fontWeight: 600, border: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }} onClick={() => { setIsViewModalOpen(false); openEquipModal(viewingEquip); }}>
                             <Edit2 size={16} /> Editar Informações
                         </button>
+                        <button className="btn" style={{ flex: 1, backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontWeight: 600, border: '1px solid rgba(16, 185, 129, 0.2)', display: 'flex', justifyContent: 'center', whiteSpace: 'nowrap' }} onClick={() => { setIsViewModalOpen(false); setLinkedEntityId(viewingEquip.id); setLinkedEntityName(viewingEquip.name); }}>
+                            <DollarSign size={16} /> Financeiro Vinculado
+                        </button>
                         <button className="btn" style={{ flex: 1, backgroundColor: 'rgba(124, 58, 237, 0.1)', color: '#a78bfa', fontWeight: 600, border: '1px solid rgba(124, 58, 237, 0.2)', display: 'flex', justifyContent: 'center' }} onClick={() => { setIsViewModalOpen(false); openConsumablesModal(viewingEquip); }}>
                             <Package size={16} /> Insumos & Refis
                         </button>
@@ -1270,6 +1276,14 @@ export function Equipments() {
                 </div>
              </div>
         )}
+
+        <LinkedTransactionsModal 
+            isOpen={!!linkedEntityId}
+            onClose={() => setLinkedEntityId(null)}
+            entityId={linkedEntityId}
+            entityName={linkedEntityName}
+            entityType="Equipment"
+        />
     </div>
   );
 }
