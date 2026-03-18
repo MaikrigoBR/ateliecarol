@@ -447,11 +447,23 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                             onChange={handleMachineSelect}
                         >
                             <option value="">Selecione o Equipamento...</option>
-                            {filteredEquips.map(eq => {
-                                const hrCost = getEquipHourlyCost(eq);
-                                return (
-                                <option key={eq.id} value={eq.id}>{eq.name} (R$ {hrCost.toFixed(2)}/h)</option>
-                            )})}
+                            {Object.entries(
+                                filteredEquips.reduce((acc, eq) => {
+                                    const group = eq.equipmentGroup || 'Geral / Outros';
+                                    if (!acc[group]) acc[group] = [];
+                                    acc[group].push(eq);
+                                    return acc;
+                                }, {})
+                            ).sort(([a], [b]) => a.localeCompare(b)).map(([group, eqs]) => (
+                                <optgroup key={group} label={group}>
+                                    {eqs.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(eq => {
+                                        const hrCost = getEquipHourlyCost(eq);
+                                        return (
+                                            <option key={eq.id} value={eq.id}>{eq.name} (R$ {hrCost.toFixed(2)}/h)</option>
+                                        )
+                                    })}
+                                </optgroup>
+                            ))}
                         </select>
                     </div>
                     <div className="input-group" style={{ marginBottom: 0 }}>

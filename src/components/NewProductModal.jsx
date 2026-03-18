@@ -854,28 +854,39 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                                 <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--background)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
                                     <select className="form-input" style={{ flex: 1, minWidth: '150px', height: '34px', padding: '0 0.5rem', fontSize: '0.85rem', marginBottom: 0 }} value={item.equipId} onChange={e => updateEquipmentItem(idx, 'equipId', e.target.value)} required>
                                         <option value="">Selecionar Máquina...</option>
-                                        {[...equipmentsList].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(eq => {
-                                            const deprecMonthly = (parseFloat(eq.purchasePrice) || 0) / (parseInt(eq.lifespanMonths) || 1);
-                                            const hrCost = deprecMonthly / (parseInt(eq.monthlyHours) || 160);
-                                            let hrConsumableCost = 0;
-                                            if (eq.consumables && eq.consumables.length > 0) {
-                                                hrConsumableCost = eq.consumables.reduce((sum, c) => {
-                                                    if (c.inventoryId && Array.isArray(materialsList)) {
-                                                        const invItem = materialsList.find(m => m.id === c.inventoryId);
-                                                        if (invItem) {
-                                                            const costPerAction = calculateFractionalCost(invItem.cost, invItem.unit, c.usedUnit, c.usedQuantity);
-                                                            return sum + ((costPerAction * parseFloat(c.actionsPerHour || 1)) || 0);
-                                                        }
+                                        {Object.entries(
+                                            equipmentsList.reduce((acc, eq) => {
+                                                const group = eq.equipmentGroup || 'Geral / Outros';
+                                                if (!acc[group]) acc[group] = [];
+                                                acc[group].push(eq);
+                                                return acc;
+                                            }, {})
+                                        ).sort(([a], [b]) => a.localeCompare(b)).map(([group, eqs]) => (
+                                            <optgroup key={group} label={group}>
+                                                {eqs.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(eq => {
+                                                    const deprecMonthly = (parseFloat(eq.purchasePrice) || 0) / (parseInt(eq.lifespanMonths) || 1);
+                                                    const hrCost = deprecMonthly / (parseInt(eq.monthlyHours) || 160);
+                                                    let hrConsumableCost = 0;
+                                                    if (eq.consumables && eq.consumables.length > 0) {
+                                                        hrConsumableCost = eq.consumables.reduce((sum, c) => {
+                                                            if (c.inventoryId && Array.isArray(materialsList)) {
+                                                                const invItem = materialsList.find(m => m.id === c.inventoryId);
+                                                                if (invItem) {
+                                                                    const costPerAction = calculateFractionalCost(invItem.cost, invItem.unit, c.usedUnit, c.usedQuantity);
+                                                                    return sum + ((costPerAction * parseFloat(c.actionsPerHour || 1)) || 0);
+                                                                }
+                                                            }
+                                                            return sum + ((c.cost || 0) / (c.yield || 1));
+                                                        }, 0);
                                                     }
-                                                    return sum + ((c.cost || 0) / (c.yield || 1));
-                                                }, 0);
-                                            }
-                                            return (
-                                                <option key={eq.id} value={eq.id}>
-                                                    {eq.name} (R$ {(hrCost + hrConsumableCost).toFixed(2)}/h {hrConsumableCost > 0 ? '+ Insumos' : ''})
-                                                </option>
-                                            );
-                                        })}
+                                                    return (
+                                                        <option key={eq.id} value={eq.id}>
+                                                            {eq.name} (R$ {(hrCost + hrConsumableCost).toFixed(2)}/h {hrConsumableCost > 0 ? '+ Insumos' : ''})
+                                                        </option>
+                                                    );
+                                                })}
+                                            </optgroup>
+                                        ))}
                                     </select>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Min:</span>

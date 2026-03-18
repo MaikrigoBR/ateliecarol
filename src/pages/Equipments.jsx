@@ -16,6 +16,7 @@ export function Equipments() {
   const [loading, setLoading] = useState(true);
   const [materialsList, setMaterialsList] = useState([]);
   const [existingGroups, setExistingGroups] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   
   // Modals state
   const [isEquipModalOpen, setIsEquipModalOpen] = useState(false);
@@ -50,7 +51,10 @@ export function Equipments() {
     monthlyHours: '160', // Default 40h/week
     status: 'Ativo',
     maintenanceHistory: [],
-    consumables: []
+    consumables: [],
+    launchFinance: false,
+    accountId: '',
+    paymentMethod: 'pix'
   });
 
   // Form State - Maintenance
@@ -59,7 +63,10 @@ export function Equipments() {
     description: '',
     cost: '',
     technician: '',
-    downtimeHours: ''
+    downtimeHours: '',
+    launchFinance: false,
+    accountId: '',
+    paymentMethod: 'pix'
   });
 
   // Form State - Consumable
@@ -100,6 +107,8 @@ export function Equipments() {
     try {
         const allEq = await db.getAll('equipments');
         const allInv = await db.getAll('inventory');
+        const allAcc = await db.getAll('accounts');
+        setAccounts(allAcc || []);
         setEquipments(allEq || []);
         if (allInv) {
             const mats = allInv.filter(i => i.type === 'material');
@@ -132,6 +141,24 @@ export function Equipments() {
               payload.maintenanceHistory = [];
               const created = await db.create('equipments', payload);
               AuditService.log(currentUser, 'CREATE', 'Equipments', created.id, `Cadastrou equipamento: ${payload.name}`);
+              
+              if (equipForm.launchFinance && equipForm.accountId && equipForm.purchasePrice > 0) {
+                  const amt = parseFloat(equipForm.purchasePrice);
+                  const newTrans = await db.create('transactions', {
+                      description: `Aquisição de Ativo: ${payload.name} (${payload.brand})`,
+                      amount: amt,
+                      type: 'expense',
+                      category: 'Investimento / Equipamentos',
+                      date: payload.purchaseDate,
+                      status: 'paid',
+                      paymentMethod: equipForm.paymentMethod || 'pix',
+                      accountId: equipForm.accountId
+                  });
+                  const targetAcc = accounts.find(a => a.id === equipForm.accountId);
+                  if (targetAcc) {
+                      await db.update('accounts', targetAcc.id, { balance: parseFloat(targetAcc.balance) - amt });
+                  }
+              }
           }
 
           setIsEquipModalOpen(false);
@@ -170,6 +197,24 @@ export function Equipments() {
           await db.update('equipments', activeEquipForMaintenance.id, { maintenanceHistory: history });
           AuditService.log(currentUser, 'UPDATE', 'Equipments', activeEquipForMaintenance.id, `Registrou manutenção no valor de R$ ${maintForm.cost}`);
           
+          if (maintForm.launchFinance && maintForm.accountId && parseFloat(maintForm.cost) > 0) {
+              const amt = parseFloat(maintForm.cost);
+              await db.create('transactions', {
+                  description: `Manut.: ${activeEquipForMaintenance.name} - ${maintForm.description}`,
+                  amount: amt,
+                  type: 'expense',
+                  category: 'Manutenção de Equipamentos',
+                  date: maintForm.date,
+                  status: 'paid',
+                  paymentMethod: maintForm.paymentMethod || 'pix',
+                  accountId: maintForm.accountId
+              });
+              const targetAcc = accounts.find(a => a.id === maintForm.accountId);
+              if (targetAcc) {
+                  await db.update('accounts', targetAcc.id, { balance: parseFloat(targetAcc.balance) - amt });
+              }
+          }
+
           setIsMaintenanceModalOpen(false);
           setActiveEquipForMaintenance(null);
           fetchEquipments();
@@ -785,6 +830,36 @@ export function Equipments() {
                             </div>
                         </div>
 
+                        {!editingEquip && (
+                            <div style={{ padding: '16px 24px', backgroundColor: '#eff6ff', borderTop: '1px solid #bfdbfe', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>
+                                    <input type="checkbox" style={{ transform: 'scale(1.2)' }} checked={equipForm.launchFinance} onChange={e => setEquipForm({...equipForm, launchFinance: e.target.checked})} />
+                                    Lançar Pagamento da Compra no Financeiro (Despesa / Debitar de Conta)
+                                </label>
+                                {equipForm.launchFinance && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px', paddingLeft: '24px' }}>
+                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                            <label style={{ color: '#1e3a8a', fontSize: '0.8rem' }}>Conta/Caixa Relacionado *</label>
+                                            <select className="form-input" style={{ borderColor: '#93c5fd' }} required value={equipForm.accountId} onChange={e => setEquipForm({...equipForm, accountId: e.target.value})}>
+                                                <option value="">Selecione a Origem dos Recursos...</option>
+                                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} (Saldo: R$ {parseFloat(acc.balance).toFixed(2)})</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                            <label style={{ color: '#1e3a8a', fontSize: '0.8rem' }}>Meio de Pagamento *</label>
+                                            <select className="form-input" style={{ borderColor: '#93c5fd' }} required value={equipForm.paymentMethod} onChange={e => setEquipForm({...equipForm, paymentMethod: e.target.value})}>
+                                                <option value="pix">PIX</option>
+                                                <option value="credit">Cartão de Crédito</option>
+                                                <option value="debit">Cartão de Débito</option>
+                                                <option value="cash">Dinheiro em Espécie</option>
+                                                <option value="transfer">Transferência Bancária</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: '#f8fafc' }}>
                             <button type="button" className="btn btn-secondary" onClick={() => setIsEquipModalOpen(false)}>Cancelar</button>
                             <button type="submit" className="btn btn-primary">Salvar Equipamento</button>
@@ -855,6 +930,35 @@ export function Equipments() {
                                         <input type="text" className="form-input" placeholder="Ex: Assistência Epson" value={maintForm.technician} onChange={e => setMaintForm({...maintForm, technician: e.target.value})} />
                                     </div>
                                 </div>
+
+                                <div style={{ marginTop: '8px', padding: '16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, color: '#991b1b', fontSize: '0.9rem' }}>
+                                        <input type="checkbox" style={{ transform: 'scale(1.2)' }} checked={maintForm.launchFinance} onChange={e => setMaintForm({...maintForm, launchFinance: e.target.checked})} />
+                                        Lançar Despesa de Manutenção no Financeiro
+                                    </label>
+                                    {maintForm.launchFinance && (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px', paddingLeft: '24px' }}>
+                                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                                <label style={{ color: '#991b1b', fontSize: '0.8rem' }}>Conta/Caixa Onde Houve Pagamento *</label>
+                                                <select className="form-input" style={{ borderColor: '#fca5a5' }} required={maintForm.launchFinance} value={maintForm.accountId} onChange={e => setMaintForm({...maintForm, accountId: e.target.value})}>
+                                                    <option value="">Selecione o Caixa...</option>
+                                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} (Saldo: R$ {parseFloat(acc.balance).toFixed(2)})</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                                <label style={{ color: '#991b1b', fontSize: '0.8rem' }}>Meio de Pagamento *</label>
+                                                <select className="form-input" style={{ borderColor: '#fca5a5' }} required={maintForm.launchFinance} value={maintForm.paymentMethod} onChange={e => setMaintForm({...maintForm, paymentMethod: e.target.value})}>
+                                                    <option value="pix">PIX</option>
+                                                    <option value="credit">Cartão de Crédito</option>
+                                                    <option value="debit">Cartão de Débito</option>
+                                                    <option value="cash">Dinheiro em Espécie</option>
+                                                    <option value="transfer">Transferência Bancária</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
                             </div>
 
                             <div className="modal-footer" style={{ marginTop: '24px', padding: 0, border: 'none' }}>
