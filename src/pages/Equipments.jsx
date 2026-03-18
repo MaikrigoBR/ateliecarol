@@ -289,7 +289,7 @@ export function Equipments() {
       const matchStatus = !statusFilter || eq.status === statusFilter;
       const matchGroup = !groupFilter || eq.equipmentGroup === groupFilter;
       return matchSearch && matchStatus && matchGroup;
-  });
+  }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   const totalEquipmentsValue = filteredEquipments.reduce((acc, eq) => acc + (eq.purchasePrice || 0), 0);
   const totalMaintenanceCost = filteredEquipments.reduce((acc, eq) => {

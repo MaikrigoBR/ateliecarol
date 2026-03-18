@@ -854,7 +854,7 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                                 <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--background)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
                                     <select className="form-input" style={{ flex: 1, minWidth: '150px', height: '34px', padding: '0 0.5rem', fontSize: '0.85rem', marginBottom: 0 }} value={item.equipId} onChange={e => updateEquipmentItem(idx, 'equipId', e.target.value)} required>
                                         <option value="">Selecionar Máquina...</option>
-                                        {equipmentsList.map(eq => {
+                                        {[...equipmentsList].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(eq => {
                                             const deprecMonthly = (parseFloat(eq.purchasePrice) || 0) / (parseInt(eq.lifespanMonths) || 1);
                                             const hrCost = deprecMonthly / (parseInt(eq.monthlyHours) || 160);
                                             let hrConsumableCost = 0;
