@@ -95,7 +95,7 @@ export function Equipments() {
       const params = new URLSearchParams(location.search);
       const maintId = params.get('maintenance_id');
       if (maintId) {
-        const eq = equipments.find(e => e.id === maintId || e.patrimonyId === maintId);
+        const eq = equipments.find(e => String(e.id) === String(maintId) || String(e.patrimonyId) === String(maintId));
         if (eq) {
           openMaintenanceModal(eq);
           // Clear param after opening so it doesn't reopen upon refresh
@@ -161,11 +161,13 @@ export function Equipments() {
                               type: 'expense',
                               category: 'Investimento / Equipamentos',
                               date: nd.toISOString().split('T')[0],
-                              status: 'pending', // Parcelas vão para 'a pagar'
+                              status: isCredit ? 'paid' : 'pending', // Parcelas vão para 'a pagar'
                               paymentMethod: equipForm.paymentMethod || 'pix',
                               accountId: equipForm.accountId,
                               installmentNumber: i + 1,
-                              installmentsTotal: installments
+                              installmentsTotal: installments,
+                              referenceId: created.id,
+                              referenceType: 'Equipment'
                           });
                       }
                   } else {
@@ -175,9 +177,11 @@ export function Equipments() {
                           type: 'expense',
                           category: 'Investimento / Equipamentos',
                           date: payload.purchaseDate,
-                          status: isCredit ? 'pending' : 'paid',
+                          status: 'paid',
                           paymentMethod: equipForm.paymentMethod || 'pix',
-                          accountId: equipForm.accountId
+                          accountId: equipForm.accountId,
+                          referenceId: created.id,
+                          referenceType: 'Equipment'
                       });
                       if (!isCredit) {
                           const targetAcc = accounts.find(a => a.id === equipForm.accountId);
@@ -241,11 +245,13 @@ export function Equipments() {
                           type: 'expense',
                           category: 'Manutenção de Equipamentos',
                           date: nd.toISOString().split('T')[0],
-                          status: 'pending',
+                          status: isCredit ? 'paid' : 'pending',
                           paymentMethod: maintForm.paymentMethod || 'pix',
                           accountId: maintForm.accountId,
                           installmentNumber: i + 1,
-                          installmentsTotal: installments
+                          installmentsTotal: installments,
+                          referenceId: activeEquipForMaintenance.id,
+                          referenceType: 'Equipment'
                       });
                   }
               } else {
@@ -255,9 +261,11 @@ export function Equipments() {
                       type: 'expense',
                       category: 'Manutenção de Equipamentos',
                       date: maintForm.date,
-                      status: isCredit ? 'pending' : 'paid',
+                      status: 'paid',
                       paymentMethod: maintForm.paymentMethod || 'pix',
-                      accountId: maintForm.accountId
+                      accountId: maintForm.accountId,
+                      referenceId: activeEquipForMaintenance.id,
+                      referenceType: 'Equipment'
                   });
                   if (!isCredit) {
                       const targetAcc = accounts.find(a => a.id === maintForm.accountId);

@@ -5,9 +5,12 @@ import { NewInventoryItemModal } from '../components/NewInventoryItemModal.jsx';
 import { LinkedTransactionsModal } from '../components/LinkedTransactionsModal.jsx';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export function Inventory() {
   const { currentUser } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const activeTab = 'material';
   const [items, setItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,6 +24,21 @@ export function Inventory() {
     fetchItems();
   }, []);
 
+  useEffect(() => {
+    if (items.length > 0 && location.search) {
+      const params = new URLSearchParams(location.search);
+      const editId = params.get('edit_item');
+      if (editId) {
+        const item = items.find(i => String(i.id) === String(editId));
+        if (item) {
+          setEditingItem(item);
+          setIsModalOpen(true);
+          navigate('/inventory', { replace: true });
+        }
+      }
+    }
+  }, [items, location.search, navigate]);
+
   const fetchItems = async () => {
     try {
         const allItems = await db.getAll('inventory');
@@ -29,6 +47,40 @@ export function Inventory() {
         console.error(e);
         setItems([]);
     }
+  };
+
+  const handleAutoSyncLinks = async () => {
+      if (!window.confirm('Varremos o financeiro antigo e vincularemos lançamentos "órfãos" (sem ligações) aos materiais do estoque pelo Nome?')) return;
+      try {
+          const trans = await db.getAll('transactions') || [];
+          const invs = await db.getAll('inventory') || [];
+          const equips = await db.getAll('equipments') || [];
+          let linkedCount = 0;
+
+          for (let t of trans) {
+              // Se já tem link ou se não for despesa... pula.
+              if (t.referenceId || t.type !== 'expense' || !t.description) continue;
+              
+              const text = t.description.toLowerCase();
+              // 1. match inventario
+              let matchInv = invs.find(i => i.name && text.includes(i.name.toLowerCase()));
+              if (matchInv) {
+                  await db.update('transactions', t.id, { ...t, referenceId: matchInv.id, referenceType: 'Inventory' });
+                  linkedCount++;
+                  continue;
+              }
+              // 2. match equipamento
+              let matchEq = equips.find(e => e.name && text.includes(e.name.toLowerCase()));
+              if (matchEq) {
+                  await db.update('transactions', t.id, { ...t, referenceId: matchEq.id, referenceType: 'Equipment' });
+                  linkedCount++;
+              }
+          }
+          alert(`Mágica retroativa feita! ${linkedCount} lançamentos antigos(órfãos) foram reconectados a esses painéis e origens.`);
+      } catch (err) {
+          console.error(err);
+          alert('Erro na integração inteligente.');
+      }
   };
   
   const handleDelete = async (id, name) => {
@@ -101,6 +153,9 @@ export function Inventory() {
                          <option value="qty_desc">Maior Quantidade</option>
                          <option value="cost_desc">Maior Custo Unitário</option>
                      </select>
+                    <button className="btn" style={{ backgroundColor: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={handleAutoSyncLinks} title="Força a IA a procurar no Financeiro lançamentos perdidos com o nome destes itens e reconecta a origem deles para edição em árvore.">
+                        <Activity size={16} /> Religar Vínculos Órfãos
+                    </button>
                     <button className="btn btn-primary" onClick={() => { setEditingItem(null); setIsModalOpen(true); }}>
                         <Plus size={16} />
                         Adicionar Item

@@ -163,6 +163,7 @@ export function EditCustomerModal({ isOpen, onClose, customer, onCustomerUpdated
                         <select className="form-input" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
                             <option value="active">Ativo</option>
                             <option value="inactive">Inativo</option>
+                            <option value="banned">🚫 Banido (Bloqueio Total)</option>
                         </select>
                     </div>
                 </div>

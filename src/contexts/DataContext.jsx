@@ -1,6 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import db from '../services/database';
+import { useAuth } from './AuthContext';
 
 /**
  * DataContext ("TanStack Query Lite")
@@ -16,6 +16,8 @@ export function useData() {
 }
 
 export function DataProvider({ children }) {
+    const { currentUser } = useAuth();
+
     // Cache State
     const [orders, setOrders] = useState([]);
     const [products, setProducts] = useState([]);
@@ -80,14 +82,14 @@ export function DataProvider({ children }) {
         refreshTransactions(true);
     };
 
-    // Auto-fetch critical data on mount?
-    // Let's do lazy fetching. But "Dashboard" uses almost everything, so let's prefetch.
+    // Auto-fetch critical data on mount only when Authenticated
     useEffect(() => {
-        // Prefetch core data
-        refreshOrders();
-        refreshProducts();
-        refreshCustomers();
-    }, []);
+        if (currentUser) {
+            refreshOrders();
+            refreshProducts();
+            refreshCustomers();
+        }
+    }, [currentUser]);
 
     const value = {
         orders,

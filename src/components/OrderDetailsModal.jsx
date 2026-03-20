@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     X, Edit, Trash2, Printer, Share2, Play, CheckCircle, Package, 
-    Calendar, DollarSign, User, AlertCircle, Clock, Check, FileText, Phone, ArrowRight
+    Calendar, DollarSign, User, AlertCircle, Clock, Check, FileText, Phone, ArrowRight, Truck, Link, ShieldCheck, RefreshCcw
 } from 'lucide-react';
+import db from '../services/database';
+import PaymentGateway from '../services/PaymentGateway';
 
 export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdit, onDelete, onPrint, onShare, onStartProduction, onComplete }) {
     if (!isOpen || !order) return null;
@@ -32,6 +34,40 @@ export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdi
     const isOverdue = order.nextDueDate && new Date(order.nextDueDate) < new Date();
 
     const totalItems = order.cartItems ? order.cartItems.reduce((acc, item) => acc + (parseInt(item.quantity) || 1), 0) : order.items || 0;
+
+    // --- State for Post-Sale Tracking ---
+    const [trackingCode, setTrackingCode] = useState('');
+    const [invoiceUrl, setInvoiceUrl] = useState('');
+    const [isSavingPostSale, setIsSavingPostSale] = useState(false);
+
+    useEffect(() => {
+        if (order) {
+            setTrackingCode(order.trackingCode || '');
+            setInvoiceUrl(order.invoiceUrl || '');
+        }
+    }, [order]);
+
+    const handleSavePostSale = async () => {
+        if (!order) return;
+        setIsSavingPostSale(true);
+        try {
+            await db.update('orders', order.id, {
+                trackingCode: trackingCode.trim(),
+                invoiceUrl: invoiceUrl.trim()
+            });
+            // Show silent UI confirmation
+            const btn = document.getElementById('savePostSaleBtn');
+            if (btn) {
+                const original = btn.innerHTML;
+                btn.innerHTML = 'Salvo!';
+                setTimeout(() => btn.innerHTML = original, 2000);
+            }
+        } catch (e) {
+            console.error("Erro ao salvar dados de pós-venda", e);
+        } finally {
+            setIsSavingPostSale(false);
+        }
+    };
 
     // --- Inline Styles mapping to Theme Variables ---
     const sOverlay = {
@@ -213,6 +249,71 @@ export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdi
                         </div>
                     </div>
 
+                    {/* Auditoria & Risco (Contra-Fluxo) */}
+                    {(paid > 0 || order.mpPaymentId || order.ecommerceOrigin) && (
+                        <div style={{ ...sCardLinear, backgroundColor: '#f8fafc', border: '1px solid #cbd5e1' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <ShieldCheck size={18} color="#334155" />
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', margin: 0 }}>Raio-X de Auditoria (Gateway)</h4>
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.8rem' }}>
+                                <div>
+                                    <span style={{ display: 'block', color: '#64748b', fontWeight: 600 }}>ID Transação Nuvem</span>
+                                    <span style={{ fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{order.transaction_id || order.mpPaymentId || 'Baixa Manual Integrada'}</span>
+                                </div>
+                                <div>
+                                    <span style={{ display: 'block', color: '#64748b', fontWeight: 600 }}>Método / Origem</span>
+                                    <span style={{ fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>{order.paymentMethod || 'Espécie / Balcão'}</span>
+                                </div>
+                                <div>
+                                    <span style={{ display: 'block', color: '#64748b', fontWeight: 600 }}>Valor Bruto Integrado</span>
+                                    <span style={{ fontWeight: 800, color: '#0f172a' }}>R$ {paid.toFixed(2)}</span>
+                                </div>
+                                <div>
+                                    <span style={{ display: 'block', color: '#64748b', fontWeight: 600 }}>Custo Estimado M.P (4.5%)</span>
+                                    <span style={{ fontWeight: 800, color: '#ef4444' }}>- R$ {(order.ecommerceOrigin || order.mpPaymentId ? paid * 0.045 : 0).toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            {order.ecommerceOrigin && order.status !== 'Cancelado' && (
+                                <div style={{ marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'flex-end' }}>
+                                    <button 
+                                        id="refundBtn"
+                                        onClick={async () => {
+                                            if(window.confirm('RISCO CRÍTICO: Tem certeza que deseja acionar a Vercel Cloud para Estornar/Devolver o valor direto pro cartão/conta do pagador? (Irreversível)')) {
+                                                const btn = document.getElementById('refundBtn');
+                                                btn.innerHTML = 'Processando Nuvem...';
+                                                btn.disabled = true;
+                                                try {
+                                                    const log = await PaymentGateway.refundTransaction(order.id);
+                                                    alert(log.message);
+                                                    onClose();
+                                                    window.location.reload(); 
+                                                } catch(e) {
+                                                     alert("Erro de API: " + e.message);
+                                                } finally {
+                                                     btn.innerHTML = 'Reembolsar Cliente (Webhook)';
+                                                     btn.disabled = false;
+                                                }
+                                            }
+                                        }}
+                                        style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', transition: 'all 0.2s' }}
+                                    >
+                                        <RefreshCcw size={14} /> Reembolsar Cliente (Webhook)
+                                    </button>
+                                </div>
+                            )}
+                            {order.status === 'Cancelado' && order.cancelReason && (
+                                <div style={{ fontSize: '0.8rem', color: '#b91c1c', fontWeight: 700, backgroundColor: '#fef2f2', padding: '8px', borderRadius: '4px', textAlign: 'center', marginTop: '8px' }}>
+                                    Obrigação Estornada: {order.cancelReason} em {new Date(order.cancelDate).toLocaleDateString()}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Items List (Linear Lines, NO Table) */}
                     <div style={sCardLinear}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
@@ -242,16 +343,51 @@ export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdi
                         </div>
                     </div>
 
-                    {/* Observations */}
-                    {order.observations && (
-                         <div style={{ ...sCardLinear, backgroundColor: '#fffbeb', borderColor: '#fef3c7', color: '#92400e' }}>
-                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                 <AlertCircle size={16} />
-                                 <h4 style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', margin: 0 }}>Anotações Importantes</h4>
-                             </div>
-                             <p style={{ fontSize: '0.875rem', margin: 0, whiteSpace: 'pre-wrap' }}>{order.observations}</p>
+                    {/* Pós Venda: Rastreio e NF */}
+                    <div style={sCardLinear}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                             <Truck size={18} color="#a855f7" />
+                             <h4 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0 }}>Logística & Fiscal (Portal do Cliente)</h4>
                          </div>
-                    )}
+                         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                             <div style={{ flex: '1 1 200px' }}>
+                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>Código Correios/Transportadora</label>
+                                 <div style={{ position: 'relative' }}>
+                                     <Truck size={16} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}/>
+                                     <input 
+                                        type="text" 
+                                        placeholder="Ex: QA123456789BR"
+                                        value={trackingCode}
+                                        onChange={e => setTrackingCode(e.target.value)}
+                                        style={{ width: '100%', padding: '0.5rem 0.5rem 0.5rem 32px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--background)', color: 'var(--text-main)', fontSize: '0.875rem' }}
+                                     />
+                                 </div>
+                             </div>
+                             <div style={{ flex: '2 1 250px' }}>
+                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>Link da Nota Fiscal ou Recibo (PDF)</label>
+                                 <div style={{ position: 'relative' }}>
+                                     <Link size={16} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}/>
+                                     <input 
+                                        type="url" 
+                                        placeholder="https://..."
+                                        value={invoiceUrl}
+                                        onChange={e => setInvoiceUrl(e.target.value)}
+                                        style={{ width: '100%', padding: '0.5rem 0.5rem 0.5rem 32px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--background)', color: 'var(--text-main)', fontSize: '0.875rem' }}
+                                     />
+                                 </div>
+                             </div>
+                             <button 
+                                id="savePostSaleBtn"
+                                onClick={handleSavePostSale}
+                                disabled={isSavingPostSale || (trackingCode === order.trackingCode && invoiceUrl === order.invoiceUrl)}
+                                style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: '0.875rem', border: 'none', cursor: 'pointer', opacity: (isSavingPostSale || (trackingCode === (order.trackingCode || '') && invoiceUrl === (order.invoiceUrl || ''))) ? 0.5 : 1 }}
+                             >
+                                 Salvar Link
+                             </button>
+                         </div>
+                         <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', margin: 0, fontStyle: 'italic' }}>*Preencher estes campos habilita automaticamente os botões de Rastreio e Recibo no Portal Online do Cliente.</p>
+                    </div>
+
                 </div>
 
                 {/* Footer / Actions */}
@@ -273,7 +409,67 @@ export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdi
                             <Printer size={16} /> Imprimir
                         </button>
                         
-                        <button onClick={() => onShare(order)} className="btn" style={{ backgroundColor: '#10b9811A', color: '#10b981', border: '1px solid #10b98133', fontWeight: 600 }}>
+                        <button onClick={async () => {
+                            const link = window.location.origin + window.location.pathname + "#/pagar/" + order.id;
+                            const company = companyConfig?.companyName || 'Ateliê';
+                            const text = `Olá ${order.customer.split(' ')[0]}!\n✨ Aqui está a Fatura Segura do seu pedido #${String(order.id).substring(0,8)}.\n\nVocê pode efetuar o pagamento via Pix ou Cartão acessando o link do Caixa Rápido da ${company}:\n\n${link}`;
+                            
+                            const btn = document.getElementById('lnkPgtoBtn');
+                            let originalHtml = "Link Pagto";
+                            if (btn) {
+                                originalHtml = btn.innerHTML;
+                                btn.innerHTML = 'Enviando Zap...';
+                            }
+                            
+                            let targetPhone = order.customerPhone;
+                            if (!targetPhone) {
+                                try {
+                                    const customers = await db.getAll('customers');
+                                    const customerObj = customers.find(c => c.name === order.customer);
+                                    if (customerObj) targetPhone = customerObj.phone || customerObj.whatsapp;
+                                } catch(e) {
+                                    console.warn("Erro ao buscar cliente no banco", e);
+                                }
+                            }
+                            
+                            let localPhoneStr = '';
+                            if (targetPhone) {
+                                const num = targetPhone.replace(/\D/g, '');
+                                if (num.length >= 10) {
+                                    localPhoneStr = `55${num}`;
+                                    try {
+                                        const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
+                                        const res = await fetch(`${apiUrl}/api/campaign`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ targets: [{ phone: num, message: text }] })
+                                        });
+                                        
+                                        if (res.ok) {
+                                            if (btn) {
+                                                btn.innerHTML = '✔ Enviado Via API';
+                                                setTimeout(() => { btn.innerHTML = originalHtml; }, 3000);
+                                            }
+                                            return;
+                                        } else {
+                                            console.warn(`A automação de WhatsApp recusou a conexão (Status: ${res.status}). Abriremos localmente.`);
+                                        }
+                                    } catch(e) {
+                                        console.warn("API de WhatsApp offline, usando link direto...", e);
+                                    }
+                                }
+                            }
+                            
+                            // Fallback manual local WhatsApp API / Web
+                            const waUrl = localPhoneStr ? `https://wa.me/${localPhoneStr}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+                            window.open(waUrl, '_blank');
+                            if (btn) btn.innerHTML = originalHtml;
+                            
+                        }} id="lnkPgtoBtn" className="btn" style={{ backgroundColor: '#9333ea1A', color: '#9333ea', border: '1px solid #9333ea33', fontWeight: 600 }} title="Enviar Link Checkout p/ Cliente (Via API ou Web)">
+                            <Link size={16} /> Link Pagto
+                        </button>
+
+                        <button onClick={() => onShare(order)} className="btn" style={{ backgroundColor: '#10b9811A', color: '#10b981', border: '1px solid #10b98133', fontWeight: 600 }} title="Enviar Status de Produção (Rastreio) Zap">
                             <Share2 size={16} /> Zap
                         </button>
 
@@ -284,8 +480,8 @@ export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdi
                         )}
 
                         {currentStepIndex > 0 && currentStepIndex < 3 ? (
-                            <button onClick={() => { onClose(); onComplete(order); }} className="btn btn-primary" style={{ backgroundColor: 'var(--success)' }}>
-                                <CheckCircle size={18} /> Concluir
+                            <button onClick={() => { onClose(); onComplete(order); }} className="btn btn-primary" style={{ backgroundColor: 'var(--success)' }} title="Registrar recebimento de dinheiro em mãos e marcar pedido como Finalizado.">
+                                <DollarSign size={18} /> Baixa Manual (Balcão)
                             </button>
                         ) : currentStepIndex === 3 ? (
                             <span style={{ padding: '0.625rem 1.25rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--surface-hover)', color: 'var(--text-muted)', fontWeight: 600, border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>

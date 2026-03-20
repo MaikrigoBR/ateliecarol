@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Phone, ShoppingBag, Plus, Trash2, Edit, MessageCircle, Instagram, Tag, Gift, Flame, Snowflake, Sun } from 'lucide-react';
+import { Mail, Phone, ShoppingBag, Plus, Trash2, Edit, MessageCircle, Instagram, Tag, Gift, Flame, Snowflake, Sun, DollarSign } from 'lucide-react';
 import db from '../services/database.js';
 import { NewCustomerModal } from '../components/NewCustomerModal.jsx';
 import { EditCustomerModal } from '../components/EditCustomerModal.jsx';
@@ -7,6 +7,7 @@ import { MarketingCampaignModal } from '../components/MarketingCampaignModal.jsx
 import { CustomerDetailsModal } from '../components/CustomerDetailsModal.jsx';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
+import { DebtCollectionModal } from '../components/DebtCollectionModal.jsx';
 
 export function Customers() {
   const { currentUser } = useAuth();
@@ -26,6 +27,7 @@ export function Customers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
@@ -96,7 +98,15 @@ export function Customers() {
             <option value="frio">❄️ Frias</option>
           </select>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+           <button 
+             className="btn" 
+             style={{ backgroundColor: '#ea580c', color: 'white', border: 'none' }} 
+             onClick={() => setIsDebtModalOpen(true)}
+             title="Identificar Inadimplência e Cobrar"
+           >
+             <DollarSign size={16} /> Cobrança Amigável (CRM)
+           </button>
            <button 
              className="btn" 
              style={{ backgroundColor: '#E1306C', color: 'white', border: 'none' }} 
@@ -286,6 +296,12 @@ export function Customers() {
         onMessage={(c) => {
             window.open(`https://wa.me/55${c.phone.replace(/\D/g, '')}?text=Olá ${c.name}, temos novidades no atelier!`, '_blank');
         }}
+      />
+
+      <DebtCollectionModal
+        isOpen={isDebtModalOpen}
+        onClose={() => setIsDebtModalOpen(false)}
+        customers={customers}
       />
     </div>
   );

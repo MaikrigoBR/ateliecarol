@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Star, Image as ImageIcon, MessageCircle, PlayCircle, Search, LayoutGrid, Instagram } from 'lucide-react';
+import { ShoppingCart, ShoppingBag, LayoutGrid, Search, PlayCircle, Instagram, MessageCircle, ImageIcon, Heart, User, Star } from 'lucide-react';
 import db from '../services/database';
+import { useCart } from '../contexts/CartContext';
+import { CartDrawer } from '../components/CartDrawer';
 
 export function ProductPortfolio() {
     const [products, setProducts] = useState([]);
@@ -10,6 +12,9 @@ export function ProductPortfolio() {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('Todos');
     const [categories, setCategories] = useState(['Todos']);
+
+    // Contexto do Carrinho
+    const { cartCount, setIsCartOpen } = useCart();
 
     useEffect(() => {
         const load = async () => {
@@ -70,7 +75,8 @@ export function ProductPortfolio() {
     };
 
     return (
-        <div style={{ minHeight: '100vh', backgroundColor: '#fcfcfc', paddingBottom: '40px', fontFamily: 'var(--font-primary)' }}>
+        <div style={{ minHeight: '100vh', backgroundColor: '#faf5ff', paddingBottom: '40px', fontFamily: 'var(--font-primary)' }}>
+            <CartDrawer companyConfig={companyConfig} />
             
             {/* Portifolio Header (Instagram-ish style) */}
             <header style={{ backgroundColor: '#ffffff', padding: '24px 20px', borderBottom: '1px solid #f1f5f9', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -111,17 +117,26 @@ export function ProductPortfolio() {
                         >
                             <MessageCircle size={16} /> Contato
                         </button>
-                        {companyConfig.instagram && (
-                             <a 
-                                href={`https://instagram.com/${companyConfig.instagram.replace('@', '')}`}
-                                target="_blank" rel="noopener noreferrer"
-                                style={{ flex: 1, padding: '10px', backgroundColor: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700, color: '#db2777', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'background-color 0.2s' }}
-                                onMouseOver={e => e.currentTarget.style.backgroundColor = '#fce7f3'}
-                                onMouseOut={e => e.currentTarget.style.backgroundColor = '#fdf2f8'}
-                            >
-                                <Instagram size={16} /> Ver no Instagram
-                            </a>
-                        )}
+
+                        {/* BOTÃO DOS MEUS PEDIDOS */}
+                        <Link to="/meus-pedidos" style={{ flex: 1, position: 'relative', padding: '10px', backgroundColor: '#f3e8ff', border: 'none', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700, color: '#9333ea', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background-color 0.2s', textDecoration: 'none' }}>
+                            <User size={16} /> Pedidos
+                        </Link>
+                        
+                        {/* BOTÃO DO CARRINHO */}
+                        <button 
+                            onClick={() => setIsCartOpen(true)}
+                            style={{ flex: 1.5, position: 'relative', padding: '10px', backgroundColor: '#a855f7', border: 'none', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background-color 0.2s', boxShadow: '0 4px 6px -1px rgba(168, 85, 247, 0.4)' }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#9333ea'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#a855f7'}
+                        >
+                            <ShoppingCart size={16} /> Sacola
+                            {cartCount > 0 && (
+                                <span style={{ position: 'absolute', top: '-6px', right: '-6px', backgroundColor: '#ef4444', color: 'white', fontSize: '0.75rem', fontWeight: 800, width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', boxShadow: '0 0 0 2px #ffffff' }}>
+                                    {cartCount}
+                                </span>
+                            )}
+                        </button>
                     </div>
                 </div>
             </header>
@@ -150,8 +165,8 @@ export function ProductPortfolio() {
                                         onClick={() => setActiveCategory(cat)}
                                         style={{ 
                                             padding: '8px 16px', borderRadius: '20px', border: 'none', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
-                                            backgroundColor: activeCategory === cat ? '#0f172a' : '#f1f5f9',
-                                            color: activeCategory === cat ? 'white' : '#64748b'
+                                            backgroundColor: activeCategory === cat ? '#9333ea' : '#f3e8ff',
+                                            color: activeCategory === cat ? 'white' : '#7e22ce'
                                         }}
                                     >
                                         {cat}
@@ -191,7 +206,7 @@ export function ProductPortfolio() {
                                 <Link to={`/product/${product.id}`} key={product.id} style={{ textDecoration: 'none', display: 'block' }}>
                                     <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', transition: 'transform 0.2s', border: '1px solid #f1f5f9' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
                                         
-                                        <div style={{ aspectRatio: '1/1', backgroundColor: '#f8fafc', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={{ aspectRatio: '1/1', backgroundColor: '#f8fafc', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
                                             {product.campaignActive && (
                                                 <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: '#f43f5e', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 800, zIndex: 2 }}>
                                                     -{product.campaignDiscount}%
@@ -203,7 +218,7 @@ export function ProductPortfolio() {
                                                 </div>
                                             )}
                                             {mediaItems.length > 0 ? (
-                                                <img src={mediaItems[0]} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={mediaItems[0]} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px', mixBlendMode: 'multiply' }} />
                                             ) : (
                                                 <ImageIcon size={32} color="#cbd5e1" />
                                             )}
@@ -214,8 +229,8 @@ export function ProductPortfolio() {
                                                 {product.name}
                                             </h3>
                                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                                                 <span style={{ fontSize: '0.75rem', color: product.campaignActive ? '#e11d48' : '#64748b' }}>R$</span>
-                                                 <span style={{ fontSize: '1.1rem', fontWeight: 800, color: product.campaignActive ? '#e11d48' : '#0f172a' }}>
+                                                 <span style={{ fontSize: '0.75rem', color: product.campaignActive ? '#e11d48' : '#7e22ce' }}>R$</span>
+                                                 <span style={{ fontSize: '1.1rem', fontWeight: 800, color: product.campaignActive ? '#e11d48' : '#6b21a8' }}>
                                                      {price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                                                  </span>
                                             </div>

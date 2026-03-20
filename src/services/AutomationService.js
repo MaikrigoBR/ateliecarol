@@ -44,6 +44,9 @@ class AutomationService {
             // 1. Estoque Baixo
             await this.checkLowStock();
 
+            // 1b. Checar Pagamentos Pendentes de E-commerce (PIX/Cartão)
+            await this.checkPendingPayments();
+
             // 2. Pedidos Atrasados
             await this.checkOverdueOrders();
 
@@ -115,6 +118,126 @@ class AutomationService {
     async cleanupOldLogs() {
         // Exemplo: Limpar logs com mais de 30 dias se necessário (não implementado delete em massa ainda)
         // Isso seria perigoso sem paginação no client-side.
+    }
+
+    async checkPendingPayments() {
+        const orders = await db.getAll('orders') || [];
+        
+        // Apenas varre Pedidos que estão pendentes e são de E-commerce.
+        const pendingEcommerce = orders.filter(o => {
+            return o.ecommerceOrigin && 
+                   o.paymentStatus !== 'Pago' && 
+                   o.paymentStatus !== 'Recebido' && 
+                   o.status !== 'cancelled' &&
+                   o.status !== 'Cancelado' &&
+                   (o.paymentMethod === 'pix' || o.paymentMethod === 'credit_card');
+        });
+
+        if (pendingEcommerce.length === 0) return;
+
+        console.log(`🦾 AutomationService: Varrendo status de ${pendingEcommerce.length} pagamentos no Mercado Pago...`);
+
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const baseUrl = isLocalhost ? 'http://localhost:5173' : 'https://ateliecarol.vercel.app';
+
+        for (const order of pendingEcommerce) {
+            const mpId = order.transaction_id || order.mpPaymentId;
+            if (mpId && mpId.startsWith('MOCK')) continue; 
+
+            try {
+                const urlQuery = mpId ? `paymentId=${mpId}` : `orderId=${order.id}`;
+                const response = await fetch(`${baseUrl}/api/check_payment?${urlQuery}`);
+                if (!response.ok) continue;
+                
+                const mpData = await response.json();
+                
+                if (mpData.status === 'approved') {
+                    console.log(`💸 Pagamento Aprovado Detectado: Pedido #${order.id}`);
+
+                    const totalOrder = Number(order.total) || 0;
+                    const totalTax = mpData.fee_details ? mpData.fee_details.reduce((acc, f) => acc + (f.amount || 0), 0) : 0;
+                    const netAmount = mpData.transaction_details?.net_received_amount || (totalOrder - totalTax);
+
+                    await db.update('orders', order.id, {
+                        paymentStatus: 'Recebido',
+                        amountPaid: totalOrder,
+                        balanceDue: 0,
+                        status: 'Em Produção',
+                        paymentDate: new Date().toISOString(),
+                        gatewayTaxes: totalTax,
+                        gatewayNet: netAmount,
+                        gatewayMethodId: mpData.payment_method_id || order.paymentMethod
+                    });
+
+                    await db.create('transactions', {
+                        type: 'income',
+                        description: `Venda E-commerce: Pedido #${String(order.id).substring(0,8)}`,
+                        amount: Number(netAmount || totalOrder), 
+                        date: new Date().toISOString().split('T')[0],
+                        category: 'Venda de Produtos',
+                        paymentMethod: mpData.payment_method_id === 'pix' ? 'PIX' : 'Cartão de Crédito',
+                        status: 'paid', // Strict para FinanceFinal
+                        orderId: order.id,
+                        accountId: '1', 
+                        auditData: { gross: totalOrder, tax: totalTax } 
+                    });
+
+                    await db.create('system_notifications', {
+                        type: 'PAYMENT_RECEIVED',
+                        message: `PIX/Cartão Recebido! O pedido online do(a) ${order.customer} foi pago e enviado para produção! 🚀`,
+                        data: order.id,
+                        timestamp: new Date().toISOString(),
+                        read: false
+                    });
+                } else if (mpData.status === 'cancelled' || mpData.status === 'rejected') {
+                    await this.cancelOrderAndRestoreStock(order, 'PIX/Cartão Expirou/Recusado no Mercado Pago. Pedido cancelado e estoque limpo.');
+                } else if (mpData.status === 'pending') {
+                    const orderDate = order.createdAt || order.date;
+                    if (orderDate) {
+                        const createdTime = new Date(orderDate).getTime();
+                        const now = new Date().getTime();
+                        const diffMs = now - createdTime;
+                        const diffHours = diffMs / (1000 * 60 * 60);
+                        if (diffHours >= 1) { 
+                            console.log(`[Cancelamento Auto] Pedido ${order.id} expirou o tempo limite de PGT.`);
+                            await this.cancelOrderAndRestoreStock(order, `Reserva Expirada (1 Hora) por falta de Pagamento. Cliente não concluiu a transação.`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("🦾 Error na checagem passiva:", error);
+            }
+        }
+    }
+
+    async cancelOrderAndRestoreStock(order, motivo) {
+        await db.update('orders', order.id, {
+            status: 'Cancelado',
+            paymentStatus: 'Expirado',
+            cancelDate: new Date().toISOString()
+        });
+        
+        try {
+            if (order.cartItems && order.cartItems.length > 0) {
+                const allProducts = await db.getAll('products') || [];
+                for (const item of order.cartItems) {
+                    const product = allProducts.find(p => String(p.id) === String(item.productId));
+                    if (product && product.stock !== undefined) {
+                        await db.update('products', product.id, {
+                            stock: product.stock + (Number(item.quantity) || 1)
+                        });
+                    }
+                }
+            }
+        } catch(e) { console.error("Falha ao recuperar estoque", e); }
+
+        await db.create('system_notifications', {
+            type: 'ORDER_CANCELLED',
+            message: motivo,
+            data: order.id,
+            timestamp: new Date().toISOString(),
+            read: false
+        });
     }
 }
 

@@ -4,6 +4,7 @@ import db from '../services/database.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { DreReport } from '../components/DreReport';
 
 export function Reports() {
   const [activeTab, setActiveTab] = useState('sales');
@@ -89,6 +90,13 @@ export function Reports() {
 
                   return dateMatch;
               });
+               break;
+
+          case 'dre':
+              result = data.transactions.filter(t => {
+                  const tDate = new Date(t.date);
+                  return tDate >= start && tDate <= end;
+              });
               break;
 
           case 'customers':
@@ -110,7 +118,7 @@ export function Reports() {
           let key;
           if (activeTab === 'sales') key = `${item.customer}_${item.date||item.createdAt}_${item.total}`;
           else if (activeTab === 'inventory') key = `${item.name}_${item.type}_${item.quantity}`;
-          else if (activeTab === 'finance') key = `${item.description}_${item.date}_${item.amount}`;
+          else if (activeTab === 'finance' || activeTab === 'dre') key = `${item.description}_${item.date}_${item.amount}`;
           else if (activeTab === 'customers') key = `${item.name}_${item.email}`;
           else key = item.id ? String(item.id) : JSON.stringify(item);
           
@@ -125,6 +133,11 @@ export function Reports() {
   /* --- EXPORT --- */
   const exportPDF = () => {
       try {
+          if (activeTab === 'dre') {
+              alert("A exportação de PDF do DRE estará disponível em breve. Tire um print da tela para salvar uma cópia temporária.");
+              return;
+          }
+
           const doc = new jsPDF();
           doc.setFontSize(18);
           const titleMap = {
@@ -260,12 +273,13 @@ export function Reports() {
           <div className="tabs">
                 <button className={`tab-item ${activeTab === 'sales' ? 'active' : ''}`} onClick={() => setActiveTab('sales')}>Vendas</button>
                 <button className={`tab-item ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => setActiveTab('finance')}>Financeiro</button>
+                <button className={`tab-item ${activeTab === 'dre' ? 'active' : ''}`} onClick={() => setActiveTab('dre')}>DRE (Lucratividade)</button>
                 <button className={`tab-item ${activeTab === 'customers' ? 'active' : ''}`} onClick={() => setActiveTab('customers')}>Clientes</button>
                 <button className={`tab-item ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => setActiveTab('inventory')}>Estoque</button>
           </div>
           
           {/* Global Date Filter for Sales and Finance */}
-          {(activeTab === 'sales' || activeTab === 'finance') && (
+          {(activeTab === 'sales' || activeTab === 'finance' || activeTab === 'dre') && (
                <div className="filters-row mb-6">
                    <div className="flex items-center gap-2">
                        <span className="text-sm font-semibold text-muted flex items-center gap-2">
@@ -318,6 +332,9 @@ export function Reports() {
            )}
 
           {/* TABLE RENDER */}
+          {activeTab === 'dre' ? (
+              <DreReport transactions={filteredData} />
+          ) : (
           <div className="table-container p-2">
               <table className="table">
                   <thead>
@@ -385,6 +402,7 @@ export function Reports() {
                   </tbody>
               </table>
           </div>
+          )}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp, CreditCard, Wrench } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp, CreditCard, Wrench, Ticket, MessageSquare } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const SectionTitle = ({ title, color, bgColor }) => (
@@ -65,7 +65,12 @@ export function Sidebar({ onClose }) {
         >
             <X size={24} className="text-muted" />
         </button>
+      </div>
 
+      <div style={{ padding: '0 16px', marginTop: '16px' }}>
+          <a href="/#/loja" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 16px', backgroundColor: '#a855f7', color: 'white', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 4px 6px -1px rgba(168, 85, 247, 0.4)', transition: 'all 0.2s', width: '100%' }}>
+              <Package size={16} /> Abrir Loja Virtual
+          </a>
       </div>
       
       <nav className="sidebar-nav" style={{ padding: '8px 0' }}>
@@ -100,11 +105,19 @@ export function Sidebar({ onClose }) {
           <FolderHeart size={20} />
           <span>Galeria de Modelos</span>
         </Link>
+        <Link to="/comments" className={`nav-item ${isActive('/comments')}`}>
+          <MessageSquare size={20} />
+          <span>Moderação da Loja</span>
+        </Link>
 
         <SectionTitle title="Cadastros" color="#059669" bgColor="#ecfdf5" />
         <Link to="/customers" className={`nav-item ${isActive('/customers')}`}>
           <Users size={20} />
           <span>Clientes</span>
+        </Link>
+        <Link to="/coupons" className={`nav-item ${isActive('/coupons')}`}>
+          <Ticket size={20} />
+          <span>Cupons (Promoções)</span>
         </Link>
         <Link to="/products" className={`nav-item ${isActive('/products')}`}>
           <Package size={20} />

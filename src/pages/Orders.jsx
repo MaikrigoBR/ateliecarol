@@ -78,7 +78,7 @@ export function Orders() {
     // Deduplicate mathematically identical orders from database (in case of double imports)
     const seen = new Set();
     const dedupedResults = results.filter(item => {
-        const key = `${item.customer}_${item.date||item.createdAt}_${item.total}_${item.status}`;
+        const key = `${item.id}_${item.customer}_${item.date||item.createdAt}_${item.total}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -91,11 +91,57 @@ export function Orders() {
     fetchOrders();
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja excluir este pedido?')) {
-      await db.delete('orders', id);
-      fetchOrders();
+  const handleCancel = async (order) => {
+    if (order.status === 'Cancelado') {
+        if (window.confirm('Este pedido já está cancelado. Deseja excluí-lo MESTRE permanentemente do banco de dados (Ação estritamente de limpeza de disco)?')) {
+            await db.delete('orders', order.id);
+            fetchOrders();
+        }
+        return;
     }
+
+    if (!window.confirm(`Tem certeza que deseja cancelar estruturalmente o pedido #${String(order.id).substring(0,6)} de ${order.customer}?\n\nIsso irá:\n1. Mudar o status para Cancelado.\n2. Devolver o estoque físico dos produtos à prateleira.\n3. Gerar uma despesa (-) de ESTORNO para equilibrar o Caixa Financeiro (Se houver dinheiro pago).`)) {
+        return;
+    }
+    
+    // 1. Marca como Cancelado
+    await db.update('orders', order.id, {
+        status: 'Cancelado',
+        cancelDate: new Date().toISOString()
+    });
+
+    // 2. Devolve o Estoque fisicamente! (Anti-Sequestro de mercadoria)
+    try {
+        if (order.cartItems && order.cartItems.length > 0) {
+            const allProducts = await db.getAll('products') || [];
+            for (const item of order.cartItems) {
+                 const product = allProducts.find(p => String(p.id) === String(item.productId));
+                 if (product && product.stock !== undefined) {
+                     await db.update('products', product.id, {
+                         stock: product.stock + (Number(item.quantity) || 1)
+                     });
+                 }
+            }
+        }
+    } catch(e) { console.error("Erro ao devolver estoque: ", e); }
+
+    // 3. Aplica Partidas Dobradas: Gera Despesa de Estorno para fechar a conta se já havia recebimento
+    if (order.amountPaid > 0) {
+        await db.create('transactions', {
+             type: 'expense',
+             amount: order.amountPaid,
+             description: `[RESTITUIÇÃO/ESTORNO CONTÁBIL] Cancelamento Pedido #${String(order.id).substring(0,8)}`,
+             category: 'Estornos e Devoluções',
+             date: new Date().toISOString().split('T')[0],
+             status: 'paid', // Estorno imediato auto-limpo
+             orderId: order.id,
+             accountId: '1', // fallback para cofre principal
+             paymentMethod: 'Reembolso'
+        });
+    }
+
+    alert('Sistema Auditado: Pedido cancelado com total segurança. Estoque destrancado e estorno financeiro registrado caso aplicável.');
+    fetchOrders();
   };
 
   const handleCompleteOrder = (order) => {
@@ -145,8 +191,9 @@ export function Orders() {
           try {
               const account = await db.getById('accounts', transactionData.targetAccountId);
               if (account) {
+                  const netAmountToDeposit = amountReceived - (transactionData.gatewayFeeAmount || 0);
                   await db.update('accounts', account.id, {
-                      balance: (parseFloat(account.balance) || 0) + amountReceived
+                      balance: (parseFloat(account.balance) || 0) + netAmountToDeposit
                   });
               }
           } catch (error) {
@@ -169,6 +216,22 @@ export function Orders() {
           surcharge: surcharge,
           accountId: transactionData.targetAccountId // Link to account
       });
+
+      // 4. Create Gateway Fee Deduction (se aplicável)
+      if (transactionData.gatewayFeeAmount && transactionData.gatewayFeeAmount > 0) {
+          await db.create('transactions', {
+              orderId: order.id,
+              description: `Taxa de Adquirência (MDR) - Ref. Pedido #${order.id.toString().substring(0,8)}`,
+              amount: transactionData.gatewayFeeAmount,
+              type: 'expense',
+              category: 'Impostos & Taxas',
+              date: new Date().toISOString().split('T')[0],
+              status: 'paid',
+              paymentMethod: transactionData.method,
+              accountId: transactionData.targetAccountId, // Withdraws the fee from exactly where it was deposited
+              installments: 1
+          });
+      }
 
       // 3. Update Customer Stats
       const customers = await db.getAll('customers');
@@ -543,12 +606,11 @@ export function Orders() {
                   <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap', width: '1%' }}>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', alignItems: 'center', minWidth: 'max-content' }}>
                         <button 
-                          className="btn btn-icon" 
-                          title="Excluir"
-                          onClick={() => handleDelete(order.id)}
-                          style={{ color: 'var(--danger)' }}
+                          onClick={() => handleCancel(order)}
+                          style={{ color: order.status === 'Cancelado' ? 'var(--danger)' : '#f59e0b' }}
+                          title={order.status === 'Cancelado' ? 'Excluir Definitivamente' : 'Cancelar Pedido & Estornar'}
                         >
-                          <Trash2 size={16} />
+                          {order.status === 'Cancelado' ? <Trash2 size={16} /> : <AlertCircle size={16} />}
                         </button>
                         <button 
                           className="btn btn-icon" 
@@ -593,11 +655,11 @@ export function Orders() {
                         {order.status !== 'Concluído' && (
                             <button 
                                 className="btn btn-icon" 
-                                title="Finalizar e Receber"
+                                title="Dar Baixa Manual (Balcão)"
                                 onClick={() => handleCompleteOrder(order)}
                                 style={{ color: 'var(--success)' }}
                             >
-                                <CheckCircle size={16} />
+                                <DollarSign size={16} />
                             </button>
                         )}
                     </div>

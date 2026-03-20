@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
-import { X, Save, Hammer, Package, Trash2, Copy } from 'lucide-react';
+import { X, Save, Hammer, Package, Trash2, Copy, DollarSign } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
+import { LinkedTransactionsModal } from './LinkedTransactionsModal.jsx';
 
 export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemCloned, defaultType = 'equipment', itemToEdit }) {
   const { currentUser } = useAuth();
@@ -37,7 +37,11 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
   // Stock Replenishment specific
   const [replenishMode, setReplenishMode] = useState(false);
   const [replenishQty, setReplenishQty] = useState('');
-  const [replenishCost, setReplenishCost] = useState('');
+  const [replenishBuyUnit, setReplenishBuyUnit] = useState('un');
+  const [replenishYield, setReplenishYield] = useState('');
+  const [replenishTotalCost, setReplenishTotalCost] = useState('');
+  
+  const [showLinked, setShowLinked] = useState(false);
 
   useEffect(() => {
       if (isOpen) {
@@ -93,7 +97,10 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
           setFinanceInstallments(1);
           setReplenishMode(false);
           setReplenishQty('');
-          setReplenishCost('');
+          setReplenishTotalCost('');
+          setReplenishBuyUnit(itemToEdit?.unit || 'un');
+          setReplenishYield('');
+          setShowLinked(false);
       }
   }, [isOpen, itemToEdit, defaultType]);
 
@@ -110,11 +117,13 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
 
     // Se é Reposição de Estoque Existente
     if (itemToEdit && formData.type === 'material' && replenishMode && parseFloat(replenishQty) > 0) {
-        const rQty = parseFloat(replenishQty);
-        const rCost = parseFloat(replenishCost) || 0;
+        const baseQty = parseFloat(replenishQty) || 0;
+        const multiplier = (replenishBuyUnit !== formData.unit) ? (parseFloat(replenishYield) || 1) : 1;
+        const rQty = baseQty * multiplier;
+        const addTotal = parseFloat(replenishTotalCost) || 0;
+        const rCost = rQty > 0 ? (addTotal / rQty) : 0;
         
         const currentTotal = finalQty * finalCost;
-        const addTotal = rQty * rCost;
         
         finalQty = finalQty + rQty;
         // Média ponderada
@@ -209,8 +218,10 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                     type: 'expense',
                     category: category,
                     accountId: financeAccountId,
+                    referenceId: savedItemId,
+                    referenceType: 'Inventory',
                     date: nd.toISOString().split('T')[0],
-                    status: 'pending',
+                    status: isCredit ? 'paid' : 'pending',
                     paymentMethod: financePaymentMethod || 'pix',
                     installments: 1, // for backward compatibility in some models, or put total
                     installmentNumber: i + 1,
@@ -220,13 +231,15 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                 });
             }
         } else {
-            const tStatus = isCredit ? 'pending' : financeStatus;
+            const tStatus = isCredit ? 'paid' : financeStatus;
             await db.create('transactions', {
                 description: `Compra de ${formData.type === 'equipment' ? 'Equipamento' : 'Estoque'}: ${formData.name}`,
                 amount: transactionAmount,
                 type: 'expense',
                 category: category,
                 accountId: financeAccountId,
+                referenceId: savedItemId,
+                referenceType: 'Inventory',
                 date: financeDate,
                 status: tStatus,
                 paymentMethod: financePaymentMethod || 'pix',
@@ -353,9 +366,16 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
     <div style={sOverlay}>
       <div style={sModal} onClick={e => e.stopPropagation()}>
         <div style={sHeader}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {itemToEdit ? 'Editar Item' : 'Novo Item de Inventário'}
-          </h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {itemToEdit ? 'Editar Item' : 'Novo Item de Inventário'}
+              </h2>
+              {itemToEdit && (
+                  <button type="button" onClick={() => setShowLinked(true)} style={{ background: '#ecfdf5', color: '#10b981', border: '1px solid #d1fae5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                      <DollarSign size={14} /> Histórico Financeiro Original (Acertos)
+                  </button>
+              )}
+          </div>
           <button className="btn btn-icon" onClick={onClose} type="button" style={{ margin: '-0.5rem' }}>
             <X size={20} />
           </button>
@@ -528,7 +548,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                             </select>
                         </div>
                          <div className="input-group">
-                            <label className="form-label">Custo Unit. (R$)</label>
+                            <label className="form-label">Custo Base da Unidade (R$)</label>
                             <input 
                                 type="number" 
                                 step="0.01"
@@ -637,39 +657,82 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                             </label>
                             
                             {replenishMode && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-4 animate-fade-in mt-2">
-                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-                                        <div className="input-group">
-                                            <label className="form-label text-xs">Qtd. Entrando (+)</label>
-                                            <input 
-                                                type="number" 
-                                                step="any"
-                                                className="form-input form-input-sm" 
-                                                placeholder="Quantos estão chegando?"
-                                                value={replenishQty}
-                                                onChange={e => setReplenishQty(e.target.value)}
-                                                required={replenishMode}
-                                            />
-                                        </div>
-                                        <div className="input-group">
-                                            <label className="form-label text-xs">Custo Únit. Comprado (R$)</label>
-                                            <input 
-                                                type="number" 
-                                                step="0.01"
-                                                className="form-input form-input-sm" 
-                                                placeholder="Novo Valor"
-                                                value={replenishCost}
-                                                onChange={e => setReplenishCost(e.target.value)}
-                                                required={replenishMode}
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-green-700 leading-relaxed">
-                                        Ao salvar, a quantidade informada será <strong>somada</strong> ao estoque atual. 
-                                        O custo de base da peça será atualizado calculando o <strong>Custo Médio Ponderado</strong> levando o valor final da compra em consideração.
-                                    </p>
-                                </div>
-                            )}
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-5 space-y-4 animate-fade-in mt-2 shadow-inner">
+                                     <h4 className="text-sm font-bold text-green-800 border-b border-green-200 pb-2 mb-3">Registrar Nota / Fatura de Compra</h4>
+                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                         <div className="input-group">
+                                             <label className="form-label text-xs">Valor Total (R$) *</label>
+                                             <input 
+                                                 type="number" 
+                                                 step="0.01"
+                                                 className="form-input form-input-sm font-bold text-green-700" 
+                                                 placeholder="0,00"
+                                                 value={replenishTotalCost}
+                                                 onChange={e => setReplenishTotalCost(e.target.value)}
+                                                 required={replenishMode}
+                                             />
+                                         </div>
+                                         <div className="input-group">
+                                             <label className="form-label text-xs">Qtd. Adquirida *</label>
+                                             <input 
+                                                 type="number" 
+                                                 step="any"
+                                                 className="form-input form-input-sm" 
+                                                 placeholder="Ex: 1, 10, 50"
+                                                 value={replenishQty}
+                                                 onChange={e => setReplenishQty(e.target.value)}
+                                                 required={replenishMode}
+                                             />
+                                         </div>
+                                         <div className="input-group">
+                                             <label className="form-label text-xs">Unidade da Compra</label>
+                                             <select 
+                                                 className="form-input form-input-sm"
+                                                 value={replenishBuyUnit}
+                                                 onChange={e => setReplenishBuyUnit(e.target.value)}
+                                             >
+                                                 <option value="un">Unidade (un)</option>
+                                                 <option value="cx">Caixa (cx)</option>
+                                                 <option value="pct">Pacote (pct)</option>
+                                                 <option value="kg">Quilo (kg)</option>
+                                                 <option value="m">Metro (m)</option>
+                                                 <option value="m²">Metro Quadrado (m²)</option>
+                                                 <option value="l">Litro (l)</option>
+                                             </select>
+                                         </div>
+                                     </div>
+                                     
+                                     {replenishBuyUnit !== formData.unit && (
+                                         <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-3 animate-fade-in flex flex-col sm:flex-row sm:items-center gap-3">
+                                             <div className="flex-1">
+                                                 <label className="form-label text-xs text-yellow-800 font-bold mb-0 flex items-center gap-1">
+                                                     Conversão de Fracionamento de Compra
+                                                 </label>
+                                                 <p className="text-[10px] text-yellow-700 mt-1">1 {replenishBuyUnit} dessa nota fiscal rende quantas {formData.unit} no estoque?</p>
+                                             </div>
+                                             <input 
+                                                 type="number" 
+                                                 step="any"
+                                                 className="form-input form-input-sm border-yellow-400 focus:border-yellow-600 w-32 font-bold text-center" 
+                                                 placeholder={`Rende (Qtd)`}
+                                                 value={replenishYield}
+                                                 onChange={e => setReplenishYield(e.target.value)}
+                                                 required={replenishMode && replenishBuyUnit !== formData.unit}
+                                             />
+                                         </div>
+                                     )}
+
+                                     <div className="bg-white rounded border border-green-200 p-3 mt-3 flex justify-between items-center shadow-sm">
+                                         <span className="text-xs text-gray-500 font-medium tracking-wide">RESULTADO PARA O ESTOQUE:</span>
+                                         <span className="text-sm font-bold text-green-700">
+                                             + {((parseFloat(replenishQty) || 0) * (replenishBuyUnit !== formData.unit ? (parseFloat(replenishYield) || 1) : 1)).toFixed(2)} {formData.unit}
+                                             <span className="text-[11px] text-gray-400 font-normal ml-2 bg-gray-50 p-1 rounded border border-gray-100">
+                                                 ≅ R$ {(((parseFloat(replenishTotalCost) || 0) / (((parseFloat(replenishQty) || 0) * (replenishBuyUnit !== formData.unit ? (parseFloat(replenishYield) || 1) : 1)) || 1)).toLocaleString('pt-BR', {minimumFractionDigits: 4, maximumFractionDigits: 4}))} / {formData.unit}
+                                             </span>
+                                         </span>
+                                     </div>
+                                 </div>
+                             )}
 
                              {/* History Mini-viewing */}
                              {itemToEdit.history && itemToEdit.history.length > 0 && (
@@ -691,7 +754,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                     )}
 
                     {/* Finance Integration (Show if New OR Replenishing) */}
-                    {(!itemToEdit && parseFloat(formData.cost) > 0) || (itemToEdit && replenishMode && parseFloat(replenishCost) > 0) ? (
+                    {(!itemToEdit && parseFloat(formData.cost) > 0) || (itemToEdit && replenishMode && parseFloat(replenishTotalCost) > 0) ? (
                         <div className="mt-6 pt-4 border-t border-gray-100">
                             <label className="flex items-center gap-2 cursor-pointer mb-4">
                                 <input 
@@ -711,7 +774,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                                             R$ {
                                                 (!itemToEdit 
                                                     ? (formData.type === 'equipment' ? (parseFloat(formData.cost) || 0) : ((parseFloat(formData.cost) || 0) * (parseFloat(formData.quantity) || 0)))
-                                                    : ((parseFloat(replenishCost) || 0) * (parseFloat(replenishQty) || 0))
+                                                    : (parseFloat(replenishTotalCost) || 0)
                                                 ).toLocaleString('pt-BR', {minimumFractionDigits: 2})
                                             }
                                         </span>
@@ -788,6 +851,16 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
           </div>
         </form>
       </div>
+      
+      {showLinked && itemToEdit && (
+         <LinkedTransactionsModal 
+            isOpen={showLinked}
+            onClose={() => setShowLinked(false)}
+            entityId={itemToEdit.id}
+            entityName={itemToEdit.name}
+            entityType="Inventory"
+         />
+      )}
     </div>
   );
 }

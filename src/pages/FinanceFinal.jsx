@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     CreditCard, Wallet, TrendingUp, TrendingDown, Plus, 
     Calendar, DollarSign, Filter, MoreHorizontal, CheckCircle, AlertCircle, Trash2, BarChart2, Edit2,
-    ShoppingBag, Truck, Briefcase, Tag, Zap, Coffee, ArrowUpRight, ArrowDownLeft, Landmark, LayoutGrid, ArrowRight, X, Settings
+    ShoppingBag, Truck, Briefcase, Tag, Zap, Coffee, ArrowUpRight, ArrowDownLeft, Landmark, LayoutGrid, ArrowRight, X, Settings, Search, FileText, Hammer
 } from 'lucide-react';
 import db from '../services/database';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,6 +13,8 @@ import {
 import '../css/pages.css';
 import { calculateFinancialStats } from '../components/FinanceHelpers';
 import { CreditCardManagerModal } from '../components/CreditCardManagerModal';
+import { FinanceTransactionDetailsModal } from '../components/FinanceTransactionDetailsModal';
+import { FinanceAIInsights, SimpleDRETable } from '../components/FinanceAIInsights';
 
 const EXPENSE_CATEGORIES = [
     'Administrativo / Fixos',
@@ -48,47 +50,62 @@ const CATEGORY_COLORS = {
 
 // --- Components from Dashboard ---
 
-function StatCard({ title, value, icon: Icon, color, subtext, valueColor }) {
-    const getColor = (c) => {
+function SciFiStatCard({ title, value, icon: Icon, color, subtext, gradient }) {
+    const getColorTheme = (c) => {
         const map = {
-            'primary': 'var(--primary)',
-            'green': '#10b981', // Emerald 500
-            'orange': '#f59e0b', // Amber 500
-            'purple': '#8b5cf6', // Violet 500
-            'blue': '#3b82f6',   // Blue 500
-            'red': '#ef4444',    // Red 500
-            'indigo': '#6366f1'
+            'green': { glow: 'rgba(16, 185, 129, 0.3)', text: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', grad: 'from-emerald-500/10 to-transparent' },
+            'orange': { glow: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', grad: 'from-amber-500/10 to-transparent' },
+            'purple': { glow: 'rgba(139, 92, 246, 0.3)', text: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', grad: 'from-violet-500/10 to-transparent' },
+            'blue': { glow: 'rgba(59, 130, 246, 0.3)', text: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', grad: 'from-blue-500/10 to-transparent' },
+            'red': { glow: 'rgba(239, 68, 68, 0.3)', text: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', grad: 'from-red-500/10 to-transparent' },
+            'emerald': { glow: 'rgba(52, 211, 153, 0.3)', text: '#34d399', bg: 'rgba(52, 211, 153, 0.1)', grad: 'from-emerald-400/10 to-transparent' }
         };
-        return map[c] || c;
+        return map[c] || map['blue'];
     };
 
-    const activeColor = getColor(color);
+    const theme = getColorTheme(color);
 
     return (
-        <div className="stat-card" style={{ borderLeftColor: activeColor }}>
-            <div className="flex-1">
-                <p style={{ 
-                    fontSize: '0.75rem', 
-                    fontWeight: 600, 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.05em', 
-                    color: 'var(--text-muted)',
-                    marginBottom: '0.25rem'
-                }}>{title}</p>
-                <h3 style={{ 
-                    fontSize: '1.5rem', 
-                    fontWeight: 700, 
-                    color: valueColor || 'var(--text-main)',
-                    lineHeight: 1.2
-                }}>{value}</h3>
-                {subtext && <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>{subtext}</p>}
+        <div 
+            style={{ 
+                position: 'relative', overflow: 'hidden', borderRadius: '16px', 
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%)', 
+                backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.5)', 
+                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)',
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', minHeight: '140px'
+            }} 
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.1)'; }} 
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.05)'; }}
+        >
+            {/* Top Right Accent */}
+            <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', borderRadius: '50%', background: theme.glow, filter: 'blur(30px)', opacity: 0.9, zIndex: 0 }}></div>
+            
+            <div style={{ position: 'relative', padding: '24px', display: 'flex', flexDirection: 'column', height: '100%', zIndex: 10, flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                    <div style={{ padding: '12px', borderRadius: '14px', backgroundColor: theme.bg, color: theme.text, display: 'inline-flex', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.04)' }}>
+                        <Icon size={26} style={{ filter: `drop-shadow(0 0 6px ${theme.glow})` }} />
+                    </div>
+                </div>
+                
+                <div style={{ marginTop: 'auto' }}>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '4px' }}>
+                        {title}
+                    </p>
+                    <h3 style={{ fontSize: '1.65rem', fontWeight: 900, letterSpacing: '-0.025em', color: color === 'red' ? '#ef4444' : '#0f172a', margin: '0 0 8px 0' }}>
+                        {value}
+                    </h3>
+                    {subtext && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9 }}>
+                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: theme.text, boxShadow: `0 0 4px ${theme.text}` }}></div>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{subtext}</span>
+                        </div>
+                    )}
+                </div>
             </div>
-            <div className="stat-icon-wrapper" style={{ 
-                color: activeColor, 
-                backgroundColor: `${activeColor}1A` 
-            }}>
-                <Icon size={24} />
-            </div>
+            
+            {/* Sci-fi Bottom Border */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, height: '4px', width: '100%', background: `linear-gradient(90deg, ${theme.text} 0%, transparent 100%)`, opacity: 0.9 }}></div>
         </div>
     );
 }
@@ -301,6 +318,8 @@ export function FinanceFinal() {
     const [newAccount, setNewAccount] = useState({ name: '', type: 'checking', balance: 0, limit: 0, dueDay: 10, color: '#3b82f6' });
     const [newTrans, setNewTrans] = useState({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
     const [selectedCreditCard, setSelectedCreditCard] = useState(null);
+    const [selectedDetailTrans, setSelectedDetailTrans] = useState(null);
+    const [transDateFilter, setTransDateFilter] = useState('');
 
 
     // Calculations
@@ -337,22 +356,44 @@ export function FinanceFinal() {
 
             // 3. Cost Center DRE (Current Month Expenses)
             const expenseMap = {};
+            let totalGatewayTaxes = 0;
+            
             currentMonthTrans.filter(t => t.type === 'expense').forEach(t => {
                 const cat = t.category || 'Outros';
                 expenseMap[cat] = (expenseMap[cat] || 0) + Number(t.amount);
             });
+            
+            // Extrair as taxas de Gateway que vieram de vendas (incomes) para o DRE Oficial
+            currentMonthTrans.filter(t => t.type === 'income').forEach(t => {
+                if (t.auditData && t.auditData.tax > 0) {
+                    totalGatewayTaxes += Number(t.auditData.tax);
+                }
+            });
+            
+            if (totalGatewayTaxes > 0) {
+                // Adicionamos a Taxa M.P. silenciosamente ao DRE
+                expenseMap['Taxas Gateway (M.P.)'] = (expenseMap['Taxas Gateway (M.P.)'] || 0) + totalGatewayTaxes;
+                if (!categoryColors['Taxas Gateway (M.P.)']) categoryColors['Taxas Gateway (M.P.)'] = '#fb923c'; 
+            }
+
             const costCenterFormat = Object.keys(expenseMap).map(k => ({
                 name: k,
                 value: expenseMap[k],
                 color: categoryColors[k] || '#9ca3af'
             })).sort((a,b) => b.value - a.value);
 
+            // True Net Profit (subtract gateway taxes from income since incomes in Firebase are recorded as NetAmount already if from webhook.
+            // Wait, Webhook records income as NET AMOUNT exactly. So the True Result doesn't need to subtract the tax again if it's already net!
+            // However, visually showing the Gateway Tax helps the owner understand how much they lost in fees.
+
             setStats({
                 totalBalance: totalBal,
                 monthIncome: income,
                 monthExpense: expense,
                 result: income - expense,
-                creditDebt: creditUsed
+                creditDebt: creditUsed,
+                gatewayTaxes: totalGatewayTaxes,
+                expenseMap: expenseMap
             });
             setCostCenterData(costCenterFormat);
         }
@@ -578,9 +619,13 @@ export function FinanceFinal() {
         fetchData();
     };
 
-    const handleDeleteTrans = async (id) => {
-        if(confirm('Tem certeza que deseja excluir esse lançamento? O saldo das contas será atualizado.')) {
-            await db.delete('transactions', id);
+    const handleDeleteTrans = async (t) => {
+        if (t.orderId && t.type === 'income') {
+            alert(`AÇÃO BLOQUEADA (Auditoria Ativa):\n\nEsta transação pertence ao Pedido (E-commerce ou PDV) #${String(t.orderId).substring(0,6)} e está selada fiscalmente.\n\nPara anular ou estornar esta receita, vá na tela principal de 'Pedidos' e clique no botão amarelo 'Cancelar Pedido & Estornar'. A exclusão avulsa é proibida para manter as Partidas Dobradas.`);
+            return;
+        }
+        if(confirm('Tem certeza que deseja excluir este lançamento manual? (Atenção: Ações sistemáticas como essa devem ser evitadas em contabilidade estrita)')) {
+            await db.delete('transactions', t.id);
             fetchData();
         }
     };
@@ -670,36 +715,36 @@ export function FinanceFinal() {
                 </div>
             </div>
 
-            {/* KPI Grid */}
-            <div className="dashboard-grid">
-                <StatCard 
+            {/* KPI Grid Sci-Fi */}
+            <FinanceAIInsights transactions={transactions} accounts={accounts} openEditTrans={openEditTrans} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+                <SciFiStatCard 
                     title={globalAccFilter ? "Saldo da Conta" : "Saldo Consolidado"} 
                     value={`${stats.totalBalance < 0 ? '-' : ''}R$ ${Math.abs(stats.totalBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-                    icon={Wallet} 
+                    icon={Landmark} 
                     color={stats.totalBalance < 0 ? 'red' : 'blue'}
-                    valueColor={stats.totalBalance < 0 ? '#ef4444' : undefined}
-                    subtext={globalAccFilter ? "Atualizado para esta conta" : "Balanço líquido total das contas"}
+                    subtext={globalAccFilter ? "Atualizado para esta conta" : "Balanço líquido total em caixa"}
                 />
-                <StatCard 
-                    title="Receitas (Mês)" 
-                    value={`R$ ${stats.monthIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                <SciFiStatCard 
+                    title="Faturamento Bruto (Mês)" 
+                    value={`R$ ${(stats.monthIncome + (stats.gatewayTaxes||0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
                     icon={TrendingUp} 
-                    color="green"
-                    subtext="Entradas realizadas"
+                    color="emerald"
+                    subtext="Todo o valor que entrou"
                 />
-                <StatCard 
-                    title="Despesas (Mês)" 
+                <SciFiStatCard 
+                    title="Despesas Operacionais" 
                     value={`R$ ${stats.monthExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
                     icon={TrendingDown} 
                     color="red"
-                    subtext="Saídas realizadas"
+                    subtext="Saídas (Exclui taxas gateway)"
                 />
-                 <StatCard 
-                    title="Fatura Cartão" 
-                    value={`R$ ${stats.creditDebt.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-                    icon={CreditCard} 
-                    color="purple"
-                    subtext="Total em aberto"
+                 <SciFiStatCard 
+                    title="Lucro Líquido Real" 
+                    value={`R$ ${(stats.result).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                    icon={Zap} 
+                    color={(stats.result) >= 0 ? "purple" : "red"}
+                    subtext={`Vendas - Despesas = Seu Bolso`}
                 />
             </div>
 
@@ -730,69 +775,76 @@ export function FinanceFinal() {
             })()}
 
             {/* Charts Grid */}
-            <div className="flex flex-col lg:flex-row gap-6 mb-6">
-                {/* Main Dynamic Chart */}
-                <div className="chart-card flex-1" style={{ overflow: 'hidden' }}>
-                    <div className="chart-header" style={{ justifyContent: 'space-between' }}>
-                        <div className="flex items-center gap-2">
-                             <BarChart2 size={20} color="var(--primary)" /> Fluxo Diário
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
+                {/* Top Row: Daily Chart + Pie Chart */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
+                    <div className="chart-card" style={{ flex: '1 1 600px', overflow: 'hidden' }}>
+                        <div className="chart-header" style={{ justifyContent: 'space-between' }}>
+                            <div className="flex items-center gap-2">
+                                <BarChart2 size={20} color="var(--primary)" /> Fluxo Diário
+                            </div>
+                            <div className="flex gap-2">
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Receitas</span>
+                                <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full">Despesas</span>
+                                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">Saldo</span>
+                            </div>
                         </div>
-                        {/* Legend Chips - Simplified */}
-                        <div className="flex gap-2">
-                             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Receitas</span>
-                             <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full">Despesas</span>
-                             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">Saldo</span>
+                        <div style={{ width: '100%', height: '320px', minWidth: 0, position: 'relative' }}>
+                            <FinancialOverviewChart data={chartData} />
                         </div>
                     </div>
-                    <div style={{ width: '100%', height: '320px', minWidth: 0, position: 'relative' }}>
-                         <FinancialOverviewChart data={chartData} />
+
+                    <div className="chart-card" style={{ flex: '1 1 350px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                        <div className="chart-header">
+                            <div className="flex items-center gap-2">
+                                <PieChart size={20} color="var(--primary)" /> Distribuição de Custos
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, width: '100%', minWidth: 0, minHeight: '320px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            {costCenterData.length > 0 ? (
+                                <>
+                                    <ResponsiveContainer width="100%" height={220}>
+                                        <PieChart>
+                                            <Pie
+                                                data={costCenterData}
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {costCenterData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip 
+                                                formatter={(value) => `R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
+                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                                            />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div className="w-full px-4 mt-2 space-y-2 max-h-[100px] overflow-y-auto scrollbar-hide">
+                                        {costCenterData.map((d, i) => (
+                                            <div key={i} className="flex items-center justify-between text-xs">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }}></div>
+                                                    <span className="text-gray-600 font-medium truncate max-w-[120px]">{d.name}</span>
+                                                </div>
+                                                <span className="font-bold text-gray-800">R$ {d.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-gray-400 text-sm italic">Nenhuma despesa no mês atual.</div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Cost Center / DRE Chart */}
-                <div className="chart-card lg:w-1/3" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <div className="chart-header">
-                        <div className="flex items-center gap-2">
-                             <PieChart size={20} color="var(--primary)" /> Distribuição de Custos
-                        </div>
-                    </div>
-                    <div style={{ flex: 1, width: '100%', minWidth: 0, minHeight: '320px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                        {costCenterData.length > 0 ? (
-                            <>
-                                <ResponsiveContainer width="100%" height={220}>
-                                    <PieChart>
-                                        <Pie
-                                            data={costCenterData}
-                                            innerRadius={60}
-                                            outerRadius={80}
-                                            paddingAngle={5}
-                                            dataKey="value"
-                                        >
-                                            {costCenterData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.color} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip 
-                                            formatter={(value) => `R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
-                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="w-full px-4 mt-2 space-y-2 max-h-[100px] overflow-y-auto scrollbar-hide">
-                                    {costCenterData.map((d, i) => (
-                                        <div key={i} className="flex items-center justify-between text-xs">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }}></div>
-                                                <span className="text-gray-600 font-medium truncate max-w-[120px]">{d.name}</span>
-                                            </div>
-                                            <span className="font-bold text-gray-800">R$ {d.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        ) : (
-                            <div className="text-gray-400 text-sm italic">Nenhuma despesa no mês atual.</div>
-                        )}
+                {/* Bottom Row: Full Width DRE */}
+                <div style={{ display: 'flex', width: '100%' }}>
+                    <div style={{ width: '100%' }}>
+                        <SimpleDRETable stats={stats} />
                     </div>
                 </div>
             </div>
@@ -951,145 +1003,169 @@ export function FinanceFinal() {
                     </div>
                 </div>
             </div>
-            {/* Recent Transactions Table */}
-    <div className="chart-card" style={{ padding: 0, overflow: 'hidden', backgroundColor: 'var(--surface)' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>Últimos Lançamentos</h3>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                 <input 
-                    type="text" 
-                    placeholder="Buscar (Descrição)..." 
-                    className="form-input" 
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}
-                    value={transSearchTerm}
-                    onChange={(e) => setTransSearchTerm(e.target.value)}
-                 />
-                 <select 
-                    className="form-input" 
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem', backgroundColor: 'var(--surface)' }}
-                    value={transTypeFilter} 
-                    onChange={e => setTransTypeFilter(e.target.value)}
-                 >
-                    <option value="">Tipo (Todos)</option>
-                    <option value="income">Receita (+)</option>
-                    <option value="expense">Despesa (-)</option>
-                 </select>
-                 <select 
-                    className="form-input" 
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem', backgroundColor: 'var(--surface)' }}
-                    value={transAccFilter} 
-                    onChange={e => setTransAccFilter(e.target.value)}
-                 >
-                    <option value="">Conta (Todas)</option>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                 </select>
-            </div>
-        </div>
-                <div className="table-container">
-                <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ background: 'var(--surface-hover)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                            <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left' }}>Data</th>
-                            <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left' }}>Descrição</th>
-                            <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left' }}>Centro de Custo</th>
-                            <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left' }}>Conta</th>
-                            <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right' }}>Valor</th>
-                            <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right' }}>Saldo Conta</th>
-                            <th style={{ padding: '0.75rem 1.5rem', textAlign: 'center' }}>Ações</th>
-                        </tr>
-                    </thead>
-                        <tbody>
-                            {transactionsWithBalance
-                                .filter(t => {
-                                    const acc = accounts.find(a => a.id === t.accountId);
-                                    // Esconde lançamentos de cartão da visão geral
-                                    if (acc?.type === 'credit' && transAccFilter === '' && globalAccFilter === '') {
-                                        return false;
-                                    }
-
-                                    const search = transSearchTerm.toLowerCase();
-                                    const matchesSearch = t.description?.toLowerCase().includes(search);
-                                    const matchesType = transTypeFilter === '' || t.type === transTypeFilter;
-                                    const matchesAcc = transAccFilter === '' || t.accountId === transAccFilter;
-                                    return matchesSearch && matchesType && matchesAcc;
-                                })
-                                .slice(0, 15)
-                                .map(t => {
-                                const acc = accounts.find(a => a.id === t.accountId);
-                                const isExpense = t.type === 'expense';
-                                return (
-                                    <tr key={t.id} style={{ borderBottom: '1px solid var(--border)' }} className="hover:bg-gray-50/10 transition-colors">
-                                        <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                                            {new Date(t.date).toLocaleDateString()}
-                                        </td>
-                                        <td style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                                            {t.description}
-                                            {t.installmentsTotal > 1 && <span className="ml-2 text-[10px] text-blue-500 bg-blue-50/20 px-1.5 rounded">{t.installmentNumber}/{t.installmentsTotal}</span>}
-                                        </td>
-                                        <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                            <span style={{ 
-                                                backgroundColor: categoryColors[t.category] ? `${categoryColors[t.category]}15` : '#f3f4f6', 
-                                                color: categoryColors[t.category] || '#4b5563',
-                                                padding: '2px 8px',
-                                                borderRadius: '999px',
-                                                fontSize: '0.7rem',
-                                                fontWeight: 600,
-                                                whiteSpace: 'nowrap'
-                                            }}>
-                                                {t.category || 'Outros'}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                            {acc?.name || '-'}
-                                        </td>
-                                        <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 700, color: isExpense ? '#ef4444' : '#10b981' }}>
-                                            {isExpense ? '-' : '+'} R$ {Number(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            {t.status !== 'paid' && <span style={{ display: 'block', fontSize: '0.65rem', color: '#f59e0b', fontWeight: 500 }}>pendente</span>}
-                                        </td>
-                                        <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 600, color: t.runningBalance < 0 ? '#ef4444' : (globalAccFilter ? 'var(--text-main)' : 'var(--text-muted)'), fontSize: '0.85rem' }}>
-                                            {globalAccFilter ? (
-                                                <>{t.runningBalance < 0 ? '-' : ''}R$ {Math.abs(t.runningBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
-                                            ) : (
-                                                <span title="Filtre uma conta específica para visualizar o extrato" style={{ opacity: 0.5 }}>-</span>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                {t.status !== 'paid' && (
-                                                    <button onClick={() => handleConfirmPayment(t)} className="text-orange-400 hover:text-emerald-500 transition-colors" title="Dar Baixa (Confirmar Pgt/Recto)">
-                                                        <CheckCircle size={16} />
-                                                    </button>
-                                                )}
-                                                <button onClick={() => openEditTrans(t)} className="text-gray-300 hover:text-blue-500 transition-colors" title="Editar Lançamento">
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button onClick={() => handleDeleteTrans(t.id)} className="text-gray-300 hover:text-red-500 transition-colors" title="Excluir">
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                            {transactionsWithBalance.length === 0 && (
-                                <tr>
-                                    <td colSpan="6" className="text-center text-gray-400 py-8 text-sm">Nenhum lançamento encontrado com os filtros atuais.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+        <div className="chart-card" style={{ padding: 0, overflow: 'hidden', backgroundColor: 'var(--surface)' }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={20} color="var(--primary)" /> Últimos Lançamentos
+                </h3>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                     <div style={{ position: 'relative' }}>
+                         <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                         <input 
+                            type="text" 
+                            placeholder="Buscar transação..." 
+                            className="form-input" 
+                            style={{ padding: '0.4rem 0.8rem 0.4rem 2.2rem', fontSize: '0.85rem', width: '220px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                            value={transSearchTerm}
+                            onChange={(e) => setTransSearchTerm(e.target.value)}
+                         />
+                     </div>
+                     <select 
+                        className="form-input" 
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', backgroundColor: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', fontWeight: 600, color: 'var(--text-main)' }}
+                        value={transTypeFilter} 
+                        onChange={e => setTransTypeFilter(e.target.value)}
+                     >
+                        <option value="">🔄 Qualquer Tipo</option>
+                        <option value="income">🟢 Apenas Receitas (+)</option>
+                        <option value="expense">🔴 Apenas Despesas (-)</option>
+                     </select>
+                     <select 
+                        className="form-input" 
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', backgroundColor: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', fontWeight: 600, color: 'var(--text-main)' }}
+                        value={transAccFilter} 
+                        onChange={e => setTransAccFilter(e.target.value)}
+                     >
+                        <option value="">🏦 Todas as Contas</option>
+                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                     </select>
+                     <input
+                         type="month"
+                         className="form-input"
+                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', backgroundColor: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', fontWeight: 600, color: 'var(--text-main)' }}
+                         value={transDateFilter}
+                         onChange={e => setTransDateFilter(e.target.value)}
+                     />
                 </div>
             </div>
+            <div className="table-container">
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                    <tr style={{ background: 'var(--surface-hover)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontWeight: 800 }}>Data</th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontWeight: 800 }}>Descrição original</th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontWeight: 800 }}>Centro de Custo</th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontWeight: 800 }}>Fonte/Banco</th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 800 }}>Impacto (R$)</th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 800 }}>Saldo Atualizado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {transactionsWithBalance
+                        .filter(t => {
+                            const acc = accounts.find(a => a.id === t.accountId);
+                            // Esconde lançamentos de cartão da visão geral
+                            if (acc?.type === 'credit' && transAccFilter === '' && globalAccFilter === '') {
+                                return false;
+                            }
 
-            {/* Modals */}
-            <CreditCardManagerModal
-                isOpen={!!selectedCreditCard}
-                onClose={() => setSelectedCreditCard(null)}
-                account={selectedCreditCard}
-                accounts={accounts}
-                transactions={transactions}
-                onUpdate={fetchData}
-            />
+                            const search = transSearchTerm.toLowerCase();
+                            const matchesSearch = t.description?.toLowerCase().includes(search) || t.category?.toLowerCase().includes(search);
+                            const matchesType = transTypeFilter === '' || t.type === transTypeFilter;
+                            const matchesAcc = transAccFilter === '' || t.accountId === transAccFilter;
+                            
+                            // Date filter (Year-Month)
+                            let matchesDate = true;
+                            if (transDateFilter) {
+                                const tMonth = t.date.substring(0, 7); // YYYY-MM
+                                matchesDate = tMonth === transDateFilter;
+                            }
+                            
+                            return matchesSearch && matchesType && matchesAcc && matchesDate;
+                        })
+                        .slice(0, 50)
+                        .map(t => {
+                        const acc = accounts.find(a => a.id === t.accountId);
+                        const isExpense = t.type === 'expense';
+                        return (
+                            <tr key={t.id} onClick={() => setSelectedDetailTrans(t)} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group">
+                                <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    <div className="flex items-center gap-2">
+                                        <Calendar size={14} className="opacity-50" />
+                                        {new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace(' de', '')}
+                                    </div>
+                                </td>
+                                <td style={{ padding: '1.25rem 1.5rem', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>
+                                    <div className="flex items-center gap-2">
+                                        {t.orderId ? <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" title="Pedido Automático"></div> : (t.referenceId ? <Hammer size={12} color="#f59e0b" title="Módulo Derivado" /> : null)}
+                                        {t.description}
+                                        {t.installmentsTotal > 1 && <span style={{ marginLeft: '6px', fontSize: '9px', color: '#4f46e5', backgroundColor: '#e0e7ff', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{t.installmentNumber}/{t.installmentsTotal}</span>}
+                                        {t.status !== 'paid' && <span style={{ marginLeft: '6px', fontSize: '9px', color: '#b45309', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>PENDENTE</span>}
+                                    </div>
+                                </td>
+                                <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                    <span style={{ 
+                                        backgroundColor: categoryColors[t.category] ? `${categoryColors[t.category]}15` : '#f1f5f9', 
+                                        color: categoryColors[t.category] || '#64748b',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 800,
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {t.category || 'Outros'}
+                                    </span>
+                                </td>
+                                <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    {acc?.name || '-'}
+                                </td>
+                                <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right', fontWeight: 800, color: isExpense ? '#ef4444' : '#10b981', fontSize: '1rem' }}>
+                                    {isExpense ? '-' : '+'} R$ {Number(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right', fontWeight: 700, color: t.runningBalance < 0 ? '#ef4444' : (globalAccFilter ? 'var(--text-main)' : 'var(--text-muted)'), fontSize: '0.95rem' }}>
+                                    {globalAccFilter ? (
+                                        <>{t.runningBalance < 0 ? '-' : ''}R$ {Math.abs(t.runningBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
+                                    ) : (
+                                        <span title="Filtre uma conta específica para visualizar o extrato progressivo" style={{ opacity: 0.3 }}>-</span>
+                                    )}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                    {transactionsWithBalance.length === 0 && (
+                        <tr>
+                            <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', fontSize: '0.875rem' }}>
+                                <div className="flex flex-col items-center justify-center gap-2">
+                                    <Search size={32} className="opacity-20" />
+                                    Nenhuma transação encontrada com os filtros refinados.
+                                </div>
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        {/* Modals */}
+        <CreditCardManagerModal
+            isOpen={!!selectedCreditCard}
+            onClose={() => setSelectedCreditCard(null)}
+            account={selectedCreditCard}
+            accounts={accounts}
+            transactions={transactions}
+            onUpdate={fetchData}
+        />
+
+        <FinanceTransactionDetailsModal
+            isOpen={!!selectedDetailTrans}
+            onClose={() => setSelectedDetailTrans(null)}
+            transaction={selectedDetailTrans}
+            onUpdate={fetchData}
+            accounts={accounts}
+            expenseCategories={expenseCategories}
+            incomeCategories={incomeCategories}
+        />
 
             {isAccModalOpen && (
                 <div className="modal-overlay" style={{ zIndex: 1000 }}>
@@ -1101,12 +1177,12 @@ export function FinanceFinal() {
                             </button>
                         </div>
                         <div className="modal-body">
-                            <form onSubmit={handleSaveAccount} className="space-y-4">
+                            <form onSubmit={handleSaveAccount} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div className="input-group">
                                     <label className="form-label">Nome da Conta</label>
                                     <input type="text" required className="form-input w-full" value={newAccount.name} onChange={e => setNewAccount({...newAccount, name: e.target.value})} />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                     <div className="input-group">
                                         <label className="form-label">Tipo</label>
                                         <select className="form-input w-full" value={newAccount.type} onChange={e => setNewAccount({...newAccount, type: e.target.value})}>
@@ -1146,12 +1222,12 @@ export function FinanceFinal() {
                             </button>
                         </div>
                         <div className="modal-body">
-                            <form onSubmit={handleSaveTrans} className="space-y-4">
+                            <form onSubmit={handleSaveTrans} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div className="input-group">
                                     <label className="form-label">Descrição</label>
                                     <input type="text" required className="form-input w-full" value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                     <div className="input-group">
                                         <label className="form-label">Valor</label>
                                         <input type="number" step="0.01" required className="form-input w-full" value={newTrans.amount} onChange={e => setNewTrans({...newTrans, amount: e.target.value})} />
@@ -1164,7 +1240,7 @@ export function FinanceFinal() {
                                         </select>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                     <div className="input-group">
                                         <label className="form-label">Centro de Custo</label>
                                         <div className="flex gap-2">
@@ -1213,7 +1289,7 @@ export function FinanceFinal() {
 
                                             {/* Dados Genéricos de Data se não for crédito (ou se já estiver sendo editado) */}
                                             {(!isCredit || editTransId || newTrans.type === 'income') && (
-                                                <div className="grid grid-cols-2 gap-4">
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                                     <div className="input-group">
                                                         <label className="form-label flex items-center gap-1.5"><Calendar size={14} className="text-gray-400" /> Data de Competência</label>
                                                         <input type="date" required className="form-input w-full" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} />
@@ -1272,38 +1348,38 @@ export function FinanceFinal() {
                             </button>
                         </div>
                         <div className="modal-body">
-                            <form onSubmit={handleCreateCategory} className="flex gap-2 items-end mb-6">
-                                <div className="flex-1">
+                            <form onSubmit={handleCreateCategory} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '24px' }}>
+                                <div style={{ flex: 1 }}>
                                     <label className="form-label text-xs mb-1">Nome da Categoria</label>
-                                    <input type="text" required className="form-input w-full" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Ex: Material Gráfico..." />
+                                    <input type="text" required className="form-input" style={{ width: '100%' }} value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Ex: Material Gráfico..." />
                                 </div>
-                                <div className="w-28">
+                                <div style={{ width: '112px' }}>
                                     <label className="form-label text-xs mb-1">Tipo</label>
-                                    <select className="form-input w-full" value={newCategoryType} onChange={e => setNewCategoryType(e.target.value)}>
+                                    <select className="form-input" style={{ width: '100%' }} value={newCategoryType} onChange={e => setNewCategoryType(e.target.value)}>
                                         <option value="expense">Despesa</option>
                                         <option value="income">Receita</option>
                                     </select>
                                 </div>
-                                <div className="w-12">
+                                <div style={{ width: '48px' }}>
                                     <label className="form-label text-xs mb-1">Cor</label>
-                                    <input type="color" className="w-full h-[38px] p-0 border-0 rounded cursor-pointer" value={newCategoryColor} onChange={e => setNewCategoryColor(e.target.value)} />
+                                    <input type="color" style={{ width: '100%', height: '38px', padding: 0, border: 'none', borderRadius: '4px', cursor: 'pointer' }} value={newCategoryColor} onChange={e => setNewCategoryColor(e.target.value)} />
                                 </div>
-                                <button type="submit" className="btn btn-primary h-[38px] flex items-center justify-center px-4" title="Adicionar Categoria">
+                                <button type="submit" className="btn btn-primary" style={{ height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }} title="Adicionar Categoria">
                                     <Plus size={16} />
                                 </button>
                             </form>
 
-                            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '350px', overflowY: 'auto', paddingRight: '8px' }} className="custom-scrollbar">
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Despesas (-)</h4>
                                     <div className="flex flex-col gap-2">
                                         {rawCategories.filter(c => c.type === 'expense').map(c => (
-                                            <div key={c.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-100 hover:bg-gray-100 transition">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></div>
-                                                    <span className="text-sm font-medium text-gray-700">{c.name}</span>
+                                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #f3f4f6' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: c.color }}></div>
+                                                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>{c.name}</span>
                                                 </div>
-                                                <button onClick={() => handleDeleteCategory(c.id, c.name)} className="text-gray-400 hover:text-red-500 p-1 transition" title={`Excluir ${c.name}`}>
+                                                <button onClick={() => handleDeleteCategory(c.id, c.name)} style={{ color: '#9ca3af', padding: '4px', border: 'none', background: 'none', cursor: 'pointer' }} title={`Excluir ${c.name}`}>
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>
@@ -1314,12 +1390,12 @@ export function FinanceFinal() {
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Receitas (+)</h4>
                                     <div className="flex flex-col gap-2">
                                         {rawCategories.filter(c => c.type === 'income').map(c => (
-                                            <div key={c.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-100 hover:bg-gray-100 transition">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></div>
-                                                    <span className="text-sm font-medium text-gray-700">{c.name}</span>
+                                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #f3f4f6' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: c.color }}></div>
+                                                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>{c.name}</span>
                                                 </div>
-                                                <button onClick={() => handleDeleteCategory(c.id, c.name)} className="text-gray-400 hover:text-red-500 p-1 transition" title={`Excluir ${c.name}`}>
+                                                <button onClick={() => handleDeleteCategory(c.id, c.name)} style={{ color: '#9ca3af', padding: '4px', border: 'none', background: 'none', cursor: 'pointer' }} title={`Excluir ${c.name}`}>
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>

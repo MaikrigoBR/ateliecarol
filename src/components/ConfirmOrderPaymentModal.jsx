@@ -15,6 +15,7 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
   const [installments, setInstallments] = useState(order.installments || 1);
   const [applyInterest, setApplyInterest] = useState(false);
   const [interestRate, setInterestRate] = useState(0);
+  const [gatewayFeePct, setGatewayFeePct] = useState('');
   const [nextDueDate, setNextDueDate] = useState('');
   
   const [accounts, setAccounts] = useState([]);
@@ -40,6 +41,7 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
         setInstallments(order.installments || 1);
         setApplyInterest(false);
         setInterestRate(0);
+        setGatewayFeePct('');
         setNextDueDate('');
       }
   }, [isOpen, order]);
@@ -58,27 +60,12 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
   // Let's assume 'paymentAmount' is the PRINCIPAL being paid off.
   // And 'surcharge' is added on top.
   
-  const currentTotalDebt = totalOrderValue; // Plus any previous interest?
-  // New Total Order Value = Old Total + Surcharge.
+  const currentTotalDebt = totalOrderValue; 
   
-  const remainingCheck = (currentTotalDebt + surchargeAmount) - (amountPaidSoFar + parsedPayment + surchargeAmount);
-  // Actually simpler:
-  // Debt: 100.
-  // User pays: 50.
-  // Surcharge: 0. 
-  // Remaining: 50.
-  
-  // Debt: 100.
-  // User pays 100.
-  // Surcharge 10% (10).
-  // User Pays 110.
-  // Order Total becomes 110.
-  // Paid 110.
-  // Remaining 0.
-
   const finalOrderTotal = totalOrderValue + surchargeAmount;
   const totalPaidAfterThis = amountPaidSoFar + parsedPayment + surchargeAmount;
   const balanceRemaining = Math.max(0, finalOrderTotal - totalPaidAfterThis);
+  const gatewayFeeAmount = (parsedPayment + surchargeAmount) * ((parseFloat(gatewayFeePct) || 0) / 100);
 
   const handleConfirm = () => {
     onConfirm({
@@ -88,6 +75,7 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
         installments: parseInt(installments) || 1,
         interestRate: parsedInterest,
         surchargeAmount: surchargeAmount,
+        gatewayFeeAmount: gatewayFeeAmount,
         nextDueDate: balanceRemaining > 0.05 ? nextDueDate : null, // Tolerance
         targetAccountId: selectedAccountId
     });
@@ -232,6 +220,12 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
                         <option value="installment">Parcelado</option>
                     </select>
                 </div>
+                {(paymentMethod === 'credit_card' || paymentMethod === 'debit_card') && (
+                    <div style={{ flex: 1, animation: 'fadeIn 0.3s ease-out' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Taxa Maquininha/Gateway (%)</label>
+                        <input type="number" step="0.1" style={sInput} value={gatewayFeePct} onChange={e => setGatewayFeePct(e.target.value)} placeholder="MDR" />
+                    </div>
+                )}
             </div>
 
             {/* Installments & Interest Logic */}
@@ -268,9 +262,16 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
             {/* Summary of Transaction */}
             <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                     <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Total lançado nesta transação:</span>
+                     <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Total lançado no sistema (Receita Bruta):</span>
                      <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>R$ {(parsedPayment + surchargeAmount).toFixed(2).replace('.', ',')}</span>
                  </div>
+                 
+                 {gatewayFeeAmount > 0 && (
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', opacity: 0.8 }}>
+                         <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>Custo de Adquirência (Dedução Oculta):</span>
+                         <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--danger)' }}>- R$ {gatewayFeeAmount.toFixed(2).replace('.', ',')}</span>
+                     </div>
+                 )}
                  
                  {balanceRemaining > 0.05 ? (
                      <div style={{ ...sCardLinear, backgroundColor: 'transparent', border: '1px solid var(--warning)', borderLeft: '4px solid var(--warning)', marginTop: '0.5rem' }}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays, Palette, Info } from 'lucide-react';
+import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays, Palette, Info, Truck } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { PromoBannerModal } from '../components/PromoBannerModal';
@@ -571,7 +571,9 @@ function SystemSettings() {
                      promoBanner: {},
                      document: '',
                      currency: 'BRL',
-                     theme: 'light'
+                     theme: 'light',
+                     enableLocalPickup: true,
+                     paymentKeys: { accessToken: '', publicKey: '' }
                  });
              }
         };
@@ -611,29 +613,61 @@ function SystemSettings() {
     };
 
     const handleExportData = async () => {
-        if (!window.confirm('Deseja baixar um backup completo dos dados (JSON)?')) return;
+        if (!window.confirm('Deseja iniciar a compilação do backup completo dos dados?')) return;
         
-        const backup = {
-            timestamp: new Date().toISOString(),
-            orders: await db.getAll('orders'),
-            products: await db.getAll('products'),
-            customers: await db.getAll('customers'),
-            inventory: await db.getAll('inventory'),
-            transactions: await db.getAll('transactions'),
-            accounts: await db.getAll('accounts'),
-            budgets: await db.getAll('budgets'),
-            designs: await db.getAll('designs'),
-            roles: await db.getAll('roles'),
-            categories: await db.getAll('categories')
-        };
+        try {
+            const backup = {
+                timestamp: new Date().toISOString(),
+                orders: await db.getAll('orders'),
+                products: await db.getAll('products'),
+                customers: await db.getAll('customers'),
+                inventory: await db.getAll('inventory'),
+                transactions: await db.getAll('transactions'),
+                accounts: await db.getAll('accounts'),
+                budgets: await db.getAll('budgets'),
+                designs: await db.getAll('designs'),
+                roles: await db.getAll('roles'),
+                categories: await db.getAll('categories')
+            };
 
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `backup_stationery_${new Date().toISOString().split('T')[0]}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
+            const jsonStr = JSON.stringify(backup, null, 2);
+            const fileName = `backup_atelie_vault_${new Date().toISOString().split('T')[0]}.json`;
+
+            // Modern FileSystem API (Proporciona escolha direta da "Pasta do Google Drive" no Windows/Mac)
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: fileName,
+                        types: [{ description: 'Arquivo de Backup JSON', accept: {'application/json': ['.json']} }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(jsonStr);
+                    await writable.close();
+                    
+                    alert("✅ Backup espelhado com sucesso e segurança no diretório escolhido!");
+                    return; // Early return on success
+                } catch (err) {
+                    // AbortError is thrown when user cancels the save dialog, ignore it.
+                    if (err.name === 'AbortError') return; 
+                    console.warn("Navegador bloqueou SaveFilePicker, tentando modo legacy...", err);
+                }
+            }
+
+            // Fallback Legacy (Download direto pra pasta Downloads)
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonStr);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", fileName);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            
+            alert("✅ Backup baixado! Dica: Salve o arquivo na sua pasta roteada do Google Drive para ter redundância na nuvem.");
+
+        } catch (error) {
+            console.error("Falha ao compilar tabelas", error);
+            alert("❌ Ocorreu um erro ao compilar as tabelas do Banco. Cheque o console.");
+        }
     };
 
     const handleLogoUpload = (e) => {
@@ -721,9 +755,9 @@ function SystemSettings() {
     return (
         <>
             <div className="card animate-fade-in">
-                <div className="card-header">
-                    <h3 className="card-title flex items-center gap-sm"><Globe size={20} /> Preferências do Sistema</h3>
-                    <p className="text-muted text-sm">Personalize a identidade da sua loja e opções gerais.</p>
+                <div className="card-header border-b border-gray-100">
+                    <h3 className="card-title flex items-center gap-2 text-purple-800"><Globe size={20} /> Loja Virtual & Integrações de Sistema</h3>
+                    <p className="text-muted text-sm pb-2">Gerencie as vitrines on-line, a logística de entrega, métodos de pagamento e o nome do Ateliê.</p>
                 </div>
 
                 <form onSubmit={handleSave} className="space-y-6 container p-4">
@@ -768,6 +802,70 @@ function SystemSettings() {
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">Preencha sem o "@". Isso ativará banners na proposta e rastreamento!</p>
                             </div>
+
+                            <div className="input-group">
+                                <label className="form-label font-bold text-purple-700">Permitir Retirada no Local (Checkout)</label>
+                                <div className="flex items-center gap-2 mt-1 bg-purple-50 p-3 rounded-lg border border-purple-100">
+                                    <input 
+                                        type="checkbox"
+                                        checked={config.enableLocalPickup !== false}
+                                        onChange={e => setConfig({ ...config, enableLocalPickup: e.target.checked })}
+                                        style={{ width: '20px', height: '20px', accentColor: '#9333ea', cursor: 'pointer' }}
+                                    />
+                                    <span className="text-sm text-gray-700">O cliente poderá escolher "Retirar no Ateliê" gratuitamente na finalização.</span>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-4 mt-6">
+                                <h4 className="font-semibold text-gray-700 border-b pb-2 flex items-center gap-2">
+                                    <Truck size={18} className="text-blue-600" /> Logística e Fretes
+                                </h4>
+                                <div className="input-group">
+                                    <label className="form-label">CEP Base do Ateliê (Origem do Frete)</label>
+                                    <input 
+                                        className="form-input bg-blue-50/30 font-mono" 
+                                        value={config.companyCep || ''}
+                                        onChange={e => setConfig({...config, companyCep: e.target.value.replace(/\D/g, '')})}
+                                        placeholder="Ex: 46960000"
+                                        maxLength="8"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Sua cidade. CEPs parecidos receberão a opção de Motoboy Local automaticamente.</p>
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">Taxa Base do Entregador/Motoboy Local (R$)</label>
+                                    <input 
+                                        type="number" step="0.50"
+                                        className="form-input bg-blue-50/30" 
+                                        value={config.localDeliveryFee}
+                                        onChange={e => setConfig({...config, localDeliveryFee: e.target.value})}
+                                        placeholder="5.00"
+                                    />
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">Taxa Extra / Embalagem Segura (Opcional - R$)</label>
+                                    <input 
+                                        type="number" step="0.50"
+                                        className="form-input bg-blue-50/30" 
+                                        value={config.packagingFee}
+                                        onChange={e => setConfig({...config, packagingFee: e.target.value})}
+                                        placeholder="0.00"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Este valor será somado a todos os fretes calculados para proteger seu lucro na sacola e fitas.</p>
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label font-bold text-blue-700">Habilitar Frete para Todo o Brasil (PAC/Sedex)</label>
+                                    <div className="flex items-center gap-2 mt-1 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                        <input 
+                                            type="checkbox"
+                                            checked={config.nationwideShippingEnabled === true}
+                                            onChange={e => setConfig({ ...config, nationwideShippingEnabled: e.target.checked })}
+                                            style={{ width: '20px', height: '20px', accentColor: '#2563eb', cursor: 'pointer' }}
+                                        />
+                                        <span className="text-sm text-gray-700">Se desativado, limitaremos as Vendas APENAS para os CEPs da sua região (Protegido).</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="input-group">
                                 <label className="form-label">Logo da Empresa (PNG Sem Fundo Recomedado)</label>
                                 <div className="flex items-center gap-4">
@@ -839,6 +937,33 @@ function SystemSettings() {
                                     <option value="light">Claro (Padrão)</option>
                                     <option value="dark">Escuro</option>
                                 </select>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-700 border-b pb-2 flex items-center gap-2">
+                                <Landmark size={18} className="text-blue-600" /> Integração Mercado Pago
+                            </h4>
+                            <p className="text-xs text-gray-500 mb-2">Configure para habilitar pagamentos reais na Loja/Checkout.</p>
+                            <div className="input-group">
+                                <label className="form-label">Access Token (Produção)</label>
+                                <input 
+                                    className="form-input bg-blue-50/30"
+                                    type="password"
+                                    value={config.paymentKeys?.accessToken || ''}
+                                    onChange={e => setConfig({...config, paymentKeys: { ...config.paymentKeys, accessToken: e.target.value }})}
+                                    placeholder="APP_USR-***"
+                                />
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Public Key (Produção - Opcional p/ Pix)</label>
+                                <input 
+                                    className="form-input bg-blue-50/30"
+                                    type="text"
+                                    value={config.paymentKeys?.publicKey || ''}
+                                    onChange={e => setConfig({...config, paymentKeys: { ...config.paymentKeys, publicKey: e.target.value }})}
+                                    placeholder="APP_USR-***"
+                                />
                             </div>
                         </div>
                     </div>
@@ -1053,6 +1178,170 @@ function PricingSettings() {
     );
 }
 
+function DangerZoneCleanup() {
+    const [statusText, setStatusText] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const wipeTestData = async () => {
+        if (!window.confirm("⚠️ ATENÇÃO: Essa ação lerá TODO o sistema buscando Pedidos e Lançamentos que contenham a palavra 'teste' na descrição ou nome, e os DELETARÁ permanentemente. Continuar?")) return;
+        setIsProcessing(true);
+        setStatusText("Iniciando faxina de rastros de teste...");
+        try {
+            let deletedOrders = 0;
+            let deletedTrans = 0;
+
+            const orders = await db.getAll('orders');
+            for (const order of orders) {
+                const searchString = `${order.customer || ''} ${order.customerEmail || ''} ${(order.items || []).map(i => i.name).join(' ')} ${order.id}`.toLowerCase();
+                if (searchString.includes('teste')) {
+                    await db.delete('orders', order.id);
+                    deletedOrders++;
+                    setStatusText(`Apagando pedido falso #${String(order.id).substring(0,6)}...`);
+                }
+            }
+
+            const trans = await db.getAll('transactions');
+            for (const t of trans) {
+                const searchString = `${t.description || ''} ${t.category || ''} ${t.type || ''}`.toLowerCase();
+                if (searchString.includes('teste') || (t.orderId && searchString.includes('venda online (pedido'))) {
+                    // if it's a generic online sale matching a deleted order.. wait better check if order exists
+                    await db.delete('transactions', t.id);
+                    deletedTrans++;
+                    setStatusText(`Limpando caixa: "${t.description.substring(0,15)}..."`);
+                }
+            }
+            // Optional sweep: if a trans has an orderId that doesn't exist anymore, delete it too!
+            const transPhase2 = await db.getAll('transactions');
+            const ordersPhase2 = await db.getAll('orders');
+            const liveOrderIds = new Set(ordersPhase2.map(o => String(o.id)));
+            for (const tp of transPhase2) {
+                if (tp.orderId && !liveOrderIds.has(String(tp.orderId))) {
+                    await db.delete('transactions', tp.id);
+                    deletedTrans++;
+                }
+            }
+
+            AuditService.log({ name: 'Admin' }, 'DELETE', 'System', 'all', `Faxina de Testes Executada: Removidos ${deletedOrders} pedidos e ${deletedTrans} lançamentos/resíduos.`);
+            setStatusText(`🔥 FAXINA CONCLUÍDA: ${deletedOrders} Pedidos e ${deletedTrans} Lançamentos ligados a Testes foram dizimados.`);
+        } catch(e) {
+            console.error(e);
+            setStatusText("❌ Erro durante a limpeza: " + e.message);
+        }
+        setIsProcessing(false);
+    };
+
+    const wipeAllToday = async () => {
+        if (!window.confirm("⚠️ PERIGO: Isso vai apagar ABSOLUTAMENTE TODOS os Pedidos e Lançamentos gerados no dia de hoje, independente de serem testes ou não. Você autoriza esse wipe?")) return;
+        setIsProcessing(true);
+        setStatusText("Buscando registros criados hoje...");
+        try {
+            const todayStr = new Date().toISOString().split('T')[0];
+            let countOrders = 0;
+            let countTrans = 0;
+
+            const orders = await db.getAll('orders');
+            for (const order of orders) {
+                if ((order.createdAt && order.createdAt.startsWith(todayStr)) || (order.date && order.date.startsWith(todayStr))) {
+                    await db.delete('orders', order.id);
+                    countOrders++;
+                }
+            }
+            
+            const trans = await db.getAll('transactions');
+            for (const t of trans) {
+                if ((t.createdAt && t.createdAt.startsWith(todayStr)) || (t.date && t.date.startsWith(todayStr))) {
+                    await db.delete('transactions', t.id);
+                    countTrans++;
+                }
+            }
+            
+            setStatusText(`🔥 RESET CONCLUÍDO: ${countOrders} Pedidos e ${countTrans} Lançamentos criados hoje evaporaram da base.`);
+        } catch(e) {
+            setStatusText("❌ Erro durante o reset: " + e.message);
+        }
+        setIsProcessing(false);
+    };
+
+    const downloadBackup = async () => {
+        setIsProcessing(true);
+        setStatusText("Gerando Arquivo de Backup Blindado (JSON)...");
+        try {
+            const allOrders = await db.getAll('orders');
+            const allTrans = await db.getAll('transactions');
+            const allCustomers = await db.getAll('customers');
+            const allInventory = await db.getAll('inventory');
+            
+            const fullSnapshot = {
+                timestamp: new Date().toISOString(),
+                orders: allOrders,
+                transactions: allTrans,
+                customers: allCustomers,
+                inventory: allInventory
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullSnapshot, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href",     dataStr);
+            downloadAnchorNode.setAttribute("download", `backup_atelie_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchorNode); // required for firefox
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            
+            setStatusText("✅ Backup Concluído Mestre. Seu arquivo JSON foi baixado localmente. Agora é seguro deletar.");
+        } catch(e) {
+            setStatusText("❌ Falha crítica ao exportar Banco: " + e.message);
+        }
+        setIsProcessing(false);
+    };
+
+    return (
+        <div className="card animate-fade-in" style={{ borderColor: '#fca5a5', backgroundColor: '#fef2f2' }}>
+            <div className="card-header" style={{ borderBottomColor: '#fee2e2' }}>
+                <h3 className="card-title flex items-center gap-sm" style={{ color: '#b91c1c' }}><Trash2 size={20} /> Danger Zone / Faxina do Banco de Dados</h3>
+                <p className="text-sm mt-1" style={{ color: '#991b1b' }}>
+                    Ferramentas destrutivas. Tenha absoluta certeza ao usá-las, o painel do Financeiro atualizará instantaneamente seus saldos.
+                </p>
+            </div>
+            <div className="p-6">
+                
+                <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>🛡️ PASSO 1: Escudo de Segurança (Faça Backup)</div>
+                        <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>Baixe o banco localmente em formato Arquivo universal JSON antes de rodar os scripts de exclusão abaixo do passo 2.</p>
+                    </div>
+                    <button onClick={downloadBackup} disabled={isProcessing} className="btn" style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', fontWeight: 700 }}>
+                        <Save size={16} /> Exportar Todas as Tabelas
+                    </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '24px' }}>
+                    <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #fecaca', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1f2937', letterSpacing: '0.05em' }}>CAÇADOR DE TESTES</div>
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280', lineHeight: 1.5, marginBottom: '16px' }}>Vasculha a tabela de Pedidos Automáticos e Lançamentos em busca da palavra "teste" no histórico descritivo. Limpa automaticamente transações ligadas a ele para alinhar o Saldo.</p>
+                        <button onClick={wipeTestData} disabled={isProcessing} className="btn" style={{ marginTop: 'auto', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', fontWeight: 700 }}>
+                            <Activity size={16} /> Iniciar Caçada / Cleanup
+                        </button>
+                    </div>
+
+                    <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #fecaca', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#991b1b', letterSpacing: '0.05em' }}>ZONA ZERO (WIPE DE HOJE)</div>
+                        <p style={{ fontSize: '0.75rem', color: '#dc2626', lineHeight: 1.5, marginBottom: '16px' }}>APAGA TUDO. Elimina todos os pedidos e todos os pagamentos (reais ou não) que nasceram a partir de meia-noite da data atual.</p>
+                        <button onClick={wipeAllToday} disabled={isProcessing} className="btn" style={{ marginTop: 'auto', backgroundColor: '#dc2626', color: '#fff', border: 'none', fontWeight: 700 }}>
+                            <Trash2 size={16} /> Exterminar Dados do Dia
+                        </button>
+                    </div>
+                </div>
+                
+                {statusText && (
+                    <div style={{ marginTop: '24px', padding: '16px', borderRadius: '8px', backgroundColor: '#111827', fontFamily: 'monospace', color: '#34d399', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ animation: 'pulse 1s infinite' }}>_</span> {statusText}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [user, setUser] = useState({ name: '', role: '', avatar: '' });
@@ -1135,8 +1424,16 @@ export function Settings() {
          <button 
             className={`tab-item ${activeTab === 'system' ? 'active' : ''}`}
             onClick={() => setActiveTab('system')}
+            style={activeTab === 'system' ? { backgroundColor: '#f3e8ff', color: '#7e22ce', borderColor: '#d8b4fe'} : {}}
         >
-            <Globe size={16} className="inline mr-2" /> Sistema
+            <Globe size={16} className="inline mr-2" /> Loja Virtual & Setup
+        </button>
+         <button 
+            className={`tab-item ${activeTab === 'danger' ? 'active' : ''}`}
+            onClick={() => setActiveTab('danger')}
+            style={activeTab === 'danger' ? { backgroundColor: '#fef2f2', color: '#b91c1c', borderColor: '#fca5a5'} : {}}
+        >
+            <Trash2 size={16} className="inline mr-2" /> Faxina / Wipe
         </button>
       </div>
       
@@ -1149,6 +1446,7 @@ export function Settings() {
       {activeTab === 'accounts' && <AccountsSettings />}
       {activeTab === 'logs' && <AuditLogViewer />}
       {activeTab === 'system' && <SystemSettings />}
+      {activeTab === 'danger' && <DangerZoneCleanup />}
 
     </div>
   );

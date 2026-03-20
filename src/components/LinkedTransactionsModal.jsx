@@ -18,7 +18,8 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
         date: new Date().toISOString().split('T')[0],
         status: 'pending',
         accountId: '',
-        paymentMethod: 'pix'
+        paymentMethod: 'pix',
+        installments: 1
     });
 
     useEffect(() => {
@@ -37,8 +38,8 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
 
             const allTrans = await db.getAll('transactions');
             if (allTrans) {
-                // Filtra as transações relacionadas à entidade
-                const linked = allTrans.filter(t => t.referenceId === entityId);
+                // Filtra as transações relacionadas à entidade resolvendo conflito de tipos ocultos
+                const linked = allTrans.filter(t => String(t.referenceId) === String(entityId));
                 // Ordena por data
                 linked.sort((a, b) => new Date(b.date) - new Date(a.date));
                 setTransactions(linked);
@@ -81,30 +82,61 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
                        : entityType === 'Maintenance' ? 'Manutenção de Equipamentos' 
                        : 'Materiais & Insumos';
                        
-        const payload = {
-            description: newTrans.description,
-            amount: parseFloat(newTrans.amount),
-            type: 'expense', // Assume despesa por padrão nestes vínculos
-            category: category,
-            date: newTrans.date,
-            status: newTrans.status,
-            paymentMethod: newTrans.paymentMethod,
-            accountId: newTrans.accountId,
-            referenceId: entityId,
-            referenceType: entityType,
-            installments: 1,
-            isRecurring: false,
-            createdAt: new Date().toISOString()
-        };
-
-        const created = await db.create('transactions', payload);
-        AuditService.log(currentUser, 'CREATE', 'Transactions', created.id, `Criou despesa vinculada manualmente: ${payload.description}`);
+        const installments = parseInt(newTrans.installments) || 1;
+        const totalAmount = parseFloat(newTrans.amount);
+        const isCredit = newTrans.paymentMethod === 'credit';
         
-        // Update account balance se for pago já
-        if (payload.status === 'paid' && payload.paymentMethod !== 'credit') {
-            const acc = accounts.find(a => a.id === payload.accountId);
-            if(acc) {
-                await db.update('accounts', acc.id, { balance: parseFloat(acc.balance) - payload.amount });
+        if (installments > 1 && isCredit) {
+            const instAmt = totalAmount / installments;
+            for (let i = 0; i < installments; i++) {
+                const nd = new Date(newTrans.date);
+                nd.setMonth(nd.getMonth() + i);
+                
+                const payload = {
+                    description: `${newTrans.description} (${i+1}/${installments})`,
+                    amount: instAmt,
+                    type: 'expense',
+                    category: category,
+                    date: nd.toISOString().split('T')[0],
+                    status: 'paid', // Credit cards consume limit instantly
+                    paymentMethod: newTrans.paymentMethod,
+                    accountId: newTrans.accountId,
+                    referenceId: entityId,
+                    referenceType: entityType,
+                    installmentNumber: i + 1,
+                    installmentsTotal: installments,
+                    isRecurring: false,
+                    createdAt: new Date().toISOString()
+                };
+                const created = await db.create('transactions', payload);
+                AuditService.log(currentUser, 'CREATE', 'Transactions', created.id, `Criou despesa vinculada manualmente: ${payload.description}`);
+            }
+        } else {
+            const payload = {
+                description: newTrans.description,
+                amount: totalAmount,
+                type: 'expense',
+                category: category,
+                date: newTrans.date,
+                status: isCredit ? 'paid' : newTrans.status,
+                paymentMethod: newTrans.paymentMethod,
+                accountId: newTrans.accountId,
+                referenceId: entityId,
+                referenceType: entityType,
+                installments: 1,
+                isRecurring: false,
+                createdAt: new Date().toISOString()
+            };
+
+            const created = await db.create('transactions', payload);
+            AuditService.log(currentUser, 'CREATE', 'Transactions', created.id, `Criou despesa vinculada manualmente: ${payload.description}`);
+            
+            // Update account balance se for pago já
+            if (payload.status === 'paid' && payload.paymentMethod !== 'credit') {
+                const acc = accounts.find(a => a.id === payload.accountId);
+                if(acc) {
+                    await db.update('accounts', acc.id, { balance: parseFloat(acc.balance) - payload.amount });
+                }
             }
         }
 
@@ -115,7 +147,8 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
             date: new Date().toISOString().split('T')[0],
             status: 'pending',
             accountId: '',
-            paymentMethod: 'pix'
+            paymentMethod: 'pix',
+            installments: 1
         });
         loadData();
     };
@@ -129,7 +162,7 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
                 <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <DollarSign className="text-green-600" size={24} />
+                            <DollarSign style={{ color: 'var(--success)' }} size={24} />
                             Financeiro Vinculado
                         </h2>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{entityName}</p>
@@ -187,6 +220,12 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
                                         <option value="cash">Dinheiro</option>
                                     </select>
                                 </div>
+                                {newTrans.paymentMethod === 'credit' && (
+                                    <div className="form-group mb-0">
+                                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Parcelas</label>
+                                        <input type="number" min="1" max="48" className="form-input text-sm" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})} />
+                                    </div>
+                                )}
                             </div>
                             <div className="flex gap-2 justify-end mt-2">
                                 <button className="btn btn-secondary text-sm px-3 py-1" onClick={() => setNewTrans({...newTrans, isAdding: false})}>Cancelar</button>
@@ -240,8 +279,8 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
                                                     <td style={{ padding: '8px' }}><input type="number" step="0.01" className="form-input text-xs p-1 h-7 w-full text-right" value={editingTrans.amount} onChange={e => setEditingTrans({...editingTrans, amount: e.target.value})} /></td>
                                                     <td className="text-center" style={{ padding: '8px' }}>
                                                         <div className="flex gap-1 justify-center">
-                                                            <button title="Salvar" onClick={() => handleSaveEdit(t.id, editingTrans)} style={{ color: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.1)', padding: '6px', borderRadius: '4px' }}><Check size={14} /></button>
-                                                            <button title="Cancelar" onClick={() => setEditingTrans(null)} style={{ color: 'var(--text-muted)', backgroundColor: 'var(--surface-hover)', padding: '6px', borderRadius: '4px' }}><X size={14} /></button>
+                                                            <button title="Salvar" onClick={() => handleSaveEdit(t.id, editingTrans)} style={{ color: 'var(--success)', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}><Check size={14} /></button>
+                                                            <button title="Cancelar" onClick={() => setEditingTrans(null)} style={{ color: 'var(--text-muted)', backgroundColor: 'var(--surface-hover)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}><X size={14} /></button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -251,15 +290,15 @@ export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType,
                                                     <td style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', padding: '12px' }}>{t.description}</td>
                                                     <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '12px' }}>{accounts.find(a => a.id === t.accountId)?.name || 'N/A'}</td>
                                                     <td style={{ padding: '12px' }}>
-                                                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 700, backgroundColor: t.status === 'paid' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: t.status === 'paid' ? '#15803d' : '#b91c1c' }}>
-                                                            {t.status === 'paid' ? 'PAGO' : 'A PAGAR'}
+                                                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 700, backgroundColor: t.status === 'paid' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: t.status === 'paid' ? 'var(--success)' : 'var(--danger)' }}>
+                                                            {t.status === 'paid' ? (t.paymentMethod === 'credit' ? '💳 CARTÃO' : 'PAGO') : 'A PAGAR'}
                                                         </span>
                                                     </td>
-                                                    <td style={{ fontSize: '0.85rem', fontWeight: 700, color: '#dc2626', textAlign: 'right', padding: '12px' }}>R$ {parseFloat(t.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                    <td style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--danger)', textAlign: 'right', padding: '12px' }}>R$ {parseFloat(t.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                                                     <td className="text-center" style={{ padding: '12px' }}>
                                                         <div className="flex gap-1 justify-center">
-                                                            <button onClick={() => setEditingTrans(t)} style={{ color: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }} title="Editar"><Edit2 size={14} /></button>
-                                                            <button onClick={() => handleDelete(t.id)} style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }} title="Excluir"><Trash2 size={14} /></button>
+                                                            <button onClick={() => setEditingTrans(t)} style={{ color: 'var(--info)', backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }} title="Editar"><Edit2 size={14} /></button>
+                                                            <button onClick={() => handleDelete(t.id)} style={{ color: 'var(--danger)', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }} title="Excluir"><Trash2 size={14} /></button>
                                                         </div>
                                                     </td>
                                                 </>
