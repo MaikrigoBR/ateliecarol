@@ -305,7 +305,7 @@ function RolesSettings() {
 function CategoriesSettings() {
     const [categories, setCategories] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [newName, setNewName] = useState('');
+    const [formData, setFormData] = useState({ name: '', isSub: false, parentId: '' });
 
     useEffect(() => { loadCats(); }, []);
 
@@ -320,85 +320,211 @@ function CategoriesSettings() {
 
     const handleAdd = async (e) => {
         e.preventDefault();
-        if (!newName.trim()) return;
+        const categoryName = formData.name.trim();
+        if (!categoryName) return;
 
-        const exists = categories.find(c => c.name.toLowerCase() === newName.trim().toLowerCase() && !c.deleted);
+        // Check if name already exists in active categories
+        const exists = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase() && !c.deleted);
         if (exists) {
-            alert('Categoria já existe!');
+            alert('Uma categoria com esse nome já existe!');
             return;
         }
 
-        await db.create('categories', { name: newName.trim() });
-        setNewName('');
-        setIsModalOpen(false);
-        loadCats();
+        const payload = {
+            name: categoryName,
+            parentId: formData.isSub && formData.parentId ? formData.parentId : null
+        };
+
+        try {
+            await db.create('categories', payload);
+            setFormData({ name: '', isSub: false, parentId: '' });
+            setIsModalOpen(false);
+            loadCats();
+        } catch(err) {
+            console.error(err);
+            alert("Falha ao salvar a categoria.");
+        }
     };
 
-    const handleDelete = async (id, name) => {
-        if(window.confirm(`Tem certeza que deseja inativar a categoria "${name}"?\nIsso não afetará os produtos que já estão classificados nela.`)) {
-            await db.update('categories', id, { deleted: true });
+    const handleDelete = async (cat) => {
+        const isMain = !cat.parentId;
+        const msg = isMain 
+            ? `Tem certeza que deseja inativar a CATEGORIA PRINCIPAL "${cat.name}"?\n(Sujas subcategorias não serão apagadas, mas perderão a referência de grupo).`
+            : `Tem certeza que deseja inativar a SUBCATEGORIA "${cat.name}"?`;
+
+        if(window.confirm(msg)) {
+            await db.update('categories', cat.id, { deleted: true });
             loadCats();
         }
     };
 
+    const openNewMainCategory = () => {
+        setFormData({ name: '', isSub: false, parentId: '' });
+        setIsModalOpen(true);
+    };
+
+    const openNewSubcategory = (parentId) => {
+        setFormData({ name: '', isSub: true, parentId });
+        setIsModalOpen(true);
+    };
+
+    const mainCategories = categories.filter(c => !c.parentId);
+    const getSubcategories = (parentId) => categories.filter(c => c.parentId === parentId);
+    
+    // Find orphaned subcategories (whose parent was soft deleted)
+    const activeMainIds = new Set(mainCategories.map(c => c.id));
+    const orphanedSubcategories = categories.filter(c => c.parentId && !activeMainIds.has(c.parentId));
+
     return (
-        <div className="card animate-fade-in">
-             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="card animate-fade-in" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                     <h3 className="card-title flex items-center gap-2 text-purple-800"><Tags size={20} /> Categorias de Produtos</h3>
-                     <p className="text-muted text-sm pb-2">Padronize as categorias para organização do catálogo e relatórios mais precisos.</p>
+                     <h3 className="card-title flex items-center gap-2 text-purple-800"><Tags size={20} /> Hierarquia de Categorias</h3>
+                     <p className="text-muted text-sm pb-2">Organize seus produtos por grupos e subgrupos inteligentes.</p>
                 </div>
-                <button onClick={() => setIsModalOpen(true)} className="btn btn-primary shadow-sm hover:-translate-y-0.5" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1rem', borderRadius: '8px', fontWeight: 600 }}>
-                    <Plus size={16} /> Nova Categoria
+                <button onClick={openNewMainCategory} className="btn btn-primary shadow-sm hover:-translate-y-0.5" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1rem', borderRadius: '8px', fontWeight: 600 }}>
+                    <Plus size={16} /> Grupo Principal
                 </button>
             </div>
             
-            <div className="flex flex-wrap gap-3 p-4 bg-gray-50/50 rounded-b-xl border-t border-gray-100 min-h-[100px]">
-                {categories.map(c => (
-                    <div key={c.id} className="flex items-center gap-1 py-1 px-3 bg-white border border-gray-200 rounded-full shadow-sm hover:border-purple-300 transition-colors group">
-                        <span className="text-sm font-medium text-gray-700">{c.name}</span>
-                        <button onClick={() => handleDelete(c.id, c.name)} className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Inativar">
-                            <Trash2 size={14} />
-                        </button>
+            <div className="p-4 bg-gray-50/50 rounded-b-xl border-t border-gray-100 min-h-[200px]" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                
+                {mainCategories.map(main => {
+                    const subs = getSubcategories(main.id);
+                    return (
+                        <div key={main.id} style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'all 0.2s', position: 'relative' }} className="hover:shadow-md hover:border-purple-200 group">
+                            <div style={{ background: 'linear-gradient(to right, #f8fafc, #f1f5f9)', padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#8b5cf6' }}></div>
+                                    <span style={{ fontWeight: 800, color: '#334155', fontSize: '0.95rem' }}>{main.name}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button onClick={() => openNewSubcategory(main.id)} className="text-purple-600 hover:bg-purple-100 p-1.5 rounded-md transition-colors" title="Adicionar Subcategoria neste grupo">
+                                        <Plus size={16} />
+                                    </button>
+                                    <button onClick={() => handleDelete(main)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100" title="Inativar Grupo Principal">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div style={{ padding: '16px', flex: 1, display: 'flex', flexWrap: 'wrap', gap: '8px', alignContent: 'flex-start' }}>
+                                {subs.map(sub => (
+                                    <div key={sub.id} style={{ background: '#f5f3ff', border: '1px solid #ede9fe', padding: '4px 10px', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#6d28d9', cursor: 'default' }} className="subcat-pill group/pill hover:border-purple-300 transition-colors">
+                                        {sub.name}
+                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(sub); }} style={{ padding: '2px', marginLeft: '4px', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="text-purple-300 hover:text-red-500 opacity-0 group-hover/pill:opacity-100 transition-opacity">
+                                            <X size={12} strokeWidth={3} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {subs.length === 0 && (
+                                    <div style={{ width: '100%', textAlign: 'center', padding: '12px 0' }}>
+                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', background: '#f8fafc', padding: '4px 12px', borderRadius: '20px', border: '1px dashed #cbd5e1' }}>Vazio. Adicione subcategorias.</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {orphanedSubcategories.length > 0 && (
+                    <div style={{ background: '#fff1f2', borderRadius: '16px', border: '1px dashed #fecdd3', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px dashed #fecdd3', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#e11d48' }}></div>
+                            <span style={{ fontWeight: 800, color: '#9f1239', fontSize: '0.95rem' }}>Subcategorias Órfãs</span>
+                        </div>
+                        <div style={{ padding: '16px', flex: 1, display: 'flex', flexWrap: 'wrap', gap: '8px', alignContent: 'flex-start' }}>
+                            {orphanedSubcategories.map(sub => (
+                                <div key={sub.id} style={{ background: 'white', border: '1px solid #ffe4e6', padding: '4px 10px', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#be123c' }} className="group/pill hover:border-red-300 transition-colors">
+                                    {sub.name}
+                                    <button onClick={(e) => { e.stopPropagation(); handleDelete(sub); }} className="text-red-300 hover:text-red-500 opacity-0 group-hover/pill:opacity-100 transition-opacity p-[2px] ml-1">
+                                        <X size={12} strokeWidth={3} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                ))}
-                {categories.length === 0 && <span className="text-muted text-sm w-full text-center py-4">Nenhuma categoria ativa cadastrada.</span>}
+                )}
+
+                {categories.length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '50%', background: '#f1f5f9', color: '#94a3b8', marginBottom: '16px' }}>
+                            <Tags size={32} />
+                        </div>
+                        <h4 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>Nenhuma Categoria Encontrada</h4>
+                        <p style={{ color: '#64748b', fontSize: '0.9rem', maxWidth: '400px', margin: '0 auto' }}>Você precisa criar o primeiro "Grupo Principal" para começar a estruturar sua árvore do catálogo.</p>
+                        <button onClick={openNewMainCategory} style={{ marginTop: '20px', background: '#8b5cf6', color: 'white', padding: '10px 24px', borderRadius: '8px', fontWeight: 600, border: 'none', cursor: 'pointer' }}>Criar Primeira Hierarquia</button>
+                    </div>
+                )}
             </div>
 
             {/* Popup Modal */}
             {isModalOpen && (
                 <div className="modal-overlay" style={{ zIndex: 1000 }}>
-                    <div className="modal-content animate-slide-up" style={{ maxWidth: '400px', width: '100%', padding: '24px', backgroundColor: 'var(--surface)', borderRadius: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                    <div className="modal-content animate-slide-up" style={{ maxWidth: '450px', width: '100%', padding: '24px', backgroundColor: 'var(--surface)', borderRadius: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
-                                Nova Categoria
+                                Adicionar Categoria
                             </h2>
                             <button onClick={() => setIsModalOpen(false)} style={{ background: 'var(--surface-hover)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
                                 <X size={18} />
                             </button>
                         </div>
                         
-                        <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            
+                            <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => setFormData({...formData, isSub: !formData.isSub})}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={formData.isSub} 
+                                        onChange={() => setFormData({...formData, isSub: !formData.isSub})}
+                                        style={{ width: '18px', height: '18px', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                                    />
+                                    <div>
+                                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>É uma subcategoria (Nível 2)</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Se marcado, ela ficará amarrada dentro de um Grupo Principal.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {formData.isSub && (
+                                <div className="animate-fade-in">
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Selecione o Grupo Principal <span style={{color: '#ef4444'}}>*</span></label>
+                                    <select 
+                                        required={formData.isSub}
+                                        style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '2px solid #e2e8f0', background: '#ffffff', color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none' }} 
+                                        value={formData.parentId}
+                                        onChange={e => setFormData({...formData, parentId: e.target.value})}
+                                    >
+                                        <option value="" disabled>Selecione um grupo da lista...</option>
+                                        {mainCategories.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                    {mainCategories.length === 0 && <p style={{ color: '#e11d48', fontSize: '0.75rem', marginTop: '6px' }}>Você precisa ter pelo menos 1 Grupo Principal criado antes de criar subcategorias.</p>}
+                                </div>
+                            )}
+
                             <div>
-                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Nome da Categoria <span style={{color: '#ef4444'}}>*</span></label>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nome do Tópico <span style={{color: '#ef4444'}}>*</span></label>
                                 <input 
                                     required 
                                     autoFocus
                                     type="text" 
-                                    placeholder="Ex: Cadernos Personalizados" 
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
-                                    value={newName} 
-                                    onChange={e => setNewName(e.target.value)} 
+                                    placeholder={formData.isSub ? "Ex: Cadernos A5 Colegiais" : "Ex: Papelaria Fina"} 
+                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '2px solid #e2e8f0', background: '#ffffff', color: 'var(--text-main)', fontSize: '0.95rem', outline: 'none' }} 
+                                    value={formData.name} 
+                                    onChange={e => setFormData({...formData, name: e.target.value})} 
                                 />
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>Ajuda a organizar os produtos na Loja Virtual Mágica e separar relatórios de vendas.</p>
                             </div>
                             
                             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface-hover)', color: 'var(--text-main)', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'var(--surface-hover)', color: 'var(--text-main)', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
                                     Cancelar
                                 </button>
-                                <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--primary)', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-                                    Criar Categoria
+                                <button type="submit" disabled={formData.isSub && (!formData.parentId || mainCategories.length === 0)} style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'var(--primary)', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer', opacity: (formData.isSub && (!formData.parentId || mainCategories.length === 0)) ? 0.5 : 1 }}>
+                                    Estruturar Árvore
                                 </button>
                             </div>
                         </form>
