@@ -22,10 +22,12 @@ export const database = {
             const querySnapshot = await getDocs(q);
             const rawArray = snapshotToArray(querySnapshot);
             
-            // Global Deduplication:
+            // Global Deduplication & Soft Delete:
             // Prevent accidental double-imports from bloating the entire application
             const seen = new Set();
             const uniqueArray = rawArray.filter(item => {
+                if (item.deleted === true) return false; // SOFT DELETE GLOBAL FILTER
+
                 // Strip ID for comparison so exact same content counts as duplicate
                 const { id, ...contentProps } = item;
                 const key = JSON.stringify(contentProps);

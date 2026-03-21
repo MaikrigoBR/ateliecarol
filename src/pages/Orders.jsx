@@ -94,22 +94,23 @@ export function Orders() {
   const handleCancel = async (order) => {
     const displayId = String(order.id).slice(-6).toUpperCase();
     if (order.status === 'Cancelado') {
-        if (window.confirm(`Este pedido já está cancelado. Deseja excluí-lo MESTRE permanentemente do banco de dados?\n\n⚠️ ISSO APAGARÁ O PEDIDO E TODOS OS REGISTROS FINANCEIROS LIGADOS A ELE (CAIXA / RECEBIMENTOS)!`)) {
+        if (window.confirm(`Este pedido já está cancelado. Deseja arquivá-lo (Soft Delete) do seu quadro de visão?\n\n⚠️ ISSO OCULTARÁ O PEDIDO E TODOS OS REGISTROS FINANCEIROS LIGADOS A ELE DO SISTEMA!`)) {
             try {
-                // 1. Apaga a Origem
-                await db.delete('orders', order.id);
+                // 1. Arquiva a Origem (Soft Delete)
+                await db.update('orders', order.id, { deleted: true, status: 'Arquivado' });
                 
-                // 2. Apaga os Rastros (Transações Financeiras Ligadas)
+                // 2. Localiza e Arquiva as Transações Ligadas (Soft Delete)
                 const allTrans = await db.getAll('transactions');
                 let count = 0;
                 for (const t of allTrans) {
-                    if (String(t.orderId) === String(order.id)) {
-                        await db.delete('transactions', t.id);
+                    // Matchs per ID or by description parser for legacy orphaned transactions
+                    if (String(t.orderId) === String(order.id) || (t.description && t.description.includes(String(order.id).substring(0,8)))) {
+                        await db.update('transactions', t.id, { deleted: true, status: 'cancelled', amount: 0 });
                         count++;
                     }
                 }
                 
-                alert(`Limpeza Integral Concluída: O Pedido #${displayId} evaporou. ${count} registros financeiros amarrados a ele foram apagados do caixa em cascata.`);
+                alert(`Arquivamento Integral Concluído: O Pedido #${displayId} foi ocultado (Soft Delete). ${count} registros financeiros (inclusive os orfãos) oram recolhidos das métricas de caixa.`);
                 fetchOrders();
             } catch(e) {
                 alert(`Erro Crítico na Limpeza do Pedido: ${e.message}`);

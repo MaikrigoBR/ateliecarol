@@ -402,7 +402,8 @@ export function Production() {
                             category: 'Vendas de Produtos',
                             date: nowIso.split('T')[0],
                             status: 'pending',
-                            customerId: updatedOrder.customer || ''
+                            customerId: updatedOrder.customer || '',
+                            orderId: order.id
                         });
                         updatedOrder.financeGenerated = true;
                     }
@@ -422,7 +423,8 @@ export function Production() {
                         category: 'Vendas de Produtos',
                         date: nowIso.split('T')[0],
                         status: 'pending',
-                        customerId: updatedOrder.customer || ''
+                        customerId: updatedOrder.customer || '',
+                        orderId: order.id
                     });
                     updatedOrder.financeGenerated = true;
                 }
