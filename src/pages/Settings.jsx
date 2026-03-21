@@ -774,6 +774,16 @@ function SystemSettings() {
                                 />
                             </div>
                             <div className="input-group">
+                                <label className="form-label">Título da Guia do Navegador (Opcional)</label>
+                                <input 
+                                    className="form-input text-purple-700 bg-purple-50 border-purple-200" 
+                                    value={config.tabTitle || ''}
+                                    onChange={e => setConfig({...config, tabTitle: e.target.value})}
+                                    placeholder="Ex: Ateliê Carol 🎀"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Este nome aparecerá nas abas superiores dos navegadores (com emojis!).</p>
+                            </div>
+                            <div className="input-group">
                                 <label className="form-label">WhatsApp de Atendimento (Para Notificações)</label>
                                 <input 
                                     className="form-input" 

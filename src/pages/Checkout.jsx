@@ -34,7 +34,7 @@ export function Checkout() {
             const settings = await db.getById('settings', 'global');
             if (settings) {
                 setCompanyConfig(settings);
-                document.title = `${settings.companyName || 'Loja'} | Checkout Seguro`;
+                document.title = `${settings.tabTitle || settings.companyName || 'Loja'} | Checkout Seguro`;
                 
                 if (settings.paymentKeys?.publicKey) {
                     initMercadoPago(settings.paymentKeys.publicKey, { locale: 'pt-BR' });

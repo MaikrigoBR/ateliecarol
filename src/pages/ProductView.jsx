@@ -21,7 +21,7 @@ export function ProductView() {
                 const settings = await db.getById('settings', 'global');
                 if (settings) {
                     setCompanyConfig(settings);
-                    if (prod) document.title = `${settings.companyName || 'Catálogo'} | ${prod.name}`;
+                    if (prod) document.title = `${settings.tabTitle || settings.companyName || 'Catálogo'} | ${prod.name}`;
                 }
             } catch(e) { console.error("Could not fetch settings", e); }
 

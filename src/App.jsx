@@ -67,6 +67,19 @@ function PrivateRoute({ children }) {
 
 
 function App() {
+  useEffect(() => {
+    try {
+        const cnf = localStorage.getItem('stationery_config');
+        if (cnf) {
+            const parsed = JSON.parse(cnf);
+            if (parsed.tabTitle) {
+                document.title = parsed.tabTitle;
+            } else if (parsed.companyName) {
+                document.title = parsed.companyName;
+            }
+        }
+    } catch(e) {}
+  }, []);
 
   return (
     <ErrorBoundary>

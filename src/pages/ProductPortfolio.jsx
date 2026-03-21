@@ -22,7 +22,7 @@ export function ProductPortfolio() {
                 const settings = await db.getById('settings', 'global');
                 if (settings) {
                     setCompanyConfig(settings);
-                    document.title = `${settings.companyName || 'Catálogo'} | Portfólio`;
+                    document.title = `${settings.tabTitle || settings.companyName || 'Catálogo'} | Portfólio`;
                 }
 
                 const allProducts = await db.getAll('products');

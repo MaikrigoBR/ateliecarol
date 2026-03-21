@@ -29,7 +29,7 @@ export function OrderTracking() {
             const settings = await db.getById('settings', 'global');
             if (settings) {
                 setCompanyConfig(settings);
-                document.title = `${settings.companyName || 'Ateliê'} | Rastreio`;
+                document.title = `${settings.tabTitle || settings.companyName || 'Ateliê'} | Rastreio`;
             }
         } catch(e) { console.error("Could not fetch settings", e); }
       } catch (error) {

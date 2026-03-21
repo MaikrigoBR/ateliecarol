@@ -29,7 +29,7 @@ export function ProposalView() {
             const settings = await db.getById('settings', 'global');
             if (settings) {
                 setCompanyConfig(settings);
-                document.title = `${settings.companyName || 'Ateliê'} | Proposta ${id}`;
+                document.title = `${settings.tabTitle || settings.companyName || 'Ateliê'} | Proposta ${id}`;
             }
         } catch(e) { console.error("Could not fetch settings", e); }
       } catch (error) {
