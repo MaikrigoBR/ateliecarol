@@ -16,16 +16,22 @@ const serviceAccount = {
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40webatelie-1cf7e.iam.gserviceaccount.com"
 };
 
+let db;
+
 try {
     if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
+        // Apenas inicializa se houver pelo menos as chaves ou mocka
+        if (process.env.FIREBASE_PRIVATE_KEY) {
+             admin.initializeApp({
+                 credential: admin.credential.cert(serviceAccount)
+             });
+        }
+    }
+    if (admin.apps.length > 0) {
+        db = admin.firestore();
     }
 } catch (e) {
     console.error("Firebase Admin Initialization Error:", e);
 }
-
-const db = admin.firestore();
 
 export { db, admin };
