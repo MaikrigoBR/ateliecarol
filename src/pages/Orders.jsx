@@ -698,7 +698,7 @@ export function Orders() {
         order={selectedOrderDetails}
         companyConfig={companyConfig}
         onEdit={(o) => { setOrderToEdit(o); setIsModalOpen(true); }}
-        onDelete={(id) => handleDelete(id)}
+        onDelete={(orderObj) => handleCancel(orderObj)}
         onPrint={(o) => { setOrderForProduction(o); setIsProductionModalOpen(true); }}
         onShare={(o) => {
             const link = window.location.origin + window.location.pathname + "#/status/" + o.id;

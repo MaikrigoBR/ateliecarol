@@ -395,7 +395,7 @@ export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdi
                     
                     {/* Secondary Actions */}
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => { onClose(); onDelete(order.id); }} className="btn btn-icon" style={{ border: '1px solid var(--border)', color: 'var(--danger)' }} title="Excluir">
+                        <button onClick={() => { onClose(); onDelete(order); }} className="btn btn-icon" style={{ border: '1px solid var(--border)', color: 'var(--danger)' }} title="Excluir / Cancelar">
                             <Trash2 size={16} />
                         </button>
                         <button onClick={() => { onClose(); onEdit(order); }} className="btn btn-icon" style={{ border: '1px solid var(--border)', color: 'var(--primary)' }} title="Editar">
