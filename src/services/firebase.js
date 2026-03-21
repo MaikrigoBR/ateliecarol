@@ -9,14 +9,19 @@ import { getAuth } from 'firebase/auth';
 // 4. Copy the "firebaseConfig" object and paste it here.
 
 
+const cleanEnv = (val, fallback) => {
+    const raw = val || fallback;
+    return typeof raw === 'string' ? raw.replace(/[\r\n\s]+/g, '') : raw;
+};
+
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAMVeDqvR2iT1bEa7DqAoPa4VVmmK-ARSs",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "webatelie-1cf7e.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "webatelie-1cf7e",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "webatelie-1cf7e.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "909595873000",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:909595873000:web:b61a50179ba235e9fcc35d",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-PH00VL84NW"
+  apiKey: cleanEnv(import.meta.env.VITE_FIREBASE_API_KEY, "AIzaSyAMVeDqvR2iT1bEa7DqAoPa4VVmmK-ARSs"),
+  authDomain: cleanEnv(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, "webatelie-1cf7e.firebaseapp.com"),
+  projectId: cleanEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID, "webatelie-1cf7e"),
+  storageBucket: cleanEnv(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, "webatelie-1cf7e.firebasestorage.app"),
+  messagingSenderId: cleanEnv(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, "909595873000"),
+  appId: cleanEnv(import.meta.env.VITE_FIREBASE_APP_ID, "1:909595873000:web:b61a50179ba235e9fcc35d"),
+  measurementId: cleanEnv(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, "G-PH00VL84NW")
 };
 
 
