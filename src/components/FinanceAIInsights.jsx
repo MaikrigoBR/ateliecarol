@@ -30,9 +30,13 @@ export function FinanceAIInsights({ transactions, accounts, openEditTrans }) {
         if (totalRecent > (avgExpense * 5) && avgExpense > 0) {
              suggestions.push({
                  type: 'warning',
-                 text: `Aviso de Fluxo de Caixa: Os gastos da última semana (R$ ${totalRecent.toLocaleString('pt-BR')}) estão muito acima da sua média de saída. Verifique se as Despesas estão corretamente categorizadas.`,
-                 actionText: 'Ver Fluxo',
-                 action: () => document.querySelector('.table-container')?.scrollIntoView({ behavior: 'smooth' })
+                 text: `Aviso de Fluxo de Caixa: Os gastos da última semana (R$ ${totalRecent.toLocaleString('pt-BR')}) estão muito acima da sua média. Certifique-se de que compras grandes (como maquinário ou aportes) não estão categorizadas como gasto comum.`,
+                 actionText: 'Revisar (Buscar Maior Valor)',
+                 action: () => {
+                     const srch = document.querySelector('input[placeholder*="Descrição"]');
+                     if(srch) srch.focus();
+                     window.scrollTo({top: 0, behavior: 'smooth'});
+                 }
              });
         }
 
@@ -40,7 +44,7 @@ export function FinanceAIInsights({ transactions, accounts, openEditTrans }) {
         const anomalousTransactions = allExpenses.filter(t => Number(t.amount) > (avgExpense * 10) && avgExpense > 50).slice(0, 3);
         anomalousTransactions.forEach(t => {
             let navText = 'Módulo Origem';
-            let navAction = () => document.querySelector('.table-container')?.scrollIntoView({ behavior: 'smooth' });
+            let navAction = () => { /* No specific jump if not tied */ };
             
             if (t.referenceType === 'Inventory') {
                 navText = 'Ir p/ Estoque (Origem)';
@@ -55,9 +59,9 @@ export function FinanceAIInsights({ transactions, accounts, openEditTrans }) {
 
             issues.push({
                 type: 'danger',
-                text: `Alerta Contábil: Lançamento discrepante de alto valor na base: "${t.description}" (R$ ${Number(t.amount).toLocaleString('pt-BR')}). Revise a fatura ou corrija o erro de dígito direto na origem.`,
-                actionText: 'Editar Lançamento (Caixa)',
-                action: () => openEditTrans ? openEditTrans(t) : navAction(),
+                text: `Alerta Contábil: Há lançamentos discrepantes (ex: "${t.description}") que custam muito acima da sua média diária (R$ ${Number(t.amount).toLocaleString('pt-BR')}). Confirme se isso não foi um erro de dígito ou se é de fato Capital Instalado/Imobilizado!`,
+                actionText: 'Editar Lançamento',
+                action: () => openEditTrans ? openEditTrans(t) : null,
                 secondaryActionText: navText,
                 secondaryAction: navAction
             });
@@ -69,20 +73,20 @@ export function FinanceAIInsights({ transactions, accounts, openEditTrans }) {
             const t = weirdIncomes[0];
             suggestions.push({
                 type: 'warning',
-                text: `Sua receita "${t.description}" está categorizada com um nome que soa como Despesa (${t.category}). Revise para não bagunçar seu DRE.`,
+                text: `Sua receita "${t.description}" está declarada na categoria de Despesa (${t.category}). Revise para não bagunçar o DRE.`,
                 actionText: 'Corrigir Lançamento',
-                action: () => openEditTrans ? openEditTrans(t) : document.querySelector('.table-container')?.scrollIntoView({ behavior: 'smooth' })
+                action: () => openEditTrans ? openEditTrans(t) : null
             });
         }
 
-        // 5. Equipment Cross-Module auditing (Magic Requirement!)
+        // 5. Equipment Cross-Module auditing
         const equipmentHeavyExp = allExpenses.filter(t => (t.category?.includes('Equipamento') || t.description?.toLowerCase().includes('manutenção')) && Number(t.amount) > (avgExpense * 1.5)).slice(0, 2);
         equipmentHeavyExp.forEach(t => {
             issues.push({
                 type: 'danger',
-                text: `Alerta de Manutenção Atípica: Lançamento atrelado a maquinário "${t.description}" custou caro para o índice (R$ ${Number(t.amount).toLocaleString('pt-BR')}). Intervenção mecânica grave ou erro de dígito na origem?`,
+                text: `Alerta de Manutenção: Lançamento atrelado a maquinário "${t.description}" foi além do normal (R$ ${Number(t.amount).toLocaleString('pt-BR')}). Mantenha as datas e valores coesos com o módulo de equipamentos.`,
                 actionText: 'Corrigir no Caixa',
-                action: () => openEditTrans ? openEditTrans(t) : document.querySelector('.table-container')?.scrollIntoView({ behavior: 'smooth' }),
+                action: () => openEditTrans ? openEditTrans(t) : null,
                 secondaryActionText: 'Verificar Origem (Máquina)',
                 secondaryAction: () => navigate(t.referenceId ? `/equipments?maintenance_id=${t.referenceId}` : `/equipments`)
             });

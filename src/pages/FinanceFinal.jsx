@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     CreditCard, Wallet, TrendingUp, TrendingDown, Plus, 
     Calendar, DollarSign, Filter, MoreHorizontal, CheckCircle, AlertCircle, Trash2, BarChart2, Edit2,
-    ShoppingBag, Truck, Briefcase, Tag, Zap, Coffee, ArrowUpRight, ArrowDownLeft, Landmark, LayoutGrid, ArrowRight, X, Settings, Search, FileText, Hammer
+    ShoppingBag, Truck, Briefcase, Tag, Zap, Coffee, ArrowUpRight, ArrowDownLeft, Landmark, LayoutGrid, ArrowRight, X, Settings, Search, FileText, Hammer, ListOrdered
 } from 'lucide-react';
 import db from '../services/database';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +15,7 @@ import { calculateFinancialStats } from '../components/FinanceHelpers';
 import { CreditCardManagerModal } from '../components/CreditCardManagerModal';
 import { FinanceTransactionDetailsModal } from '../components/FinanceTransactionDetailsModal';
 import { FinanceAIInsights, SimpleDRETable } from '../components/FinanceAIInsights';
+import { FinanceBatchEntryModal } from '../components/FinanceBatchEntryModal';
 
 const EXPENSE_CATEGORIES = [
     'Administrativo / Fixos',
@@ -280,6 +281,7 @@ export function FinanceFinal() {
     const [loading, setLoading] = useState(true);
     const [chartData, setChartData] = useState([]);
     const [costCenterData, setCostCenterData] = useState([]);
+    const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
     
     // Dynamic Categories State
     const [expenseCategories, setExpenseCategories] = useState(EXPENSE_CATEGORIES);
@@ -700,6 +702,13 @@ export function FinanceFinal() {
                         style={{ padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem' }}
                     >
                         <Plus size={16} /> Novo Lançamento
+                    </button>
+                    <button 
+                        onClick={() => setIsBatchModalOpen(true)}
+                        className="btn bg-purple-100 text-purple-700 btn-sm flex items-center gap-2 hover:bg-purple-200 transition-colors"
+                        style={{ padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem' }}
+                    >
+                        <ListOrdered size={16} /> Lote Retroativo
                     </button>
                     <button 
                         onClick={() => {
@@ -1148,6 +1157,16 @@ export function FinanceFinal() {
         </div>
 
         {/* Modals */}
+        <FinanceBatchEntryModal
+            isOpen={isBatchModalOpen}
+            onClose={() => setIsBatchModalOpen(false)}
+            accounts={accounts}
+            categories={rawCategories}
+            onSaveSuccess={(count) => {
+                alert(`Injeção Bem-sucedida! ${count} lançamentos foram gravados no sistema.`);
+                fetchData();
+            }}
+        />
         <CreditCardManagerModal
             isOpen={!!selectedCreditCard}
             onClose={() => setSelectedCreditCard(null)}
