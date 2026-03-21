@@ -92,6 +92,7 @@ export function Orders() {
   };
 
   const handleCancel = async (order) => {
+    const displayId = String(order.id).slice(-6).toUpperCase();
     if (order.status === 'Cancelado') {
         if (window.confirm(`Este pedido já está cancelado. Deseja excluí-lo MESTRE permanentemente do banco de dados?\n\n⚠️ ISSO APAGARÁ O PEDIDO E TODOS OS REGISTROS FINANCEIROS LIGADOS A ELE (CAIXA / RECEBIMENTOS)!`)) {
             try {
@@ -108,57 +109,63 @@ export function Orders() {
                     }
                 }
                 
-                alert(`Limpeza Integral Concluída: O Pedido #${String(order.id).substring(0,6)} evaporou. ${count} registros financeiros amarrados a ele foram apagados do caixa em cascata.`);
+                alert(`Limpeza Integral Concluída: O Pedido #${displayId} evaporou. ${count} registros financeiros amarrados a ele foram apagados do caixa em cascata.`);
                 fetchOrders();
             } catch(e) {
-                alert("Erro ao excluir. " + e.message);
+                alert(`Erro Crítico na Limpeza do Pedido: ${e.message}`);
+                console.error("Erro deletando:", e);
             }
         }
         return;
     }
 
-    if (!window.confirm(`Tem certeza que deseja cancelar estruturalmente o pedido #${String(order.id).substring(0,6)} de ${order.customer}?\n\nIsso irá:\n1. Mudar o status para Cancelado.\n2. Devolver o estoque físico dos produtos à prateleira.\n3. Gerar uma despesa (-) de ESTORNO para equilibrar o Caixa Financeiro (Se houver dinheiro pago).`)) {
+    if (!window.confirm(`Tem certeza que deseja cancelar o pedido #${displayId} de ${order.customer}?\n\nIsso irá:\n1. Mudar o status para Cancelado.\n2. Devolver o estoque físico.\n3. Gerar Despesa de Estorno no Caixa (Se pago).`)) {
         return;
     }
     
-    // 1. Marca como Cancelado
-    await db.update('orders', order.id, {
-        status: 'Cancelado',
-        cancelDate: new Date().toISOString()
-    });
-
-    // 2. Devolve o Estoque fisicamente! (Anti-Sequestro de mercadoria)
     try {
-        if (order.cartItems && order.cartItems.length > 0) {
-            const allProducts = await db.getAll('products') || [];
-            for (const item of order.cartItems) {
-                 const product = allProducts.find(p => String(p.id) === String(item.productId));
-                 if (product && product.stock !== undefined) {
-                     await db.update('products', product.id, {
-                         stock: product.stock + (Number(item.quantity) || 1)
-                     });
-                 }
-            }
-        }
-    } catch(e) { console.error("Erro ao devolver estoque: ", e); }
-
-    // 3. Aplica Partidas Dobradas: Gera Despesa de Estorno para fechar a conta se já havia recebimento
-    if (order.amountPaid > 0) {
-        await db.create('transactions', {
-             type: 'expense',
-             amount: order.amountPaid,
-             description: `[RESTITUIÇÃO/ESTORNO CONTÁBIL] Cancelamento Pedido #${String(order.id).substring(0,8)}`,
-             category: 'Estornos e Devoluções',
-             date: new Date().toISOString().split('T')[0],
-             status: 'paid', // Estorno imediato auto-limpo
-             orderId: order.id,
-             accountId: '1', // fallback para cofre principal
-             paymentMethod: 'Reembolso'
+        // 1. Marca como Cancelado
+        await db.update('orders', order.id, {
+            status: 'Cancelado',
+            cancelDate: new Date().toISOString()
         });
-    }
 
-    alert('Sistema Auditado: Pedido cancelado com total segurança. Estoque destrancado e estorno financeiro registrado caso aplicável.');
-    fetchOrders();
+        // 2. Devolve o Estoque fisicamente! (Anti-Sequestro de mercadoria)
+        try {
+            if (order.cartItems && order.cartItems.length > 0) {
+                const allProducts = await db.getAll('products') || [];
+                for (const item of order.cartItems) {
+                     const product = allProducts.find(p => String(p.id) === String(item.productId));
+                     if (product && product.stock !== undefined) {
+                         await db.update('products', product.id, {
+                             stock: product.stock + (Number(item.quantity) || 1)
+                         });
+                     }
+                }
+            }
+        } catch(e) { console.error("Erro ao devolver estoque: ", e); }
+
+        // 3. Aplica Partidas Dobradas: Gera Despesa de Estorno
+        if (order.amountPaid && Number(order.amountPaid) > 0) {
+            await db.create('transactions', {
+                 type: 'expense',
+                 amount: Number(order.amountPaid),
+                 description: `[RESTITUIÇÃO/ESTORNO CONTÁBIL] Cancelamento Pedido #${displayId}`,
+                 category: 'Estornos e Devoluções',
+                 date: new Date().toISOString().split('T')[0],
+                 status: 'paid', // Estorno imediato auto-limpo
+                 orderId: String(order.id),
+                 accountId: '1', // fallback para cofre principal
+                 paymentMethod: 'Reembolso'
+            });
+        }
+
+        alert('Sistema Auditado: Pedido cancelado com total segurança. Estoque destrancado e estorno financeiro registrado caso aplicável.');
+        fetchOrders();
+    } catch(e) {
+        alert(`Erro Oculto ao Cancelar: ${e.message}`);
+        console.error("Erro no HandleCancel:", e);
+    }
   };
 
   const handleCompleteOrder = (order) => {
