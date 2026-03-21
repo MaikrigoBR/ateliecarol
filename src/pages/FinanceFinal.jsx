@@ -1187,15 +1187,20 @@ export function FinanceFinal() {
         />
 
             {isAccModalOpen && (
-                <div className="modal-overlay" style={{ zIndex: 1000 }}>
-                    <div className="modal-content" style={{ maxWidth: '450px', width: '100%' }} onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">{editAccId ? 'Editar' : 'Nova'} Conta</h2>
-                            <button type="button" className="btn btn-icon" onClick={() => setIsAccModalOpen(false)}>
+                <div className="modal-overlay" style={{ display: 'flex', zIndex: 1000 }}>
+                    <div className="modal-content animate-scale-in" style={{ maxWidth: '450px', width: '95%', backgroundColor: 'var(--surface)', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div style={{ backgroundColor: 'var(--primary)', color: 'white', padding: '6px', borderRadius: '8px', display: 'flex' }}>
+                                    <Wallet size={20} />
+                                </div>
+                                {editAccId ? 'Editar Conta' : 'Nova Conta'}
+                            </h2>
+                            <button type="button" className="btn btn-icon" onClick={() => setIsAccModalOpen(false)} style={{ color: 'var(--text-muted)' }}>
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="modal-body">
+                        <div style={{ padding: '1.5rem' }}>
                             <form onSubmit={handleSaveAccount} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div className="input-group">
                                     <label className="form-label">Nome da Conta</label>
@@ -1205,25 +1210,31 @@ export function FinanceFinal() {
                                     <div className="input-group">
                                         <label className="form-label">Tipo</label>
                                         <select className="form-input w-full" value={newAccount.type} onChange={e => setNewAccount({...newAccount, type: e.target.value})}>
-                                            <option value="checking">Conta Corrente</option>
-                                            <option value="cash">Carteira (Dinheiro)</option>
+                                            <option value="checking">Conta/Bancária</option>
+                                            <option value="cash">Carteira (Espécie)</option>
                                             <option value="credit">Cartão de Crédito</option>
                                         </select>
                                     </div>
                                     <div className="input-group">
                                         <label className="form-label">Saldo Inicial</label>
-                                        <input type="number" step="0.01" className="form-input w-full" value={newAccount.balance} onChange={e => setNewAccount({...newAccount, balance: e.target.value})} />
+                                        <div style={{ position: 'relative' }}>
+                                            <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.875rem' }}>R$</span>
+                                            <input type="number" step="0.01" className="form-input w-full" style={{ paddingLeft: '32px' }} value={newAccount.balance} onChange={e => setNewAccount({...newAccount, balance: e.target.value})} />
+                                        </div>
                                     </div>
                                 </div>
                                 {newAccount.type === 'credit' && (
-                                    <div className="input-group">
-                                        <label className="form-label">Limite do Cartão</label>
-                                        <input type="number" step="0.01" className="form-input w-full" value={newAccount.limit} onChange={e => setNewAccount({...newAccount, limit: e.target.value})} />
+                                    <div className="input-group p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl justify-center items-center">
+                                        <label className="form-label text-purple-900 dark:text-purple-300">Limite do Cartão</label>
+                                        <div style={{ position: 'relative' }}>
+                                            <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.875rem' }}>R$</span>
+                                            <input type="number" step="0.01" className="form-input w-full border-purple-200" style={{ paddingLeft: '32px' }} value={newAccount.limit} onChange={e => setNewAccount({...newAccount, limit: e.target.value})} />
+                                        </div>
                                     </div>
                                 )}
-                                <div className="modal-footer" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-                                    <button type="button" onClick={() => setIsAccModalOpen(false)} className="btn btn-secondary">Cancelar</button>
-                                    <button type="submit" className="btn btn-primary">Salvar</button>
+                                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                    <button type="button" onClick={() => setIsAccModalOpen(false)} className="btn" style={{ backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)' }}>Cancelar</button>
+                                    <button type="submit" className="btn btn-primary" style={{ backgroundColor: 'var(--primary)' }}>{editAccId ? 'Atualizar' : 'Salvar Conta'}</button>
                                 </div>
                             </form>
                         </div>
@@ -1232,30 +1243,41 @@ export function FinanceFinal() {
             )}
 
             {isTransModalOpen && (
-                <div className="modal-overlay" style={{ zIndex: 1000 }}>
-                    <div className="modal-content" style={{ maxWidth: '500px', width: '100%' }} onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">{editTransId ? 'Editar' : 'Novo'} Lançamento</h2>
-                            <button type="button" className="btn btn-icon" onClick={() => setIsTransModalOpen(false)}>
+                <div className="modal-overlay" style={{ display: 'flex', zIndex: 1000 }}>
+                    <div className="modal-content animate-scale-in" style={{ maxWidth: '500px', width: '95%', backgroundColor: 'var(--surface)', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div style={{ backgroundColor: 'var(--primary)', color: 'white', padding: '6px', borderRadius: '8px', display: 'flex' }}>
+                                    <FileText size={20} />
+                                </div>
+                                {editTransId ? 'Editar Lançamento' : 'Novo Lançamento'}
+                            </h2>
+                            <button type="button" className="btn btn-icon" onClick={() => setIsTransModalOpen(false)} style={{ color: 'var(--text-muted)' }}>
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="modal-body">
+                        <div style={{ padding: '1.5rem', overflowY: 'auto', maxHeight: '70vh' }} className="scrollbar-hide">
                             <form onSubmit={handleSaveTrans} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div className="input-group">
-                                    <label className="form-label">Descrição</label>
-                                    <input type="text" required className="form-input w-full" value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} />
+                                    <label className="form-label">Descrição da Movimentação</label>
+                                    <input type="text" required className="form-input w-full" placeholder="Ex: Fornecedor Papel" value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} />
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                     <div className="input-group">
-                                        <label className="form-label">Valor</label>
-                                        <input type="number" step="0.01" required className="form-input w-full" value={newTrans.amount} onChange={e => setNewTrans({...newTrans, amount: e.target.value})} />
+                                        <label className="form-label">Valor (R$)</label>
+                                        <div style={{ position: 'relative' }}>
+                                            <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.875rem' }}>R$</span>
+                                            <input type="number" step="0.01" required className="form-input w-full font-bold" style={{ paddingLeft: '32px' }} value={newTrans.amount} onChange={e => setNewTrans({...newTrans, amount: e.target.value})} />
+                                        </div>
                                     </div>
                                     <div className="input-group">
-                                        <label className="form-label">Tipo</label>
-                                        <select className="form-input w-full" value={newTrans.type} onChange={e => setNewTrans({...newTrans, type: e.target.value, category: e.target.value === 'income' ? 'Vendas de Produtos' : 'Outros'})}>
-                                            <option value="expense">Despesa (-)</option>
-                                            <option value="income">Receita (+)</option>
+                                        <label className="form-label">Tipo de Lançamento</label>
+                                        <select 
+                                            className="form-input w-full font-bold" 
+                                            style={{ color: newTrans.type === 'income' ? '#10b981' : '#ef4444', backgroundColor: newTrans.type === 'income' ? '#ecfdf5' : '#fef2f2' }}
+                                            value={newTrans.type} onChange={e => setNewTrans({...newTrans, type: e.target.value, category: e.target.value === 'income' ? 'Vendas de Produtos' : 'Outros'})}>
+                                            <option value="expense">Despesa (Saída -)</option>
+                                            <option value="income">Receita (Entrada +)</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1269,15 +1291,15 @@ export function FinanceFinal() {
                                                     <option key={cat} value={cat}>{cat}</option>
                                                 ))}
                                             </select>
-                                            <button type="button" onClick={() => setIsCategoryModalOpen(true)} className="btn btn-secondary border-gray-200 p-2 shrink-0 bg-gray-50 flex items-center justify-center" style={{ width: '42px', height: '42px' }} title="Gerenciar Categorias">
+                                            <button type="button" onClick={() => setIsCategoryModalOpen(true)} className="btn p-2 shrink-0 flex items-center justify-center" style={{ width: '40px', height: '40px', border: '1px solid var(--border)', backgroundColor: 'var(--surface-hover)' }} title="Gerenciar Categorias">
                                                 <Settings size={18} className="text-gray-500" />
                                             </button>
                                         </div>
                                     </div>
                                     <div className="input-group">
-                                        <label className="form-label">Conta/Cartão</label>
+                                        <label className="form-label">Conta/Cartão Relacionado</label>
                                         <select required className="form-input w-full" value={newTrans.accountId} onChange={e => setNewTrans({...newTrans, accountId: e.target.value})}>
-                                            <option value="">Selecione...</option>
+                                            <option value="">Selecione a fonte...</option>
                                             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                         </select>
                                     </div>
@@ -1288,55 +1310,56 @@ export function FinanceFinal() {
                                     
                                     return (
                                         <>
-                                            {/* Se for Crédito e Despesa */}
+                                            {/* Crédito e Despesa */}
                                             {isCredit && newTrans.type === 'expense' && !editTransId && (
-                                                <div className="input-group p-4 bg-purple-50 rounded-xl border border-purple-100">
-                                                    <label className="form-label text-purple-900 flex items-center gap-2 mb-3">
+                                                <div className="input-group p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-100">
+                                                    <label className="form-label text-purple-900 dark:text-purple-300 flex items-center gap-2 mb-3">
                                                         <CreditCard size={16} /> Condição de Pagamento (Cartão)
                                                     </label>
-                                                    <select className="form-input w-full bg-white border-purple-200 focus:border-purple-500 focus:ring-purple-500" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})}>
+                                                    <select className="form-input w-full bg-white dark:bg-gray-800 border-purple-200 focus:border-purple-500 focus:ring-purple-500" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})}>
                                                         {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
                                                             <option key={n} value={n}>{n === 1 ? '1x (À vista na próxima fatura)' : `${n}x de R$ ${(Number(newTrans.amount || 0)/n).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}</option>
                                                         ))}
                                                     </select>
-                                                    <div className="text-[11px] text-purple-600/70 mt-3 flex items-start gap-1">
+                                                    <div className="text-[11px] text-purple-600/70 dark:text-purple-300/70 mt-3 flex items-start gap-1">
                                                         <AlertCircle size={12} className="shrink-0 mt-0.5" />
-                                                        Dica: A data da transação será agrupada e cobrada diretamente nas faturas de acordo com o dia de fechamento deste cartão. Jogue o Valor Total da compra acima.
+                                                        Dica: A transação será cobrada diretamente nas faturas de acordo com o fechamento deste cartão. Jogue o Valor Total da compra Acima.
                                                     </div>
                                                 </div>
                                             )}
 
-                                            {/* Dados Genéricos de Data se não for crédito (ou se já estiver sendo editado) */}
+                                            {/* Datas (não for crédito ou editTransId) */}
                                             {(!isCredit || editTransId || newTrans.type === 'income') && (
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                                     <div className="input-group">
-                                                        <label className="form-label flex items-center gap-1.5"><Calendar size={14} className="text-gray-400" /> Data de Competência</label>
+                                                        <label className="form-label flex items-center gap-1.5"><Calendar size={14} className="text-gray-400" /> Competência / Fato</label>
                                                         <input type="date" required className="form-input w-full" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} />
                                                     </div>
                                                     <div className="input-group">
                                                         <label className="form-label">Situação</label>
                                                         <select required className="form-input w-full" value={newTrans.status} onChange={e => setNewTrans({...newTrans, status: e.target.value})}>
-                                                            <option value="paid">{newTrans.type === 'income' ? 'Recebido (+)' : 'Pago (-)'}</option>
-                                                            <option value="pending">{newTrans.type === 'income' ? 'A Receber' : 'A Pagar / Agendado'}</option>
+                                                            <option value="paid">{newTrans.type === 'income' ? 'Recebido/Creditado (+)' : 'Pago/Debitado (-)'}</option>
+                                                            <option value="pending">{newTrans.type === 'income' ? 'A Receber (Proj.)' : 'A Pagar (Proj.)'}</option>
                                                         </select>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            {/* Recorrência Conta Corrente */}
+                                            {/* Controle Automático Recorrente */}
                                             {!editTransId && !isCredit && (
-                                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-2 transition-all hover:border-blue-200">
-                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                <div style={{ backgroundColor: 'var(--surface-hover)', borderRadius: '12px', padding: '16px', marginTop: '8px', border: '1px solid var(--border)' }}>
+                                                    <label className="flex items-center gap-3 cursor-pointer">
                                                         <input 
                                                             type="checkbox" 
                                                             checked={newTrans.isRecurring} 
                                                             onChange={e => setNewTrans({...newTrans, isRecurring: e.target.checked})} 
-                                                            className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" 
+                                                            className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary" 
+                                                            style={{ accentColor: 'var(--primary)' }}
                                                         />
-                                                        <span className="text-sm font-bold text-gray-700">Lançamento Controlado Automático</span>
+                                                        <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Lançamento Controlado Automático</span>
                                                     </label>
                                                     {newTrans.isRecurring && (
-                                                        <div className="mt-3 pl-6 flex items-center gap-3 animate-fade-in">
+                                                        <div className="mt-3 pl-7 flex items-center gap-3 animate-fade-in">
                                                             <span className="text-sm text-gray-500 font-medium">Repetir por</span>
                                                             <input type="number" min="2" max="60" className="form-input w-20 text-center py-1.5" value={newTrans.recurrenceMonths} onChange={e => setNewTrans({...newTrans, recurrenceMonths: e.target.value})} />
                                                             <span className="text-sm text-gray-500 font-medium">meses todo dia {newTrans.date.split('-')[2] || '01'}</span>
@@ -1347,9 +1370,12 @@ export function FinanceFinal() {
                                         </>
                                     );
                                 })()}
-                                <div className="modal-footer" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-                                    <button type="button" onClick={() => setIsTransModalOpen(false)} className="btn btn-secondary">Cancelar</button>
-                                    <button type="submit" className="btn btn-primary">Salvar Lançamento</button>
+                                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                    <button type="button" onClick={() => setIsTransModalOpen(false)} className="btn" style={{ backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)' }}>Cancelar</button>
+                                    <button type="submit" className="btn btn-primary" style={{ backgroundColor: 'var(--primary)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <CheckCircle size={16} />
+                                        Salvar Lançamento
+                                    </button>
                                 </div>
                             </form>
                         </div>
