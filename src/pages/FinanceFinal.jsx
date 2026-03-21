@@ -1141,7 +1141,7 @@ export function FinanceFinal() {
                                     </span>
                                 </td>
                                 <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
-                                    {acc?.name || '-'}
+                                    {acc?.name || (!t.accountId ? 'A Definir' : 'Excluída')}
                                 </td>
                                 <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right', fontWeight: 800, color: isExpense ? '#ef4444' : '#10b981', fontSize: '1rem' }}>
                                     {isExpense ? '-' : '+'} R$ {Number(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

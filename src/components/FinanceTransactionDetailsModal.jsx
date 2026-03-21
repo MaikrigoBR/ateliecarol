@@ -193,7 +193,7 @@ export function FinanceTransactionDetailsModal({ transaction, isOpen, onClose, o
                                     </select>
                                 ) : (
                                     <div style={{ fontSize: '1rem', fontWeight: 600, color: '#334155', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-                                        {accounts.find(a => a.id === formData.accountId)?.name || 'Conta Remanescente/Excluída'}
+                                        {formData.accountId ? (accounts.find(a => a.id === formData.accountId)?.name || 'Conta Remanescente/Excluída') : 'A Definir'}
                                     </div>
                                 )}
                             </div>
