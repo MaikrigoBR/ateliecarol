@@ -4,12 +4,15 @@ import db from '../services/database';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, PieChart, Pie
 } from 'recharts';
+import { FinanceTransactionDetailsModal } from '../components/FinanceTransactionDetailsModal';
 import '../css/pages.css';
 
 export function CreditCards() {
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [allAccounts, setAllAccounts] = useState([]);
+    const [expenseCategories, setExpenseCategories] = useState([]);
+    const [incomeCategories, setIncomeCategories] = useState([]);
     const [selectedCardId, setSelectedCardId] = useState(null);
     const [selectedMonthOffset, setSelectedMonthOffset] = useState(0);
 
@@ -18,10 +21,14 @@ export function CreditCards() {
     const [paymentAccId, setPaymentAccId] = useState('');
     const [editAccId, setEditAccId] = useState(null);
     const [newAccount, setNewAccount] = useState({ name: '', type: 'credit', balance: 0, limit: 0, dueDay: 10, closeDay: '', color: '#8b5cf6' });
+    const [selectedDetailTrans, setSelectedDetailTrans] = useState(null);
 
     const fetchData = async () => {
         const accs = await db.getAll('accounts');
         const trans = await db.getAll('transactions');
+        const dbCategories = await db.getAll('categories') || [];
+        setExpenseCategories(dbCategories.filter(c => c.type === 'expense').map(c => c.name));
+        setIncomeCategories(dbCategories.filter(c => c.type === 'income').map(c => c.name));
         const cards = accs.filter(a => a.type === 'credit');
         setAllAccounts(accs);
         setAccounts(cards);
@@ -51,14 +58,14 @@ export function CreditCards() {
 
     const handleDeleteAccount = async (id, e) => {
         e.stopPropagation();
-        if(window.confirm('Tem certeza que deseja excluir este cartão de crédito? As transações atreladas a ele perderão vínculo e a fatura ficará órfã.')) {
+        if(window.confirm('Tem certeza que deseja inativar este cartão de crédito? (Soft Delete)\nEle sumirá da lista, mas o histórico de lançamentos atrelados a ele será preservado financeiramente.')) {
             try {
-                await db.delete('accounts', id);
+                await db.update('accounts', id, { deleted: true });
                 if (selectedCardId === id) setSelectedCardId(null);
                 await fetchData();
             } catch (error) {
-                console.error("Erro ao excluir cartão:", error);
-                alert("Falha ao excluir o cartão.");
+                console.error("Erro ao inativar cartão:", error);
+                alert("Falha ao inativar o cartão.");
             }
         }
     };
@@ -156,12 +163,13 @@ export function CreditCards() {
 
         return transactions.filter(t => {
             if (t.accountId !== selectedCard.id) return false;
-            if (t.type !== 'income') return false; // Pagamentos são entradas
-            // Filtra só os pagamentos que caem no mes dessa fatura, mas idealmente marcamos um metadado
-            // Mas checando o mesmo mês já serve na maioria dos casos básicos.
+            // Pagamentos da fatura são registrados como 'income' (entradas que restauram o limite)
+            if (t.type !== 'income') return false; 
+            
+            // Filtra só os pagamentos que caem no mês desta fatura
             const [y, m, d] = t.date.split('-');
             const transDate = new Date(y, m - 1, d);
-            return isSameMonth(transDate, targetDate) && t.description.includes('Pagamento Fatura');
+            return isSameMonth(transDate, targetDate);
         }).reduce((acc, t) => acc + Number(t.amount || 0), 0);
     }, [transactions, selectedCard, selectedMonthOffset]);
 
@@ -546,7 +554,13 @@ export function CreditCards() {
                         </thead>
                         <tbody>
                             {currentInvoiceTrans.map(trans => (
-                                <tr key={trans.id} style={{ borderBottom: '1px solid var(--border)' }} className="hover:bg-gray-50/10 transition-colors">
+                                <tr 
+                                    key={trans.id} 
+                                    onClick={() => setSelectedDetailTrans(trans)}
+                                    style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }} 
+                                    className="hover:bg-blue-50 transition-colors"
+                                    title="Editar Lançamento"
+                                >
                                     <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
                                         {new Date(trans.date).toLocaleDateString()}
                                     </td>
@@ -668,6 +682,16 @@ export function CreditCards() {
                     </div>
                 </div>
             )}
+
+            <FinanceTransactionDetailsModal
+                isOpen={!!selectedDetailTrans}
+                onClose={() => setSelectedDetailTrans(null)}
+                transaction={selectedDetailTrans}
+                onUpdate={fetchData}
+                accounts={allAccounts}
+                expenseCategories={expenseCategories}
+                incomeCategories={incomeCategories}
+            />
 
         </div>
     );
