@@ -36,8 +36,9 @@ export function FinanceTransactionDetailsModal({ transaction, isOpen, onClose, o
     };
 
     const handleSave = async () => {
-        if (!formData.description || !formData.amount || !formData.accountId) {
-             alert("Preencha todos os campos chave."); return;
+        if (!formData.description || formData.amount === undefined || formData.amount === '' || !formData.accountId) {
+             alert(`Por favor, preencha todos os campos.\nAssegure-se de que selecionou a "Conta / Fonte" na lista (ela é obrigatória).\n\nValores diagnosticados:\n- Descrição: ${formData.description ? 'OK' : 'Vazio'}\n- Valor: ${formData.amount !== undefined && formData.amount !== '' ? 'OK' : 'Vazio'}\n- Conta Selecionada: ${formData.accountId || 'Nenhuma (Por favor, clique e selecione)'}`); 
+             return;
         }
         try {
             await db.update('transactions', transaction.id, {
@@ -188,7 +189,8 @@ export function FinanceTransactionDetailsModal({ transaction, isOpen, onClose, o
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>Conta / Fonte</label>
                                 {editMode ? (
-                                    <select className="form-input" style={{ width: '100%', padding: '12px' }} value={formData.accountId} onChange={e => setFormData({...formData, accountId: e.target.value})}>
+                                    <select className="form-input" style={{ width: '100%', padding: '12px' }} value={formData.accountId || ''} onChange={e => setFormData({...formData, accountId: e.target.value})}>
+                                        <option value="" disabled>-- Selecione a Conta Obrigatória --</option>
                                         {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>
                                 ) : (
