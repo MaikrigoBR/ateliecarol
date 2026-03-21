@@ -93,9 +93,26 @@ export function Orders() {
 
   const handleCancel = async (order) => {
     if (order.status === 'Cancelado') {
-        if (window.confirm('Este pedido já está cancelado. Deseja excluí-lo MESTRE permanentemente do banco de dados (Ação estritamente de limpeza de disco)?')) {
-            await db.delete('orders', order.id);
-            fetchOrders();
+        if (window.confirm(`Este pedido já está cancelado. Deseja excluí-lo MESTRE permanentemente do banco de dados?\n\n⚠️ ISSO APAGARÁ O PEDIDO E TODOS OS REGISTROS FINANCEIROS LIGADOS A ELE (CAIXA / RECEBIMENTOS)!`)) {
+            try {
+                // 1. Apaga a Origem
+                await db.delete('orders', order.id);
+                
+                // 2. Apaga os Rastros (Transações Financeiras Ligadas)
+                const allTrans = await db.getAll('transactions');
+                let count = 0;
+                for (const t of allTrans) {
+                    if (String(t.orderId) === String(order.id)) {
+                        await db.delete('transactions', t.id);
+                        count++;
+                    }
+                }
+                
+                alert(`Limpeza Integral Concluída: O Pedido #${String(order.id).substring(0,6)} evaporou. ${count} registros financeiros amarrados a ele foram apagados do caixa em cascata.`);
+                fetchOrders();
+            } catch(e) {
+                alert("Erro ao excluir. " + e.message);
+            }
         }
         return;
     }
