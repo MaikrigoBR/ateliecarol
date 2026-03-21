@@ -137,6 +137,7 @@ function BusinessHoursSettings() {
 
 function RolesSettings() {
     const [roles, setRoles] = useState([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [newRole, setNewRole] = useState({ name: '', baseSalary: '', enforceWorkingHours: false });
 
     useEffect(() => { loadRoles(); }, []);
@@ -153,7 +154,7 @@ function RolesSettings() {
         if (!newRole.name) return;
         
         // Check if role already exists
-        const exists = roles.find(r => r.name.toLowerCase() === newRole.name.toLowerCase());
+        const exists = roles.find(r => r.name.toLowerCase() === newRole.name.toLowerCase() && !r.deleted);
         if (exists) {
             alert('Cargo já existe!');
             return;
@@ -164,78 +165,146 @@ function RolesSettings() {
             baseSalary: parseFloat(newRole.baseSalary) || 0,
             enforceWorkingHours: newRole.enforceWorkingHours 
         });
-        setNewRole({ name: '', baseSalary: '', enforceWorkingHours: false });
+        
+        handleClose();
         loadRoles();
     };
 
-    const handleDelete = async (id) => {
-        if(window.confirm('Excluir este cargo?')) {
-            await db.delete('roles', id);
+    const handleDelete = async (id, name) => {
+        if(window.confirm(`Inativar cargo "${name}"?\n(Não deletará usuários que já possuem este cargo)`)) {
+            await db.update('roles', id, { deleted: true });
             loadRoles();
         }
     };
 
+    const handleOpenNew = () => {
+        setNewRole({ name: '', baseSalary: '', enforceWorkingHours: false });
+        setIsModalOpen(true);
+    };
+
+    const handleClose = () => {
+        setIsModalOpen(false);
+        setNewRole({ name: '', baseSalary: '', enforceWorkingHours: false });
+    };
+
     return (
         <div className="card animate-fade-in">
-            <div className="card-header">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h3 className="card-title flex items-center gap-sm"><Users size={20} /> Cargos & Salários Base</h3>
-                    <p className="text-muted text-sm">Defina os cargos padrão e salários sugeridos para padronização.</p>
+                    <h3 className="card-title flex items-center gap-2 text-purple-800"><Users size={20} /> Cargos & Salários Base</h3>
+                    <p className="text-muted text-sm pb-2">Defina os cargos padrão, salários sugeridos e restrições de horário.</p>
                 </div>
+                <button onClick={handleOpenNew} className="btn btn-primary shadow-sm hover:-translate-y-0.5" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1rem', borderRadius: '8px', fontWeight: 600 }}>
+                    <Plus size={16} /> Novo Cargo
+                </button>
             </div>
             
-            <form onSubmit={handleAdd} className="flex gap-4 items-center mb-6 p-4 bg-surface-hover rounded-md flex-wrap">
-                <div className="flex-1 min-w-[200px]">
-                    <label className="form-label text-xs">Nome do Cargo</label>
-                    <input className="form-input" placeholder="Ex: Designer Pleno" value={newRole.name} onChange={e => setNewRole({...newRole, name: e.target.value})} required />
-                </div>
-                <div className="w-32">
-                    <label className="form-label text-xs">Salário Base (R$)</label>
-                    <input type="number" step="0.01" className="form-input" placeholder="0.00" value={newRole.baseSalary} onChange={e => setNewRole({...newRole, baseSalary: e.target.value})} />
-                </div>
-                <div className="flex items-center gap-2 mt-4">
-                    <input 
-                        type="checkbox" 
-                        id="chk-enforce" 
-                        checked={newRole.enforceWorkingHours} 
-                        onChange={e => setNewRole({...newRole, enforceWorkingHours: e.target.checked})}
-                        className="accent-primary"
-                    />
-                    <label htmlFor="chk-enforce" className="text-xs text-gray-700 cursor-pointer">
-                        Restringir Acesso Fora do Expediente
-                    </label>
-                </div>
-                <button type="submit" className="btn btn-primary mt-4"><Plus size={16} /> Adicionar</button>
-            </form>
-
-            <div className="table-container">
-                <table className="table">
-                    <thead><tr><th>Cargo</th><th>Salário Base (Sugerido)</th><th>Restrição de Horário</th><th>Ações</th></tr></thead>
-                    <tbody>
+            <div className="overflow-x-auto mt-4 px-4 pb-4">
+                <table className="w-full text-left text-sm">
+                    <thead>
+                        <tr className="border-b border-gray-200 text-gray-500 font-medium">
+                            <th className="pb-2">Cargo</th>
+                            <th className="pb-2">Salário Base (Sugerido)</th>
+                            <th className="pb-2">Fuso (Obrigatório)</th>
+                            <th className="pb-2 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
                         {roles.map(r => (
-                            <tr key={r.id}>
-                                <td className="font-medium text-gray-800">{r.name}</td>
-                                <td>R$ {r.baseSalary?.toFixed(2)}</td>
-                                <td>
+                            <tr key={r.id} className="hover:bg-purple-50 transition-colors">
+                                <td className="py-3 font-medium text-gray-800">{r.name}</td>
+                                <td className="py-3 text-gray-600 font-mono">
+                                    {r.baseSalary ? `R$ ${r.baseSalary.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : 'R$ 0,00'}
+                                </td>
+                                <td className="py-3 text-gray-600">
                                     {r.enforceWorkingHours ? (
-                                        <span className="badge badge-warning text-[10px] py-0.5">Sim</span>
+                                        <span className="badge badge-warning text-[10px] py-0.5"><Clock size={10} className="inline mr-1" /> Restrito</span>
                                     ) : (
-                                        <span className="text-muted text-xs">Não</span>
+                                        <span className="text-muted text-xs">Livre Acesso</span>
                                     )}
                                 </td>
-                                <td><button onClick={() => handleDelete(r.id)} className="text-danger p-1"><Trash2 size={16} /></button></td>
+                                <td className="py-3 text-right flex justify-end gap-1">
+                                    <button onClick={() => handleDelete(r.id, r.name)} className="text-gray-400 hover:text-red-500 transition-colors p-2" title="Inativar Cargo"><Trash2 size={16} /></button>
+                                </td>
                             </tr>
                         ))}
-                        {roles.length === 0 && <tr><td colSpan="4" className="text-center text-muted py-4">Nenhum cargo definido.</td></tr>}
+                        {roles.length === 0 && <tr><td colSpan="4" className="text-center text-muted py-8 bg-gray-50/50 rounded-lg">Nenhum cargo definido.</td></tr>}
                     </tbody>
                 </table>
             </div>
+
+            {/* Popup Modal */}
+            {isModalOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1000 }}>
+                    <div className="modal-content animate-slide-up" style={{ maxWidth: '450px', width: '100%', padding: '24px', backgroundColor: 'var(--surface)', borderRadius: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                                Novo Cargo / Nível
+                            </h2>
+                            <button onClick={handleClose} style={{ background: 'var(--surface-hover)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Nome da Função/Cargo <span style={{color: '#ef4444'}}>*</span></label>
+                                <input 
+                                    required 
+                                    type="text" 
+                                    placeholder="Ex: Designer Pleno, Atendente..." 
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                    value={newRole.name} 
+                                    onChange={e => setNewRole({...newRole, name: e.target.value})} 
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Piso Salarial (R$) <span className="text-muted font-normal">(Sugerido)</span></label>
+                                <input 
+                                    type="number" step="0.01" 
+                                    placeholder="Ex: 2500.00" 
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                    value={newRole.baseSalary} 
+                                    onChange={e => setNewRole({...newRole, baseSalary: e.target.value})} 
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', padding: '12px', background: 'var(--surface-hover)', borderRadius: '8px' }}>
+                                <input 
+                                    type="checkbox" 
+                                    id="chk-enforce-modal" 
+                                    checked={newRole.enforceWorkingHours} 
+                                    onChange={e => setNewRole({...newRole, enforceWorkingHours: e.target.checked})}
+                                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                                />
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <label htmlFor="chk-enforce-modal" style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', marginBottom: '2px' }}>
+                                        Restringir Sistema por Expediente
+                                    </label>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                        Se verificado, os usuários com este cargo não poderão logar fora do horário definido em "Expediente".
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                                <button type="button" onClick={handleClose} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface-hover)', color: 'var(--text-main)', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                    Cancelar
+                                </button>
+                                <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--primary)', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                    Criar Cargo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 function CategoriesSettings() {
     const [categories, setCategories] = useState([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [newName, setNewName] = useState('');
 
     useEffect(() => { loadCats(); }, []);
@@ -243,49 +312,99 @@ function CategoriesSettings() {
     const loadCats = async () => {
         try {
             const data = await db.getAll('categories');
-            setCategories(Array.isArray(data) ? data : []);
+            // sort categories alphabetically
+            const sorted = (Array.isArray(data) ? data : []).sort((a,b) => a.name?.localeCompare(b.name));
+            setCategories(sorted);
         } catch (e) { console.error(e); }
     };
 
     const handleAdd = async (e) => {
         e.preventDefault();
-        if (!newName) return;
-        await db.create('categories', { name: newName });
+        if (!newName.trim()) return;
+
+        const exists = categories.find(c => c.name.toLowerCase() === newName.trim().toLowerCase() && !c.deleted);
+        if (exists) {
+            alert('Categoria já existe!');
+            return;
+        }
+
+        await db.create('categories', { name: newName.trim() });
         setNewName('');
+        setIsModalOpen(false);
         loadCats();
     };
 
-    const handleDelete = async (id) => {
-        if(window.confirm('Excluir categoria?')) {
-            await db.delete('categories', id);
+    const handleDelete = async (id, name) => {
+        if(window.confirm(`Tem certeza que deseja inativar a categoria "${name}"?\nIsso não afetará os produtos que já estão classificados nela.`)) {
+            await db.update('categories', id, { deleted: true });
             loadCats();
         }
     };
 
     return (
         <div className="card animate-fade-in">
-             <div className="card-header">
+             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                     <h3 className="card-title flex items-center gap-sm"><Tags size={20} /> Categorias de Produtos</h3>
-                     <p className="text-muted text-sm">Padronize as categorias para relatórios mais precisos.</p>
+                     <h3 className="card-title flex items-center gap-2 text-purple-800"><Tags size={20} /> Categorias de Produtos</h3>
+                     <p className="text-muted text-sm pb-2">Padronize as categorias para organização do catálogo e relatórios mais precisos.</p>
                 </div>
+                <button onClick={() => setIsModalOpen(true)} className="btn btn-primary shadow-sm hover:-translate-y-0.5" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1rem', borderRadius: '8px', fontWeight: 600 }}>
+                    <Plus size={16} /> Nova Categoria
+                </button>
             </div>
-             <form onSubmit={handleAdd} className="flex gap-2 items-end mb-6 p-4 bg-surface-hover rounded-md">
-                <div className="flex-1">
-                    <label className="form-label text-xs">Nova Categoria</label>
-                    <input className="form-input" placeholder="Ex: Cadernos, Canetas..." value={newName} onChange={e => setNewName(e.target.value)} required />
-                </div>
-                <button type="submit" className="btn btn-primary"><Plus size={16} /></button>
-            </form>
-            <div className="flex flex-wrap gap-2">
+            
+            <div className="flex flex-wrap gap-3 p-4 bg-gray-50/50 rounded-b-xl border-t border-gray-100 min-h-[100px]">
                 {categories.map(c => (
-                    <div key={c.id} className="badge badge-neutral flex gap-2 items-center text-sm py-2 px-3">
-                        {c.name}
-                        <button onClick={() => handleDelete(c.id)} className="text-danger ml-2"><Trash2 size={14} /></button>
+                    <div key={c.id} className="flex items-center gap-1 py-1 px-3 bg-white border border-gray-200 rounded-full shadow-sm hover:border-purple-300 transition-colors group">
+                        <span className="text-sm font-medium text-gray-700">{c.name}</span>
+                        <button onClick={() => handleDelete(c.id, c.name)} className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Inativar">
+                            <Trash2 size={14} />
+                        </button>
                     </div>
                 ))}
-                 {categories.length === 0 && <span className="text-muted text-sm">Nenhuma categoria definida.</span>}
+                {categories.length === 0 && <span className="text-muted text-sm w-full text-center py-4">Nenhuma categoria ativa cadastrada.</span>}
             </div>
+
+            {/* Popup Modal */}
+            {isModalOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1000 }}>
+                    <div className="modal-content animate-slide-up" style={{ maxWidth: '400px', width: '100%', padding: '24px', backgroundColor: 'var(--surface)', borderRadius: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                                Nova Categoria
+                            </h2>
+                            <button onClick={() => setIsModalOpen(false)} style={{ background: 'var(--surface-hover)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Nome da Categoria <span style={{color: '#ef4444'}}>*</span></label>
+                                <input 
+                                    required 
+                                    autoFocus
+                                    type="text" 
+                                    placeholder="Ex: Cadernos Personalizados" 
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                    value={newName} 
+                                    onChange={e => setNewName(e.target.value)} 
+                                />
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>Ajuda a organizar os produtos na Loja Virtual Mágica e separar relatórios de vendas.</p>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface-hover)', color: 'var(--text-main)', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                    Cancelar
+                                </button>
+                                <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--primary)', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                    Criar Categoria
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -353,11 +472,12 @@ function AuditLogViewer() {
 
 function AccountsSettings() {
     const [accounts, setAccounts] = useState([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ 
         name: '', 
         type: 'bank', 
         balance: '', 
-        limit: '', // Added limit
+        limit: '', 
         currency: 'BRL' 
     });
     const [editingId, setEditingId] = useState(null);
@@ -376,34 +496,33 @@ function AccountsSettings() {
         const balanceValue = parseFloat(formData.balance) || 0;
         const limitValue = parseFloat(formData.limit) || 0;
 
-        if (editingId) {
-            // Update existing
-            await db.update('accounts', editingId, {
-                name: formData.name,
-                type: formData.type,
-                balance: balanceValue,
-                limit: limitValue, // Added limit to update
-                updatedAt: new Date().toISOString()
-            });
-
-            await AuditService.log({ name: 'Admin' }, 'UPDATE', 'Account', formData.name, `Conta atualizada. Novo saldo: R$ ${balanceValue.toFixed(2)}`);
-
-        } else {
-            // Create New
-            await db.create('accounts', {
-                name: formData.name,
-                type: formData.type,
-                balance: balanceValue,
-                limit: limitValue, // Ensure limit is saved on create
-                currency: 'BRL',
-                updatedAt: new Date().toISOString()
-            });
-
-            await AuditService.log({ name: 'Admin' }, 'CREATE', 'Account', formData.name, `Conta criada com saldo inicial R$ ${balanceValue.toFixed(2)}`);
+        try {
+            if (editingId) {
+                await db.update('accounts', editingId, {
+                    name: formData.name,
+                    type: formData.type,
+                    balance: balanceValue,
+                    limit: limitValue,
+                    updatedAt: new Date().toISOString()
+                });
+                await AuditService.log({ name: 'Admin' }, 'UPDATE', 'Account', formData.name, `Conta atualizada. Novo saldo: R$ ${balanceValue.toFixed(2)}`);
+            } else {
+                await db.create('accounts', {
+                    name: formData.name,
+                    type: formData.type,
+                    balance: balanceValue,
+                    limit: limitValue,
+                    currency: 'BRL',
+                    updatedAt: new Date().toISOString()
+                });
+                await AuditService.log({ name: 'Admin' }, 'CREATE', 'Account', formData.name, `Conta criada com saldo inicial R$ ${balanceValue.toFixed(2)}`);
+            }
+        } catch(err) {
+            console.error(err);
+            alert("Falha ao salvar a conta.");
         }
 
-        setFormData({ name: '', type: 'bank', balance: '', limit: '', currency: 'BRL' });
-        setEditingId(null);
+        handleClose();
         loadAccounts();
     };
 
@@ -416,91 +535,42 @@ function AccountsSettings() {
             limit: acc.limit || '',
             currency: acc.currency 
         });
+        setIsModalOpen(true);
     };
 
-    const handleCancel = () => {
+    const handleOpenNew = () => {
+        setEditingId(null);
+        setFormData({ name: '', type: 'bank', balance: '', limit: '', currency: 'BRL' });
+        setIsModalOpen(true);
+    };
+
+    const handleClose = () => {
+        setIsModalOpen(false);
         setEditingId(null);
         setFormData({ name: '', type: 'bank', balance: '', limit: '', currency: 'BRL' });
     };
 
     const handleDelete = async (account) => {
-        if (window.confirm(`Excluir conta ${account.name}?`)) {
-            await db.delete('accounts', account.id);
-            await AuditService.log({ name: 'Admin' }, 'DELETE', 'Account', account.name, `Conta removida via Configurações`);
+        if (window.confirm(`Inativar conta ${account.name}?\nO histórico financeiro atrelado a ela não será perdido (Soft Delete).`)) {
+            await db.update('accounts', account.id, { deleted: true });
+            await AuditService.log({ name: 'Admin' }, 'DELETE', 'Account', account.name, `Conta inativada via Configurações`);
             loadAccounts();
         }
     };
 
     return (
         <div className="card animate-fade-in">
-            <div className="card-header">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h3 className="card-title flex items-center gap-2"><Landmark size={20} /> Contas Bancárias & Caixas</h3>
-                    <p className="text-muted text-sm">Gerencie as contas por onde o dinheiro entra e sai do negócio.</p>
+                    <h3 className="card-title flex items-center gap-2 text-purple-800"><Landmark size={20} /> Contas Bancárias & Caixas</h3>
+                    <p className="text-muted text-sm pb-2">Gerencie as contas por onde o dinheiro entra e sai do negócio.</p>
                 </div>
+                <button onClick={handleOpenNew} className="btn btn-primary shadow-sm hover:-translate-y-0.5" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1rem', borderRadius: '8px', fontWeight: 600 }}>
+                    <Plus size={16} /> Nova Conta
+                </button>
             </div>
 
-            <form onSubmit={handleSave} className="bg-gray-50 p-4 rounded-md mb-6 border border-gray-100 flex gap-4 items-end flex-wrap">
-                 <div className="flex-1 min-w-[200px]">
-                    <label className="form-label text-xs">Nome da Conta / Caixa</label>
-                    <input 
-                        className="form-input bg-white" 
-                        placeholder="Ex: Banco do Brasil, Caixa Pequeno..."
-                        value={formData.name}
-                        onChange={e => setFormData({...formData, name: e.target.value})}
-                        required
-                    />
-                 </div>
-                 <div className="w-[180px]">
-                    <label className="form-label text-xs">Tipo</label>
-                    <select 
-                        className="form-input bg-white"
-                        value={formData.type}
-                        onChange={e => setFormData({...formData, type: e.target.value})}
-                    >
-                        <option value="bank">Banco / Fintech</option>
-                        <option value="cash">Caixa Físico</option>
-                        <option value="wallet">Carteira Digital</option>
-                        <option value="credit">Cartão de Crédito</option>
-                    </select>
-                 </div>
-                 <div className="w-[150px]">
-                    <label className="form-label text-xs">
-                        {editingId ? 'Saldo Atual (R$)' : 'Saldo Inicial (R$)'}
-                    </label>
-                    <input 
-                        type="number" step="0.01"
-                        className="form-input bg-white"
-                        value={formData.balance}
-                        onChange={e => setFormData({...formData, balance: e.target.value})}
-                        placeholder="0.00"
-                    />
-                 </div>
-                 {formData.type === 'credit' && (
-                     <div className="w-[150px]">
-                        <label className="form-label text-xs">Limite (R$)</label>
-                        <input 
-                            type="number" step="0.01"
-                            className="form-input bg-white"
-                            value={formData.limit}
-                            onChange={e => setFormData({...formData, limit: e.target.value})}
-                            placeholder="Ex: 5000.00"
-                        />
-                     </div>
-                 )}
-                 <div className="flex gap-2 items-end pb-[1px]">
-                    {editingId && (
-                        <button type="button" onClick={handleCancel} className="btn btn-secondary h-[38px] flex items-center gap-2">
-                            <X size={16} /> Cancelar
-                        </button>
-                    )}
-                    <button type="submit" className={`btn h-[38px] flex items-center gap-2 ${editingId ? 'btn-primary' : 'btn-primary'}`}>
-                        {editingId ? <><Save size={16} /> Salvar</> : <><Plus size={16} /> Adicionar</>}
-                    </button>
-                 </div>
-            </form>
-
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto mt-4 px-4 pb-4">
                 <table className="w-full text-left text-sm">
                     <thead>
                         <tr className="border-b border-gray-200 text-gray-500 font-medium">
@@ -512,27 +582,105 @@ function AccountsSettings() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {accounts.map(acc => (
-                            <tr key={acc.id} className={`hover:bg-gray-50 ${editingId === acc.id ? 'bg-blue-50' : ''}`}>
+                            <tr key={acc.id} className="hover:bg-purple-50 transition-colors">
                                 <td className="py-3 font-medium text-gray-800">{acc.name}</td>
                                 <td className="py-3 text-gray-600">
                                     {acc.type === 'bank' && <span className="flex items-center gap-1"><Landmark size={14}/> Banco</span>}
                                     {acc.type === 'cash' && <span className="flex items-center gap-1"><Wallet size={14}/> Caixa Físico</span>}
-                                    {acc.type === 'wallet' && <span className="flex items-center gap-1"><Globe size={14}/> Digital</span>}
-                                    {acc.type === 'credit' && <span className="flex items-center gap-1"><CreditCard size={14}/> Cartão</span>}
+                                    {acc.type === 'wallet' && <span className="flex items-center gap-1"><Globe size={14}/> Carteira Digital</span>}
+                                    {acc.type === 'credit' && <span className="flex items-center gap-1"><CreditCard size={14}/> Cartão de Crédito</span>}
                                 </td>
                                 <td className={`py-3 font-mono font-bold ${acc.balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                    R$ {acc.balance ? parseFloat(acc.balance).toFixed(2) : '0.00'}
+                                    R$ {acc.balance ? parseFloat(acc.balance).toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '0.00'}
                                 </td>
                                 <td className="py-3 text-right flex justify-end gap-1">
-                                    <button onClick={() => handleEdit(acc)} className="text-gray-400 hover:text-blue-500 transition-colors p-1" title="Editar"><Edit2 size={16}/></button>
-                                    <button onClick={() => handleDelete(acc)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Excluir"><Trash2 size={16}/></button>
+                                    <button onClick={() => handleEdit(acc)} className="text-gray-400 hover:text-purple-600 transition-colors p-2" title="Configurar Conta"><Edit2 size={16}/></button>
+                                    <button onClick={() => handleDelete(acc)} className="text-gray-400 hover:text-red-500 transition-colors p-2" title="Inativar Conta"><Trash2 size={16}/></button>
                                 </td>
                             </tr>
                         ))}
-                        {accounts.length === 0 && <tr><td colSpan="4" className="text-center text-muted py-8">Nenhuma conta cadastrada. Adicione uma acima.</td></tr>}
+                        {accounts.length === 0 && <tr><td colSpan="4" className="text-center text-muted py-8 bg-gray-50/50 rounded-lg">Nenhuma conta ou caixa cadastrado.</td></tr>}
                     </tbody>
                 </table>
             </div>
+
+            {/* Popup Modal */}
+            {isModalOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1000 }}>
+                    <div className="modal-content animate-slide-up" style={{ maxWidth: '450px', width: '100%', padding: '24px', backgroundColor: 'var(--surface)', borderRadius: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                                {editingId ? 'Editar Conta/Caixa' : 'Nova Conta Bancária'}
+                            </h2>
+                            <button onClick={handleClose} style={{ background: 'var(--surface-hover)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Nome da Conta <span style={{color: '#ef4444'}}>*</span></label>
+                                <input 
+                                    required 
+                                    type="text" 
+                                    placeholder="Ex: Nubank, Caixa Caixinha" 
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                    value={formData.name} 
+                                    onChange={e => setFormData({...formData, name: e.target.value})} 
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Tipo de Destinação <span style={{color: '#ef4444'}}>*</span></label>
+                                <select 
+                                    required
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                    value={formData.type}
+                                    onChange={e => setFormData({...formData, type: e.target.value})}
+                                >
+                                    <option value="bank">Banco Corporativo</option>
+                                    <option value="cash">Caixa Físico no Ateliê</option>
+                                    <option value="wallet">Carteira Digital (Shopee/Nuvem)</option>
+                                    <option value="credit">Cartão de Crédito</option>
+                                </select>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: formData.type === 'credit' ? '1fr 1fr' : '1fr', gap: '16px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>
+                                        {editingId ? 'Saldo Corrente (R$)' : 'Balanço Inicial (R$)'}
+                                    </label>
+                                    <input 
+                                        type="number" step="0.01"
+                                        placeholder="0.00" 
+                                        style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                        value={formData.balance} 
+                                        onChange={e => setFormData({...formData, balance: e.target.value})} 
+                                    />
+                                </div>
+                                {formData.type === 'credit' && (
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Limite Teto (R$)</label>
+                                        <input 
+                                            type="number" step="0.01"
+                                            placeholder="5000.00" 
+                                            style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                            value={formData.limit} 
+                                            onChange={e => setFormData({...formData, limit: e.target.value})} 
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                                <button type="button" onClick={handleClose} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface-hover)', color: 'var(--text-main)', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                    Cancelar
+                                </button>
+                                <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--primary)', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                    {editingId ? 'Gravar Alterações' : 'Salvar Nova Conta'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
