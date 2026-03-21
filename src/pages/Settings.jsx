@@ -1168,7 +1168,9 @@ function PricingSettings() {
     const [fixedCosts, setFixedCosts] = useState([]);
     const [bdiTaxes, setBdiTaxes] = useState([]);
     const [capacity, setCapacity] = useState({ monthlyHours: 160 });
-    const [newFixedCost, setNewFixedCost] = useState({ name: '', value: '' });
+    
+    // Modal state for BDI
+    const [isBdiModalOpen, setIsBdiModalOpen] = useState(false);
     const [newBdi, setNewBdi] = useState({ name: '', percentage: '', type: 'tax' });
 
     useEffect(() => { loadData(); }, []);
@@ -1186,10 +1188,13 @@ function PricingSettings() {
                 return d.getMonth() === now.getMonth() && 
                        d.getFullYear() === now.getFullYear() && 
                        t.type === 'expense' && 
-                       t.category === 'Administrativo / Fixos';
+                       t.category === 'Administrativo / Fixos' &&
+                       !t.deleted; // Ensure it's not a soft deleted transaction
             });
 
             setFixedCosts(currentMonthFc);
+            // Filter out soft-deleted BDI records 
+            // (db.getAll usually filters them, but just in case, bi might already be clean)
             setBdiTaxes(bi);
             setCapacity(cap);
         } catch (e) { console.error(e); }
@@ -1200,19 +1205,22 @@ function PricingSettings() {
         if (!newBdi.name) return;
         await db.create('bdi_taxes', { name: newBdi.name, percentage: parseFloat(newBdi.percentage) || 0, type: newBdi.type || 'tax' });
         setNewBdi({ name: '', percentage: '', type: 'tax' });
+        setIsBdiModalOpen(false);
         loadData();
     };
 
-    const handleDeleteBdi = async (id) => {
-        if (window.confirm("Remover este imposto/taxa?")) {
-            await db.delete('bdi_taxes', id);
+    const handleDeleteBdi = async (id, name) => {
+        if (window.confirm(`Tem certeza que deseja inativar o índice "${name}"?`)) {
+            await db.update('bdi_taxes', id, { deleted: true });
             loadData();
         }
     };
 
     const handleSaveCapacity = async () => {
-        await db.set('settings', 'capacity_planning', capacity);
-        alert('Capacidade produtiva salva!');
+        const h = parseInt(capacity.monthlyHours);
+        if (isNaN(h) || h <= 0) return alert("Insira um valor de horas válido.");
+        await db.set('settings', 'capacity_planning', { monthlyHours: h });
+        alert('Capacidade Produtiva gravada com sucesso!');
     };
 
     const totalFixed = fixedCosts.reduce((acc, fc) => acc + (parseFloat(fc.amount) || 0), 0);
@@ -1220,118 +1228,210 @@ function PricingSettings() {
     const costPerHour = capacity.monthlyHours ? (totalFixed / capacity.monthlyHours) : 0;
 
     return (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* CAPACITY PLANNER */}
-            <div className="card">
-                <div className="card-header">
-                    <div>
-                        <h3 className="card-title flex items-center gap-sm"><Activity size={20} /> Capacidade Produtiva (Rateio)</h3>
-                        <p className="text-muted text-sm">Defina sua capacidade mensal de produção. Os custos fixos serão divididos por estas horas para obter o R$/hora rateado da empresa.</p>
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* --- DASHBOARD STAT CARDS --- */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                
+                {/* Capacity Card */}
+                <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '16px', padding: '24px', color: 'white', position: 'relative', overflow: 'hidden', boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.4)' }}>
+                    <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.1 }}><Activity size={100} /></div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Capacidade Total Mensal</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', zIndex: 1, position: 'relative' }}>
+                        <span style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1 }}>{capacity.monthlyHours}</span>
+                        <span style={{ fontSize: '1rem', color: '#cbd5e1' }}>h/mês</span>
+                    </div>
+                    
+                    <div style={{ marginTop: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input 
+                            type="number" 
+                            style={{ width: '80px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #334155', background: '#0f172a', color: 'white', fontSize: '0.85rem' }} 
+                            value={capacity.monthlyHours} 
+                            onChange={e => setCapacity({...capacity, monthlyHours: e.target.value})} 
+                        />
+                        <button onClick={handleSaveCapacity} style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--primary)', color: 'white', fontSize: '0.85rem', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}>
+                            Ajustar
+                        </button>
                     </div>
                 </div>
-                <div className="p-4 flex gap-4 items-end bg-surface-hover rounded mt-2">
-                    <div className="input-group mb-0 flex-1">
-                        <label className="form-label">Horas Faturáveis / Produtivas Mensais</label>
-                        <input type="number" className="form-input" value={capacity.monthlyHours} onChange={e => setCapacity({...capacity, monthlyHours: e.target.value})} />
-                        <span className="text-xs text-muted mt-1">Ex: 1 funcionário x 8h x 20 dias = 160h.</span>
+
+                {/* Fixed Costs Card */}
+                <div style={{ background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', borderRadius: '16px', padding: '24px', color: 'white', position: 'relative', overflow: 'hidden', boxShadow: '0 10px 15px -3px rgba(220, 38, 38, 0.3)' }}>
+                    <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.15 }}><Landmark size={100} /></div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Custo Fixo do Mês</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', zIndex: 1, position: 'relative' }}>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 600 }}>R$</span>
+                        <span style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1 }}>{totalFixed.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
-                    <button className="btn btn-primary" onClick={handleSaveCapacity}>Salvar</button>
+                    <p style={{ fontSize: '0.75rem', color: '#fecaca', marginTop: '12px', lineHeight: 1.4, zIndex: 1, position: 'relative' }}>
+                        Somatório de todas as despesas categorizadas como "Administrativo / Fixos" lançadas no financeiro neste mês corrente.
+                    </p>
+                </div>
+
+                {/* Rateio Ratio Card */}
+                <div style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', borderRadius: '16px', padding: '24px', color: 'white', position: 'relative', overflow: 'hidden', boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.3)' }}>
+                    <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.15 }}><Activity size={100} /></div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#bfdbfe', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Custo Absorvido / Rateio</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', zIndex: 1, position: 'relative' }}>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 600 }}>R$</span>
+                        <span style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1 }}>{costPerHour.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        <span style={{ fontSize: '1rem', color: '#bfdbfe' }}>/h</span>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: '#dbeafe', marginTop: '12px', lineHeight: 1.4, zIndex: 1, position: 'relative' }}>
+                        Valor mínimo exigido por hora de produção de cada item, apenas para pagar a luz do teto de sua operação empírica.
+                    </p>
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '20px' }}>
-                {/* FIXED COSTS */}
-                <div className="card">
-                    <div className="card-header border-b">
-                        <div>
-                            <h3 className="card-title flex items-center gap-sm"><Landmark size={20} /> Custos Fixos (Financeiro)</h3>
-                            <p className="text-muted text-sm border-b pb-4 mb-2">Despesas deste mês categorizadas como "Administrativo / Fixos".</p>
-                        </div>
-                    </div>
-                    <div className="p-3 bg-blue-50 border-b border-blue-100 flex items-center gap-2 text-xs text-blue-700">
-                        <Info size={14} />
-                        Para adicionar mais custos, registre a despesa no módulo Financeiro com a categoria "Administrativo / Fixos".
-                    </div>
-                    <div className="px-4 pb-4 mt-2">
-                        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                            {fixedCosts.map(fc => (
-                                <div key={fc.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                                    <div className="text-sm font-semibold text-gray-700">{fc.description}</div>
-                                    <div className="flex gap-4 items-center">
-                                        <div className="text-sm">R$ {parseFloat(fc.amount).toFixed(2)}</div>
-                                        {fc.status === 'paid' ? 
-                                            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Pago</span> : 
-                                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">Pendente</span>
-                                        }
-                                    </div>
-                                </div>
-                            ))}
-                            {fixedCosts.length === 0 && (
-                                <div className="text-center py-4 text-sm text-gray-400">Nenhum custo fixo registrado neste mês ainda.</div>
-                            )}
-                        </div>
-                        <div className="mt-4 pt-3 border-t flex justify-between items-center text-sm font-bold text-gray-800 bg-gray-50 p-2 rounded">
-                            <span>TOTAL FIXO:</span>
-                            <span>R$ {totalFixed.toFixed(2)}/mês</span>
-                        </div>
-                        <div className="mt-2 text-center text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-100 font-semibold shadow-sm">
-                            Taxa de Absorção: R$ {costPerHour.toFixed(2)}/hora produzida
-                        </div>
-                    </div>
-                </div>
-
+            {/* --- LISTS --- */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '24px' }}>
+                
                 {/* BDI / TAXES */}
-                <div className="card">
-                    <div className="card-header border-b">
+                <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <div className="card-header border-b" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                            <h3 className="card-title flex items-center gap-sm"><Wallet size={20} /> Composição de BDI e Margens Sugeridas</h3>
-                            <p className="text-muted text-sm border-b pb-4 mb-2">Estrutura inteligente para sugerir Preço Ideal (Impostos, Taxas e Lucro Desejado).</p>
+                            <h3 className="card-title flex items-center gap-2"><Wallet size={20} className="text-purple-600" /> Matriz BDI (Margens & Impostos)</h3>
+                            <p className="text-muted text-sm pb-2">Percentuais cobrados sobre o Preço Final da Peça.</p>
                         </div>
+                        <button onClick={() => setIsBdiModalOpen(true)} className="btn btn-primary shadow-sm hover:-translate-y-0.5" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.5rem 0.8rem', borderRadius: '8px', fontWeight: 600, backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}>
+                            <Plus size={16} /> Margem
+                        </button>
                     </div>
-                    <form onSubmit={handleAddBdi} className="p-4 flex gap-2 flex-wrap">
-                        <select className="form-input text-sm p-1.5 w-full sm:w-auto" value={newBdi.type} onChange={e => setNewBdi({...newBdi, type: e.target.value})}>
-                            <option value="tax">Imposto/Governo</option>
-                            <option value="fee">Taxa de Pgto/Cartão</option>
-                            <option value="profit">Lucro Líquido Alvo</option>
-                        </select>
-                        <input type="text" className="form-input text-sm p-1.5 flex-1" placeholder="Ex: DAS (Simples Nacional)" value={newBdi.name} onChange={e => setNewBdi({...newBdi, name: e.target.value})} />
-                        <input type="number" step="0.01" className="form-input text-sm p-1.5 w-24" placeholder="Taxa (%)" value={newBdi.percentage} onChange={e => setNewBdi({...newBdi, percentage: e.target.value})} />
-                        <button type="submit" className="btn btn-primary btn-icon" style={{ backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}><Plus size={16} /></button>
-                    </form>
-                    <div className="px-4 pb-4">
-                        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+
+                    <div className="px-4 py-4 flex-1">
+                        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
                             {bdiTaxes.map(tx => {
                                 const typeMap = {
-                                    'tax': { label: 'Imposto', color: 'bg-red-100 text-red-700' },
-                                    'fee': { label: 'Taxa', color: 'bg-orange-100 text-orange-700' },
-                                    'profit': { label: 'Lucro Alvo', color: 'bg-green-100 text-green-700' },
-                                    'other': { label: 'Outro', color: 'bg-gray-100 text-gray-700' }
+                                    'tax': { label: 'Imposto Estadual/Federal', color: 'bg-red-50 text-red-700 border-red-200' },
+                                    'fee': { label: 'Taxa Parceiros/Cartão', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+                                    'profit': { label: 'Lucratividade Líquida', color: 'bg-green-50 text-green-700 border-green-200' },
                                 };
                                 const badge = typeMap[tx.type || 'tax'];
                                 return (
-                                    <div key={tx.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                                        <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                            {tx.name}
-                                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${badge.color}`}>{badge.label}</span>
+                                    <div key={tx.id} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50/50 px-2 rounded transition-colors group">
+                                        <div>
+                                            <div className="text-sm font-bold text-gray-800">{tx.name}</div>
+                                            <div className={`text-[10px] px-1.5 py-0.5 mt-1 rounded font-semibold uppercase border inline-block ${badge.color}`}>{badge.label}</div>
                                         </div>
                                         <div className="flex gap-4 items-center">
-                                            <div className={`text-sm font-bold ${tx.type === 'profit' ? 'text-green-600' : 'text-[#8b5cf6]'}`}>{parseFloat(tx.percentage).toFixed(2)}%</div>
-                                            <button onClick={() => handleDeleteBdi(tx.id)} className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"><Trash2 size={16} /></button>
+                                            <div className="text-[1.1rem] font-extrabold text-[#1e293b]">{parseFloat(tx.percentage).toFixed(2)}%</div>
+                                            <button onClick={() => handleDeleteBdi(tx.id, tx.name)} className="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
                                         </div>
                                     </div>
                                 );
                             })}
                             {bdiTaxes.length === 0 && (
-                                <div className="text-center py-4 text-sm text-gray-400">Nenhum imposto ou taxa cadastrada.</div>
+                                <div className="text-center py-8 text-sm text-gray-400 bg-gray-50/50 rounded-xl">Nenhuma indexação financeira cadastrada.</div>
                             )}
                         </div>
-                        <div className="mt-4 pt-3 border-t flex justify-between items-center text-sm font-bold text-gray-800 bg-[#faf5ff] p-2 rounded border border-[#e9d5ff]">
-                            <span>CARGA TOTAL BDI:</span>
-                            <span className="text-[#8b5cf6]">{totalBdi.toFixed(2)}%</span>
+                    </div>
+                    
+                    <div style={{ padding: '16px', background: '#faf5ff', borderTop: '1px solid #e9d5ff', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="text-sm font-bold text-purple-900 uppercase tracking-widest">Carga Total Indexada:</span>
+                        <span className="text-xl font-black text-purple-700">{totalBdi.toLocaleString('pt-BR', {minimumFractionDigits: 2})}%</span>
+                    </div>
+                </div>
+
+                {/* FIXED COSTS LIST */}
+                <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <div className="card-header border-b">
+                        <div>
+                            <h3 className="card-title flex items-center gap-2"><Landmark size={20} className="text-red-600" /> Extrato de Custo Fixo (Mês Corrente)</h3>
+                            <p className="text-muted text-sm pb-2">Registros de Custo Administrativos que formam o Rateio.</p>
+                        </div>
+                    </div>
+                    <div className="p-3 bg-red-50/50 border-b border-red-100 flex items-start gap-2 text-xs text-red-800">
+                        <Info size={16} className="mt-0.5 flex-shrink-0" />
+                        <span>Este quadro é alimentado <strong>automaticamente</strong>. Para adicionar/remover itens aqui, você deve acessar o Módulo Financeiro e lançar despesas na categoria "Administrativo / Fixos".</span>
+                    </div>
+                    <div className="p-4 flex-1">
+                        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                            {fixedCosts.map(fc => (
+                                <div key={fc.id} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50/50 px-2 rounded transition-colors">
+                                    <div className="text-sm font-semibold text-gray-800">{fc.description}</div>
+                                    <div className="flex gap-3 items-center">
+                                        <div className="text-[1.05rem] font-bold text-gray-700">R$ {parseFloat(fc.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                                        {fc.status === 'paid' ? 
+                                            <span className="text-[10px] bg-green-100 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-bold">Pago</span> : 
+                                            <span className="text-[10px] bg-yellow-100 text-yellow-700 border border-yellow-200 px-2 py-0.5 rounded-full font-bold">Pendente</span>
+                                        }
+                                    </div>
+                                </div>
+                            ))}
+                            {fixedCosts.length === 0 && (
+                                <div className="text-center py-8 text-sm text-gray-400 bg-gray-50/50 rounded-xl">Seu Financeiro ainda não sofreu lançamentos fixos esse mês.</div>
+                            )}
                         </div>
                     </div>
                 </div>
+
             </div>
+
+            {/* BDI MODAL */}
+            {isBdiModalOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1000 }}>
+                    <div className="modal-content animate-slide-up" style={{ maxWidth: '450px', width: '100%', padding: '24px', backgroundColor: 'var(--surface)', borderRadius: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                                Adicionar Novo BDI / Margem
+                            </h2>
+                            <button onClick={() => setIsBdiModalOpen(false)} style={{ background: 'var(--surface-hover)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleAddBdi} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Nome da Margem/Taxa <span style={{color: '#ef4444'}}>*</span></label>
+                                <input 
+                                    required 
+                                    autoFocus
+                                    type="text" 
+                                    placeholder="Ex: Lucro Projetado, Simples Nacional..." 
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                    value={newBdi.name} 
+                                    onChange={e => setNewBdi({...newBdi, name: e.target.value})} 
+                                />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Tipo de Indexador <span style={{color: '#ef4444'}}>*</span></label>
+                                    <select 
+                                        required
+                                        style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                        value={newBdi.type}
+                                        onChange={e => setNewBdi({...newBdi, type: e.target.value})}
+                                    >
+                                        <option value="tax">Imposto/Governo</option>
+                                        <option value="fee">Taxas e Encargos (Cartão/Parceiros)</option>
+                                        <option value="profit">Lucro Líquido Esperado</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>Percentual (%) <span style={{color: '#ef4444'}}>*</span></label>
+                                    <input 
+                                        required 
+                                        type="number" step="0.01" 
+                                        placeholder="0.00" 
+                                        style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} 
+                                        value={newBdi.percentage} 
+                                        onChange={e => setNewBdi({...newBdi, percentage: e.target.value})} 
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                                <button type="button" onClick={() => setIsBdiModalOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface-hover)', color: 'var(--text-main)', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                    Cancelar
+                                </button>
+                                <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--primary)', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                                    Adicionar à Matriz
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
