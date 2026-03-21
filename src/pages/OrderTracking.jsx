@@ -214,7 +214,7 @@ export function OrderTracking() {
             <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
                 {companyConfig.companyName || 'Ateliê Estúdio Criativo'}
             </h1>
-            <p style={{ color: '#64748b' }}>Acompanhamento Mágico do seu Pedido</p>
+            <p style={{ color: '#64748b' }}>Ateliê Carol 🎀</p>
         </div>
 
         {/* Card */}
