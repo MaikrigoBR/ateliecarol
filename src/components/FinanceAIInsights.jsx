@@ -92,6 +92,47 @@ export function FinanceAIInsights({ transactions, accounts, openEditTrans }) {
             });
         });
 
+        // 6. Overdue Payable Bills (Contas a Pagar Atrasadas)
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        const overdueExpenses = allExpenses.filter(t => t.status === 'pending' && new Date(t.date) < today);
+        if (overdueExpenses.length > 0) {
+            const sumOverdue = overdueExpenses.reduce((s, t) => s + Number(t.amount), 0);
+            issues.push({
+                type: 'danger',
+                text: `Alerta de Inadimplência Própria: Você possui ${overdueExpenses.length} despesa(s) catalogada(s) que já venceram no sistema, somando R$ ${sumOverdue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}. Isso atrapalha a precisão do Caixa Real. Programe os pagamentos ou edite as datas.`,
+                actionText: 'Rolar para Últimos Lançamentos',
+                action: () => window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})
+            });
+        }
+
+        // 7. Overdue Receivables (Contas a Receber Atrasadas/Calotes)
+        const overdueIncomes = transactions.filter(t => t.type === 'income' && t.status === 'pending' && new Date(t.date) < today);
+        if (overdueIncomes.length > 0) {
+            const sumOverdueInc = overdueIncomes.reduce((s, t) => s + Number(t.amount), 0);
+            suggestions.push({
+                type: 'warning',
+                text: `Atraso em Recebimentos: O sistema detectou ${overdueIncomes.length} receita(s) esperada(s) que já passaram da data preterida, estancando R$ ${sumOverdueInc.toLocaleString('pt-BR', {minimumFractionDigits: 2})}. Acione os devedores ou baixe se já recebeu.`,
+                actionText: 'Checar Inadimplência',
+                action: () => window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})
+            });
+        }
+
+        // 8. Credit Card Open Faturas
+        accounts.filter(a => a.type === 'credit').forEach(card => {
+            const cardBalance = Number(card.balance) || 0;
+            // Nas lógicas de cartão, um balanço negativo sinaliza uso de limite, logo a fatura acumulou dívida.
+            if (cardBalance < 0) {
+                suggestions.push({
+                    type: 'warning',
+                    text: `Fatura de Cartão Preditiva: O cartão "${card.name}" consolidou um gasto de R$ ${Math.abs(cardBalance).toLocaleString('pt-BR', {minimumFractionDigits: 2})}. Não se esqueça de registrar o Lançamento de Baixa/Pagamento desta fatura no dia do vencimento usando uma conta corrente, caso já tenha liquidado o banco.`,
+                    actionText: 'Rolar até os Cartões',
+                    action: () => window.scrollTo({top: 0, behavior: 'smooth'})
+                });
+            }
+        });
+
         return { issues, suggestions };
     }, [transactions, accounts, navigate, openEditTrans]);
 
