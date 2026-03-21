@@ -1192,7 +1192,7 @@ function DangerZoneCleanup() {
 
             const orders = await db.getAll('orders');
             for (const order of orders) {
-                const searchString = `${order.customer || ''} ${order.customerEmail || ''} ${(order.items || []).map(i => i.name).join(' ')} ${order.id}`.toLowerCase();
+                const searchString = `${order.customer || ''} ${order.customerEmail || ''} ${(order.cartItems || []).map(i => i.name).join(' ')} ${order.id}`.toLowerCase();
                 if (searchString.includes('teste')) {
                     await db.delete('orders', order.id);
                     deletedOrders++;
