@@ -241,28 +241,32 @@ function FinancialOverviewChart({ data }) {
                 <div style={{ width: `${Math.max(100, data.length * 45)}px`, height: '100%', minHeight: '300px', minWidth: 0 }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={data} margin={{ top: 20, right: 10, bottom: 20, left: 0 }} barGap={2}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                            <defs>
+                                <linearGradient id="colorSaldo" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={<CustomXAxisTick />} interval={0} />
-                            
-                            {/* Hide internal YAxis, rely on the sticky one */}
                             <YAxis hide={true} domain={[-maxVal, maxVal]} type="number" />
-
-                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent', stroke: 'rgba(0,0,0,0.05)', strokeWidth: 20 }} />
+                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent', stroke: 'var(--border)', strokeWidth: 20, strokeDasharray: '4 4' }} />
                             
-                            <Line type="monotone" dataKey="Receitas" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#10b981' }} />
-                            <Line type="monotone" dataKey="Projeção" stroke="#34d399" strokeWidth={2} strokeDasharray="4 4" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#34d399' }} />
+                            <Area type="monotone" dataKey="Saldo" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSaldo)" activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', fill: '#3b82f6' }} />
                             
-                            <Line type="monotone" dataKey="Despesas" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#ef4444' }} />
-                            <Line type="monotone" dataKey="APagar" stroke="#f87171" strokeWidth={2} strokeDasharray="4 4" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#f87171' }} />
+                            <Line type="monotone" dataKey="Receitas" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', fill: '#10b981' }} />
+                            <Line type="monotone" dataKey="Despesas" stroke="#ef4444" strokeWidth={3} dot={false} activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', fill: '#ef4444' }} />
                             
-                            <Line 
-                                type="monotone" 
-                                dataKey="Saldo" 
-                                stroke="#3b82f6" 
-                                strokeWidth={2} 
-                                dot={false}
-                                activeDot={{ r: 4, strokeWidth: 0, fill: '#3b82f6' }}
-                            />
+                            <Line type="monotone" dataKey="Projeção" stroke="#34d399" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#34d399' }} />
+                            <Line type="monotone" dataKey="APagar" stroke="#f87171" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#f87171' }} />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
@@ -378,11 +382,19 @@ export function FinanceFinal() {
                 if (!categoryColors['Taxas Gateway (M.P.)']) categoryColors['Taxas Gateway (M.P.)'] = '#fb923c'; 
             }
 
-            const costCenterFormat = Object.keys(expenseMap).map(k => ({
-                name: k,
-                value: expenseMap[k],
-                color: categoryColors[k] || '#9ca3af'
-            })).sort((a,b) => b.value - a.value);
+            const fallbackColors = ['#0ea5e9', '#ec4899', '#f59e0b', '#8b5cf6', '#10b981', '#f43f5e', '#3b82f6'];
+            const costCenterFormat = Object.keys(expenseMap).map((k, index) => {
+                let color = categoryColors[k];
+                if (!color || color === '#9ca3af') {
+                    // Se for cinza genérico ou vazio, pega uma cor vibrante do fallback baseado no índice
+                    color = fallbackColors[index % fallbackColors.length];
+                }
+                return {
+                    name: k,
+                    value: expenseMap[k],
+                    color: color
+                };
+            }).sort((a,b) => b.value - a.value);
 
             // True Net Profit (subtract gateway taxes from income since incomes in Firebase are recorded as NetAmount already if from webhook.
             // Wait, Webhook records income as NET AMOUNT exactly. So the True Result doesn't need to subtract the tax again if it's already net!
@@ -816,29 +828,32 @@ export function FinanceFinal() {
                                         <PieChart>
                                             <Pie
                                                 data={costCenterData}
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
+                                                innerRadius={65}
+                                                outerRadius={85}
+                                                paddingAngle={6}
+                                                cornerRadius={8}
                                                 dataKey="value"
+                                                stroke="var(--surface)"
+                                                strokeWidth={2}
                                             >
                                                 {costCenterData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    <Cell key={`cell-${index}`} fill={entry.color} style={{ filter: `drop-shadow(0px 4px 6px ${entry.color}60)` }} />
                                                 ))}
                                             </Pie>
                                             <Tooltip 
                                                 formatter={(value) => `R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                                                contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                                             />
                                         </PieChart>
                                     </ResponsiveContainer>
-                                    <div className="w-full px-4 mt-2 space-y-2 max-h-[100px] overflow-y-auto scrollbar-hide">
+                                    <div className="w-full px-4 mt-2 space-y-2 max-h-[100px] overflow-y-auto custom-scrollbar">
                                         {costCenterData.map((d, i) => (
                                             <div key={i} className="flex items-center justify-between text-xs">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }}></div>
-                                                    <span className="text-gray-600 font-medium truncate max-w-[120px]">{d.name}</span>
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color, boxShadow: `0 0 8px ${d.color}90` }}></div>
+                                                    <span style={{ color: 'var(--text-main)', fontWeight: 600 }} className="truncate max-w-[140px]">{d.name}</span>
                                                 </div>
-                                                <span className="font-bold text-gray-800">R$ {d.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                                <span className="font-bold" style={{ color: 'var(--text-main)' }}>R$ {d.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                             </div>
                                         ))}
                                     </div>
