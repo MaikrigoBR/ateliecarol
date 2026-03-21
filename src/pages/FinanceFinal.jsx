@@ -1189,6 +1189,7 @@ export function FinanceFinal() {
             accounts={accounts}
             transactions={transactions}
             onUpdate={fetchData}
+            onEditTrans={setSelectedDetailTrans}
         />
 
         <FinanceTransactionDetailsModal

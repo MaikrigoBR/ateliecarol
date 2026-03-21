@@ -41,6 +41,31 @@ export function FinanceTransactionDetailsModal({ transaction, isOpen, onClose, o
              return;
         }
         try {
+            // Se for parte de um parcelamento/mensalidade agrupado
+            if (transaction.parentId && transaction.installmentsTotal > 1) {
+                if (window.confirm(`Esta transação faz parte de um parcelamento em ${transaction.installmentsTotal}x.\n\nDeseja replicar as modificações (Valor, Categoria, Conta base e Descrição) para TODAS as parcelas futuras e passadas deste grupo?`)) {
+                    const allTrans = await db.getAll('transactions');
+                    const group = allTrans.filter(t => t.parentId === transaction.parentId);
+                    
+                    // Remove sufixos existentes tipo " (1/12)" se o usuário não tiver removido manualmente na form
+                    const cleanBaseDesc = formData.description.replace(/\s?\(\d+[/]\d+\)$/, '').trim();
+                    
+                    for (const t of group) {
+                        await db.update('transactions', t.id, {
+                            description: `${cleanBaseDesc} (${t.installmentNumber}/${t.installmentsTotal})`,
+                            amount: Number(formData.amount),
+                            accountId: formData.accountId,
+                            category: formData.category,
+                            status: t.id === transaction.id ? formData.status : t.status // Só altera status se for a parcela editada central
+                        });
+                    }
+                    onUpdate();
+                    setEditMode(false);
+                    onClose();
+                    return;
+                }
+            }
+
             await db.update('transactions', transaction.id, {
                 ...transaction,
                 description: formData.description,

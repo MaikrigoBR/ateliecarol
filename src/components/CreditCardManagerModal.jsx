@@ -3,7 +3,7 @@ import { X, ChevronLeft, ChevronRight, CheckCircle, CreditCard, Calendar, Trendi
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import db from '../services/database';
 
-export function CreditCardManagerModal({ account, accounts = [], transactions, isOpen, onClose, onUpdate }) {
+export function CreditCardManagerModal({ account, accounts = [], transactions, isOpen, onClose, onUpdate, onEditTrans }) {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [selectedPaymentAccount, setSelectedPaymentAccount] = useState('');
     const [isPaying, setIsPaying] = useState(false);
@@ -275,7 +275,13 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {currentInvoice.transactions.map(t => (
-                                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #f1f5f9', boxShadow: '0 2px 8px -4px rgba(0,0,0,0.05)' }}>
+                                <div 
+                                    key={t.id} 
+                                    onClick={() => { if(onEditTrans){ onEditTrans(t); onClose(); } }}
+                                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #f1f5f9', boxShadow: '0 2px 8px -4px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'all 0.2s' }} 
+                                    className="hover:bg-blue-50 hover:border-blue-200"
+                                    title="Editar Lançamento"
+                                >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                         <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#eef2ff', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                             {t.installmentsTotal > 1 ? <Calendar size={18} /> : <TrendingDown size={18} />}
