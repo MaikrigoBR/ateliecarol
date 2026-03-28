@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, Plus, DollarSign, Users, Package, Clock, Image as ImageIcon, Video, Percent, Tag, PieChart, Info, Upload, Eye, Wrench, Globe, Search, RefreshCw, BarChart2, ShieldQuestion, ExternalLink, Landmark, Wallet } from 'lucide-react';
+import { X, Save, Trash2, Plus, DollarSign, Users, Package, Clock, Image as ImageIcon, Video, Percent, Tag, PieChart, Info, Upload, Eye, Wrench, Globe, Search, RefreshCw, BarChart2, ShieldQuestion, ExternalLink, Landmark, Wallet, Palette } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,6 +41,8 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
   const [equipmentItems, setEquipmentItems] = useState([]); 
   const [marketSearch, setMarketSearch] = useState({ loading: false, result: null });
   const [customScoutQuery, setCustomScoutQuery] = useState('');
+  const [linkedModels, setLinkedModels] = useState([]);
+  const [designsList, setDesignsList] = useState([]);
   const [globalPricing, setGlobalPricing] = useState({ fixedPerHour: 0, bdiPercentage: 0, bdiTaxes: [] });
 
   useEffect(() => {
@@ -59,11 +61,13 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
               const rolesData = rawRoles.length > 0 ? rawRoles : defaultRoles;
               const cats = await db.getAll('categories') || [];
               const equips = await db.getAll('equipments') || [];
+              const desgs = await db.getAll('designs') || [];
               
               setMaterialsList(Array.isArray(inventory) ? inventory.filter(i => i.type === 'material') : []);
               setRolesList(rolesData);
               setCategoriesList(Array.isArray(cats) ? cats : []);
               setEquipmentsList(Array.isArray(equips) ? equips : []);
+              setDesignsList(Array.isArray(desgs) ? desgs : []);
 
               // Load Global Pricing settings
               const trans = await db.getAll('transactions') || [];
@@ -141,6 +145,13 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                       setEquipmentItems([]);
                   }
 
+                  // Restore Linked Models
+                  if (productToEdit.linkedModels && Array.isArray(productToEdit.linkedModels)) {
+                      setLinkedModels(productToEdit.linkedModels);
+                  } else {
+                      setLinkedModels([]);
+                  }
+
                   setCustomScoutQuery(`${productToEdit.name} ${productToEdit.category || ''}`.trim());
 
               } else {
@@ -152,6 +163,7 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                   setSelectedMaterials([]);
                   setLaborItems([]);
                   setEquipmentItems([]);
+                  setLinkedModels([]);
                   setMarketSearch({ loading: false, result: null });
                   setCustomScoutQuery('');
               }
@@ -461,6 +473,7 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
       laborDetails: laborItems, 
       materials: selectedMaterials.map(m => ({ id: m.id, qty: m.qtyUsed, usageUnit: m.usageUnit || m.unit })),
       equipmentDetails: equipmentItems,
+      linkedModels: linkedModels,
 
       updatedAt: new Date().toISOString(),
       updatedBy: currentUser?.email || 'Sistema'
@@ -918,6 +931,60 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                             ))}
                         </div>
                         <button type="button" onClick={handleAddEquipment} className="btn" style={{ backgroundColor: 'var(--background)', color: 'var(--text-main)', border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}><Plus size={16} /> Atrelar Processo (Depreciação)</button>
+                    </div>
+
+                    {/* 4. MOLDES E ARTES (INTEGRAÇÃO DE MODELOS) */}
+                    <div style={sCardLinear}>
+                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Palette size={18} style={{ color: '#ec4899' }} />
+                                <h4 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0 }}>Modelos / Artes (Galeria)</h4>
+                            </div>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ec4899' }}>{linkedModels.length} associados</span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            Vincule as artes e moldes padrões para este produto. Ao gerar um pedido, estas artes serão sugeridas.
+                        </div>
+
+                        <select 
+                            className="form-input text-sm" 
+                            onChange={(e) => {
+                                if (e.target.value && !linkedModels.includes(e.target.value)) {
+                                    setLinkedModels([...linkedModels, e.target.value]);
+                                }
+                                e.target.value = '';
+                            }} 
+                            value=""
+                        >
+                            <option value="">+ Associar Modelo da Galeria...</option>
+                            {designsList.map(d => (
+                                <option key={d.id} value={d.id}>{d.name} {d.category ? `[${d.category}]` : ''}</option>
+                            ))}
+                        </select>
+
+                        {linkedModels.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {linkedModels.map(modelId => {
+                                    const d = designsList.find(x => String(x.id) === String(modelId));
+                                    if (!d) return null;
+                                    return (
+                                        <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {d.thumbnail || d.fileUrl ? (
+                                                    <img src={d.thumbnail || d.fileUrl} alt={d.name} style={{ width: '30px', height: '30px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #e2e8f0' }} />
+                                                ) : (
+                                                    <div style={{ width: '30px', height: '30px', backgroundColor: '#fdf2f8', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}><Palette size={14} color="#ec4899" /></div>
+                                                )}
+                                                <div>
+                                                    <p style={{ fontWeight: 600, fontSize: '0.85rem', margin: 0 }}>{d.name}</p>
+                                                </div>
+                                            </div>
+                                            <button type="button" onClick={() => setLinkedModels(linkedModels.filter(m => m !== modelId))} style={{ padding: '0.25rem', border: 'none', background: 'transparent', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={16}/></button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </div>
                  </div>
             )}

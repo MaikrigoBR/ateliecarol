@@ -267,18 +267,33 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
                         <div className="md:col-span-5">
                             <label className="text-[11px] font-bold text-purple-600 uppercase tracking-wider flex items-center gap-1 mb-1">
                                 🎨 Molde / Arte Central (Opcional)
+                                {currentProductId && (() => {
+                                    const selectedProduct = products.find(p => String(p.id) === String(currentProductId));
+                                    const allowedModelIds = selectedProduct?.linkedModels || [];
+                                    return allowedModelIds.length > 0 ? <span className="text-[9px] bg-purple-100 px-1 py-0.5 rounded text-purple-800 ml-1">Exclusivos</span> : null;
+                                })()}
                             </label>
                             <select 
-                                className="form-input text-sm bg-purple-50/30 border-purple-200 text-purple-900 w-full"
+                                className="form-input text-sm bg-purple-50/30 border-purple-200 text-purple-900 w-full disabled:opacity-50"
                                 value={currentDesignId}
                                 onChange={e => setCurrentDesignId(e.target.value)}
+                                disabled={!currentProductId}
                             >
                                 <option value="">[Não aplicar / Arte Genérica]</option>
-                                {designs.map(design => (
-                                    <option key={design.id} value={design.id}>
-                                        {design.name} {design.category && `(${design.category})`}
-                                    </option>
-                                ))}
+                                {(() => {
+                                    if (!currentProductId) return null;
+                                    const selectedProduct = products.find(p => String(p.id) === String(currentProductId));
+                                    const allowedModelIds = selectedProduct?.linkedModels || [];
+                                    const availableDesigns = allowedModelIds.length > 0 
+                                        ? designs.filter(d => allowedModelIds.includes(String(d.id))) 
+                                        : designs;
+                                    
+                                    return availableDesigns.map(design => (
+                                        <option key={design.id} value={design.id}>
+                                            {design.name} {design.category && `(${design.category})`}
+                                        </option>
+                                    ));
+                                })()}
                             </select>
                         </div>
 
