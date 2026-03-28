@@ -175,7 +175,33 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
 
   if (!isOpen) return null;
 
-  // IMAGE UPLOAD HANDLER
+  // IMAGE UPLOAD HANDLER — com compressão automática via canvas
+  const compressImage = (dataUrl, maxWidth = 800, maxHeight = 800, quality = 0.75) => {
+      return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+              let { width, height } = img;
+
+              // Redimensiona mantendo proporção
+              if (width > maxWidth || height > maxHeight) {
+                  const ratio = Math.min(maxWidth / width, maxHeight / height);
+                  width = Math.round(width * ratio);
+                  height = Math.round(height * ratio);
+              }
+
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+
+              // Sempre salva como JPEG para garantir compressão
+              resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.src = dataUrl;
+      });
+  };
+
   const handleImageUpload = (e) => {
       const files = Array.from(e.target.files);
       if (images.length + files.length > 5) {
@@ -184,12 +210,21 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
       }
       files.forEach(file => {
           const reader = new FileReader();
-          reader.onload = (ev) => {
-              if (ev.target.result.length > 800000) {
-                  alert("Uma imagem é muito grande. Escolha imagens menores.");
-                  return;
+          reader.onload = async (ev) => {
+              try {
+                  const compressed = await compressImage(ev.target.result);
+                  // Limite de segurança pós-compressão: ~150KB por imagem
+                  if (compressed.length > 200000) {
+                      // Segunda passagem com qualidade ainda mais baixa se ainda grande
+                      const compressed2 = await compressImage(ev.target.result, 600, 600, 0.5);
+                      setImages(prev => [...prev, compressed2]);
+                  } else {
+                      setImages(prev => [...prev, compressed]);
+                  }
+              } catch (err) {
+                  console.error('Erro ao comprimir imagem:', err);
+                  alert('Não foi possível processar esta imagem.');
               }
-              setImages(prev => [...prev, ev.target.result]);
           };
           reader.readAsDataURL(file);
       });
@@ -441,6 +476,28 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
         console.warn("Name validation check failed", err);
     }
 
+    // 🗜️ Recomprimir imagens existentes (pode ter legado em alta resolução)
+    let safeImages = images;
+    try {
+        safeImages = await Promise.all(
+            images.map(async (img) => {
+                // Se o base64 está grande, recomprime
+                if (img && img.length > 150000) {
+                    const recompressed = await compressImage(img, 800, 800, 0.7);
+                    // Segunda passagem se ainda grande
+                    if (recompressed.length > 150000) {
+                        return compressImage(img, 600, 600, 0.5);
+                    }
+                    return recompressed;
+                }
+                return img;
+            })
+        );
+    } catch (err) {
+        console.warn('Falha na recompressão preventiva de imagens:', err);
+        safeImages = images;
+    }
+
     const laborCost = calculateTotalLaborCost();
     const materialCost = calculateTotalMaterialCost();
     const equipmentCost = calculateTotalEquipmentCost();
@@ -453,8 +510,8 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
       price: parseFloat(values.price) || 0,
       stock: parseInt(values.stock) || 0,
       category: values.category || 'Geral',
-      images: images,
-      image: images.length > 0 ? images[0] : '', // Retro-compatibility
+      images: safeImages,
+      image: safeImages.length > 0 ? safeImages[0] : '', // Retro-compatibility
       videoUrl: values.videoUrl || '',
       campaignActive: values.campaignActive || false,
       campaignDiscount: parseFloat(values.campaignDiscount) || 0,
