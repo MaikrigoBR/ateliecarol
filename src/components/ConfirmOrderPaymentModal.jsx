@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, DollarSign, Calendar, CreditCard, Landmark } from 'lucide-react';
+import { X, Check, DollarSign, CreditCard, Landmark, Plus, Trash2 } from 'lucide-react';
 import db from '../services/database.js';
 
 export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) {
@@ -9,76 +9,98 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
   const amountPaidSoFar = order.amountPaid || 0;
   const initialBalanceDue = Math.max(0, totalOrderValue - amountPaidSoFar);
 
-  const [paymentAmount, setPaymentAmount] = useState(initialBalanceDue);
-  const [paymentMethod, setPaymentMethod] = useState(order.paymentMethod || 'pix');
-  const [paymentCondition, setPaymentCondition] = useState(order.paymentCondition || 'spot');
-  const [installments, setInstallments] = useState(order.installments || 1);
-  const [applyInterest, setApplyInterest] = useState(false);
-  const [interestRate, setInterestRate] = useState(0);
-  const [gatewayFeePct, setGatewayFeePct] = useState('');
-  const [nextDueDate, setNextDueDate] = useState('');
-  
   const [accounts, setAccounts] = useState([]);
-  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [payments, setPayments] = useState([]);
+  const [nextDueDate, setNextDueDate] = useState('');
 
-  // Load accounts
-  useEffect(() => {
-    const loadAccounts = async () => {
-        const accs = await db.getAll('accounts');
-        setAccounts(accs);
-        if (accs.length > 0) setSelectedAccountId(accs[0].id);
-    };
-    if (isOpen) loadAccounts();
-  }, [isOpen]);
+  const resetPayments = (accs) => {
+      const firstAcc = accs.length > 0 ? accs[0].id : '';
+      setPayments([
+          {
+              id: Date.now(),
+              amount: initialBalanceDue,
+              method: order.paymentMethod || 'pix',
+              condition: order.paymentCondition || 'spot',
+              installments: order.installments || 1,
+              applyInterest: false,
+              interestRate: 0,
+              gatewayFeePct: '',
+              targetAccountId: firstAcc
+          }
+      ]);
+      setNextDueDate('');
+  };
 
-  // Reset state when order changes
   useEffect(() => {
       if (isOpen && order) {
-        const remaining = Math.max(0, (order.total || 0) - (order.amountPaid || 0));
-        setPaymentAmount(remaining);
-        setPaymentMethod(order.paymentMethod || 'pix');
-        setPaymentCondition(order.paymentCondition || 'spot');
-        setInstallments(order.installments || 1);
-        setApplyInterest(false);
-        setInterestRate(0);
-        setGatewayFeePct('');
-        setNextDueDate('');
+          db.getAll('accounts').then(accs => {
+              setAccounts(accs);
+              resetPayments(accs);
+          });
       }
-  }, [isOpen, order]);
+  }, [isOpen, order, initialBalanceDue]);
 
-  // Calculations
-  const parsedPayment = parseFloat(paymentAmount) || 0;
-  const parsedInterest = parseFloat(interestRate) || 0;
+  let sumSurcharges = 0;
+  let sumAmounts = 0;
+  let sumGatewayFees = 0;
 
-  const surchargeAmount = applyInterest ? (parsedPayment * (parsedInterest / 100)) : 0;
-  const totalTransactionValue = parsedPayment + surchargeAmount; 
-  // Wait, usually interest increases the DEBT, not just the transaction.
-  // User said: "opções de definir o método parcelado ... com juros ... ou sem juros".
-  // If I pay 100 with 10% interest, the client pays 110.
-  // Does the order total increase to 110? Yes.
-  
-  // Let's assume 'paymentAmount' is the PRINCIPAL being paid off.
-  // And 'surcharge' is added on top.
-  
-  const currentTotalDebt = totalOrderValue; 
-  
-  const finalOrderTotal = totalOrderValue + surchargeAmount;
-  const totalPaidAfterThis = amountPaidSoFar + parsedPayment + surchargeAmount;
+  payments.forEach(p => {
+      const amt = parseFloat(p.amount) || 0;
+      const rate = parseFloat(p.interestRate) || 0;
+      const sur = p.applyInterest ? (amt * (rate / 100)) : 0;
+      const gate = parseFloat(p.gatewayFeePct) || 0;
+      
+      sumAmounts += amt;
+      sumSurcharges += sur;
+      sumGatewayFees += (amt + sur) * (gate / 100);
+  });
+
+  const finalOrderTotal = totalOrderValue + sumSurcharges;
+  const totalPaidAfterThis = amountPaidSoFar + sumAmounts + sumSurcharges;
   const balanceRemaining = Math.max(0, finalOrderTotal - totalPaidAfterThis);
-  const gatewayFeeAmount = (parsedPayment + surchargeAmount) * ((parseFloat(gatewayFeePct) || 0) / 100);
+
+  const handleAddPayment = () => {
+      const firstAcc = accounts.length > 0 ? accounts[0].id : '';
+      setPayments([...payments, {
+          id: Date.now() + Math.random(),
+          amount: balanceRemaining > 0 ? balanceRemaining : 0,
+          method: 'pix',
+          condition: 'spot',
+          installments: 1,
+          applyInterest: false,
+          interestRate: 0,
+          gatewayFeePct: '',
+          targetAccountId: firstAcc
+      }]);
+  };
+
+  const handleRemovePayment = (id) => {
+      setPayments(payments.filter(p => p.id !== id));
+  };
+
+  const updatePayment = (id, field, value) => {
+      setPayments(payments.map(p => p.id === id ? { ...p, [field]: value } : p));
+  };
 
   const handleConfirm = () => {
-    onConfirm({
-        amount: parsedPayment + surchargeAmount, // Record full amount paid
-        method: paymentMethod,
-        condition: paymentCondition,
-        installments: parseInt(installments) || 1,
-        interestRate: parsedInterest,
-        surchargeAmount: surchargeAmount,
-        gatewayFeeAmount: gatewayFeeAmount,
-        nextDueDate: balanceRemaining > 0.05 ? nextDueDate : null, // Tolerance
-        targetAccountId: selectedAccountId
-    });
+      const payload = payments.map(p => {
+          const amt = parseFloat(p.amount) || 0;
+          const sur = p.applyInterest ? (amt * (parseFloat(p.interestRate) || 0) / 100) : 0;
+          const gate = (amt + sur) * ((parseFloat(p.gatewayFeePct) || 0) / 100);
+          
+          return {
+              amount: amt + sur,
+              method: p.method,
+              condition: p.condition,
+              installments: parseInt(p.installments) || 1,
+              interestRate: parseFloat(p.interestRate) || 0,
+              surchargeAmount: sur,
+              gatewayFeeAmount: gate,
+              nextDueDate: balanceRemaining > 0.05 ? nextDueDate : null,
+              targetAccountId: p.targetAccountId
+          };
+      });
+      onConfirm(payload);
   };
 
   const paymentMethods = [
@@ -89,7 +111,6 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
     { value: 'transfer', label: 'Transferência' }
   ];
 
-  // --- Inline Styles mapping to Theme Variables ---
   const sOverlay = {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
@@ -99,7 +120,7 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
 
   const sModal = {
       backgroundColor: 'var(--surface)', 
-      width: '100%', maxWidth: '540px', maxHeight: '90vh',
+      width: '100%', maxWidth: '640px', maxHeight: '90vh',
       borderRadius: 'var(--radius-lg)',
       boxShadow: 'var(--shadow-lg)',
       display: 'flex', flexDirection: 'column',
@@ -134,7 +155,8 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius-md)',
       padding: '1rem',
-      display: 'flex', flexDirection: 'column', gap: '0.75rem'
+      display: 'flex', flexDirection: 'column', gap: '0.75rem',
+      position: 'relative'
   };
 
   const sInput = {
@@ -147,12 +169,9 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
   return (
     <div style={sOverlay} onClick={onClose}>
       <div style={sModal} onClick={e => e.stopPropagation()}>
-        
-        {/* Header */}
         <div style={sHeader}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <DollarSign size={22} color="var(--success)"/> 
-            Registrar Recebimento
+            <DollarSign size={22} color="var(--success)"/> Checkout Multi-Fontes
           </h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.5rem' }}>
             <X size={20} />
@@ -160,8 +179,6 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
         </div>
         
         <div style={sBody} className="hide-scrollbar">
-            
-            {/* Context */}
             <div style={{ ...sCardLinear, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderLeft: '3px solid var(--primary)' }}>
                 <div>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total do Pedido</span>
@@ -169,107 +186,116 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
                 </div>
                 {amountPaidSoFar > 0 && (
                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Já Pago Anteriormente</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Pago Anteriormente</span>
                         <span style={{ fontSize: '1.125rem', color: 'var(--success)', fontWeight: 700 }}>R$ {amountPaidSoFar.toFixed(2).replace('.', ',')}</span>
                     </div>
                 )}
             </div>
 
-            {/* Amount Entry */}
-            <div style={sCardLinear}>
-                <label style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>Valor a Receber Agora</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <span style={{ position: 'absolute', left: '1rem', color: 'var(--text-muted)', fontWeight: 700 }}>R$</span>
-                    <input 
-                        type="number" 
-                        step="0.01"
-                        style={{ ...sInput, paddingLeft: '2.5rem', fontSize: '1.125rem', fontWeight: 700 }}
-                        value={paymentAmount}
-                        onChange={e => setPaymentAmount(e.target.value)}
-                        max={initialBalanceDue}
-                    />
-                </div>
-            </div>
-
-            {/* Method & Account */}
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                 <div style={{ flex: 1, minWidth: '200px' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Forma de Pagamento</label>
-                    <select style={sInput} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-                        {paymentMethods.map(method => (
-                            <option key={method.value} value={method.value}>{method.label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Conta de Destino (Caixa/Banco)</label>
-                    <select style={{ ...sInput, cursor: 'pointer' }} value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} required>
-                        <option value="">Selecione...</option>
-                        {accounts.map(acc => (
-                            <option key={acc.id} value={acc.id}>{acc.name}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Condição</label>
-                    <select style={sInput} value={paymentCondition} onChange={e => setPaymentCondition(e.target.value)}>
-                        <option value="spot">À Vista</option>
-                        <option value="installment">Parcelado</option>
-                    </select>
-                </div>
-                {(paymentMethod === 'credit_card' || paymentMethod === 'debit_card') && (
-                    <div style={{ flex: 1, animation: 'fadeIn 0.3s ease-out' }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Taxa Maquininha/Gateway (%)</label>
-                        <input type="number" step="0.1" style={sInput} value={gatewayFeePct} onChange={e => setGatewayFeePct(e.target.value)} placeholder="MDR" />
-                    </div>
-                )}
-            </div>
-
-            {/* Installments & Interest Logic */}
-            {paymentCondition === 'installment' && (
-                <div style={{ ...sCardLinear, borderLeft: '3px solid var(--info)', backgroundColor: 'transparent' }}>
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--info)', textTransform: 'uppercase', display: 'block', marginBottom: '0.375rem' }}>Nº Parcelas</label>
-                            <input type="number" min="2" max="24" style={sInput} value={installments} onChange={e => setInstallments(e.target.value)} />
-                        </div>
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', paddingBottom: '0.5rem' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                                <input type="checkbox" checked={applyInterest} onChange={e => setApplyInterest(e.target.checked)} style={{ width: '1.25rem', height: '1.25rem', accentColor: 'var(--primary)' }} />
-                                Adicionar Juros?
-                            </label>
-                        </div>
+            {payments.map((p, idx) => (
+                <div key={p.id} style={{...sCardLinear, border: '1px solid var(--border)'}}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                           Pagamento {idx + 1}
+                        </h4>
+                        {payments.length > 1 && (
+                            <button onClick={() => handleRemovePayment(p.id)} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', gap: '0.2rem', alignItems: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
+                                <Trash2 size={14}/> Remover
+                            </button>
+                        )}
                     </div>
                     
-                    {applyInterest && (
-                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', animation: 'fadeIn 0.3s ease-out', marginTop: '0.5rem' }}>
-                             <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.375rem' }}>Taxa Acréscimo (%)</label>
-                                <input type="number" step="0.1" style={sInput} value={interestRate} onChange={e => setInterestRate(e.target.value)} placeholder="Ex: 5" />
-                             </div>
-                             <div style={{ flex: 1, textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Custo do Parcelamento</span>
-                                 <strong style={{ color: 'var(--danger)', fontSize: '1rem' }}>+ R$ {surchargeAmount.toFixed(2).replace('.', ',')}</strong>
-                             </div>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>Valor a Receber</label>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <span style={{ position: 'absolute', left: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>R$</span>
+                                <input 
+                                    type="number" step="0.01"
+                                    style={{ ...sInput, paddingLeft: '2.25rem', fontSize: '1rem', fontWeight: 700 }}
+                                    value={p.amount}
+                                    onChange={e => updatePayment(p.id, 'amount', e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>Forma</label>
+                            <select style={sInput} value={p.method} onChange={e => updatePayment(p.id, 'method', e.target.value)}>
+                                {paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                            </select>
+                        </div>
+                         <div style={{ flex: 1, minWidth: '150px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>Conta/Cofre</label>
+                            <select style={sInput} value={p.targetAccountId} onChange={e => updatePayment(p.id, 'targetAccountId', e.target.value)} required>
+                                <option value="">Selecione...</option>
+                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>Condição</label>
+                            <select style={sInput} value={p.condition} onChange={e => updatePayment(p.id, 'condition', e.target.value)}>
+                                <option value="spot">À Vista</option>
+                                <option value="installment">Parcelado</option>
+                            </select>
+                        </div>
+                        {(p.method === 'credit_card' || p.method === 'debit_card') && (
+                            <div style={{ flex: 1, minWidth: '150px', animation: 'fadeIn 0.3s ease-out' }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>Taxa MDR Maquininha (%)</label>
+                                <input type="number" step="0.1" style={sInput} value={p.gatewayFeePct} onChange={e => updatePayment(p.id, 'gatewayFeePct', e.target.value)} placeholder="Ex: 1.5" />
+                            </div>
+                        )}
+                    </div>
+
+                    {p.condition === 'installment' && (
+                        <div style={{ padding: '0.75rem', border: '1px solid var(--info)', borderRadius: 'var(--radius-sm)', backgroundColor: 'transparent' }}>
+                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--info)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Nº Parcelas</label>
+                                    <input type="number" min="2" max="24" style={sInput} value={p.installments} onChange={e => updatePayment(p.id, 'installments', e.target.value)} />
+                                </div>
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                        <input type="checkbox" checked={p.applyInterest} onChange={e => updatePayment(p.id, 'applyInterest', e.target.checked)} style={{ width: '1rem', height: '1rem', accentColor: 'var(--primary)' }} />
+                                        Adicionar Juros?
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            {p.applyInterest && (
+                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', animation: 'fadeIn 0.3s ease-out', marginTop: '0.75rem' }}>
+                                     <div style={{ flex: 1 }}>
+                                        <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>Taxa Acréscimo (%)</label>
+                                        <input type="number" step="0.1" style={sInput} value={p.interestRate} onChange={e => updatePayment(p.id, 'interestRate', e.target.value)} placeholder="Ex: 5" />
+                                     </div>
+                                     <div style={{ flex: 1, textAlign: 'right' }}>
+                                         <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block' }}>Custo do Parcelamento</span>
+                                         <strong style={{ color: 'var(--danger)', fontSize: '0.875rem' }}>+ R$ {((parseFloat(p.amount)||0) * (parseFloat(p.interestRate)||0)/100).toFixed(2).replace('.', ',')}</strong>
+                                     </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
-            )}
+            ))}
+
+            <button onClick={handleAddPayment} style={{ width: '100%', padding: '0.75rem', border: '2px dashed var(--border)', borderRadius: 'var(--radius-md)', background: 'transparent', color: 'var(--primary)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}>
+                <Plus size={18}/> Adicionar Outra Fonte de Pagamento
+            </button>
 
             {/* Summary of Transaction */}
             <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                     <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Total lançado no sistema (Receita Bruta):</span>
-                     <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>R$ {(parsedPayment + surchargeAmount).toFixed(2).replace('.', ',')}</span>
+                     <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Soma dos Pagamentos Lançados:</span>
+                     <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>R$ {(sumAmounts + sumSurcharges).toFixed(2).replace('.', ',')}</span>
                  </div>
                  
-                 {gatewayFeeAmount > 0 && (
+                 {sumGatewayFees > 0 && (
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', opacity: 0.8 }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>Custo de Adquirência (Dedução Oculta):</span>
-                         <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--danger)' }}>- R$ {gatewayFeeAmount.toFixed(2).replace('.', ',')}</span>
+                         <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>Total de Custo MDR (Taxas Ocultas):</span>
+                         <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--danger)' }}>- R$ {sumGatewayFees.toFixed(2).replace('.', ',')}</span>
                      </div>
                  )}
                  
@@ -286,7 +312,7 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
                      </div>
                  ) : (
                      <div style={{ textAlign: 'center', color: '#fff', backgroundColor: 'var(--success)', padding: '0.5rem', borderRadius: 'var(--radius-md)', marginTop: '1rem', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                         <Check size={16} /> Parcela Final — Pedido Quitado.
+                         <Check size={16} /> Contabilidade Fechada — Pagamento Quitado.
                      </div>
                  )}
             </div>
@@ -297,8 +323,8 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
             <button type="button" className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>
                 Cancelar
             </button>
-            <button type="button" className="btn btn-primary" onClick={handleConfirm} disabled={balanceRemaining > 0.05 && !nextDueDate} style={{ flex: 1, backgroundColor: 'var(--success)' }}>
-                Liquidar
+            <button type="button" className="btn btn-primary" onClick={handleConfirm} disabled={(balanceRemaining > 0.05 && !nextDueDate) || sumAmounts <= 0} style={{ flex: 1, backgroundColor: 'var(--success)' }}>
+                Liquidar e Registrar
             </button>
         </div>
       </div>

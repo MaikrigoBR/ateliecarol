@@ -6,7 +6,81 @@ import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 export function calculateFinancialStats(transactions, orders, accounts, dateFilter) {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
+    const mode = dateFilter.mode || 'daily';
     
+    if (mode === 'monthly') {
+        const monthsBack = dateFilter.monthsBack || 6;
+        const monthsForward = dateFilter.monthsForward || 6;
+        const totalMonths = monthsBack + monthsForward;
+        
+        const startDate = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
+        
+        const accountsInitial = accounts.reduce((sum, a) => sum + Number(a.initialBalance || 0), 0);
+        
+        const pastTransactions = transactions.filter(t => {
+            if (!t.date) return false;
+            const tDate = new Date(t.date);
+            if (isNaN(tDate)) return false;
+            tDate.setHours(0,0,0,0);
+            return tDate < startDate && t.status === 'paid';
+        });
+        
+        const pastBalance = pastTransactions.reduce((sum, t) => {
+            return sum + (t.type === 'income' ? Number(t.amount) : -Number(t.amount));
+        }, 0);
+
+        let runningBalance = accountsInitial + pastBalance;
+        
+        const effectiveTransactions = transactions.map(t => {
+            let effectiveDate = t.date;
+            if (t.status !== 'paid') {
+                if (!effectiveDate || effectiveDate < todayStr) effectiveDate = todayStr;
+            }
+            return { ...t, effectiveDate };
+        });
+
+        const pendingOrders = orders.filter(o => o.status !== 'Concluído' && o.status !== 'cancelled' && o.status !== 'completed');
+        const effectiveOrders = pendingOrders.map(o => {
+            let targetDate = o.nextDueDate || o.deadline || (o.createdAt ? new Date(new Date(o.createdAt).valueOf() + 7*86400000).toISOString().split('T')[0] : todayStr);
+            if (targetDate < todayStr) targetDate = todayStr;
+            const balanceDue = Number(o.balanceDue !== undefined ? o.balanceDue : (o.total || 0));
+            return { ...o, effectiveDate: targetDate.split('T')[0], balanceDue };
+        });
+
+        const data = [];
+        for (let i = 0; i < totalMonths; i++) {
+            const mDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+            const monthPrefix = `${mDate.getFullYear()}-${String(mDate.getMonth() + 1).padStart(2, '0')}`;
+            const monthLabel = mDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+            
+            const monthTrans = effectiveTransactions.filter(t => t.effectiveDate && t.effectiveDate.startsWith(monthPrefix));
+            
+            const income = monthTrans.filter(t => t.type === 'income' && t.status === 'paid').reduce((sum, t) => sum + Number(t.amount), 0);
+            const pendingIncome = monthTrans.filter(t => t.type === 'income' && t.status !== 'paid').reduce((sum, t) => sum + Number(t.amount), 0);
+            
+            const paidExpense = monthTrans.filter(t => t.type === 'expense' && t.status === 'paid').reduce((sum, t) => sum + Number(t.amount), 0);
+            const pendingExpense = monthTrans.filter(t => t.type === 'expense' && t.status !== 'paid').reduce((sum, t) => sum + Number(t.amount), 0);
+            
+            const projectedIncomeFromOrders = effectiveOrders.filter(o => o.effectiveDate.startsWith(monthPrefix)).reduce((sum, o) => sum + o.balanceDue, 0);
+
+            const totalIncome = income + pendingIncome + projectedIncomeFromOrders;
+            const totalExpense = paidExpense + pendingExpense;
+            runningBalance += (totalIncome - totalExpense);
+
+            data.push({
+                name: monthLabel,
+                fullName: mDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+                Receitas: income,
+                Projeção: pendingIncome + projectedIncomeFromOrders,
+                Despesas: paidExpense,
+                APagar: pendingExpense,
+                Saldo: runningBalance,
+                isToday: mDate.getMonth() === today.getMonth() && mDate.getFullYear() === today.getFullYear()
+            });
+        }
+        return data;
+    }
+
     const startDate = new Date(today);
     const daysBack = dateFilter.daysBack || 30;
     startDate.setDate(today.getDate() - daysBack);

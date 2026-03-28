@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Send, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { Plus, Trash2, Send, CheckCircle, XCircle, FileText, Edit } from 'lucide-react';
 import db from '../services/database.js';
 import { NewBudgetModal } from '../components/NewBudgetModal.jsx';
 import { getPublicAppBaseUrl } from '../utils/publicRuntime.js';
@@ -10,6 +10,12 @@ export function Budgets() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [editingBudget, setEditingBudget] = useState(null);
+
+  const handleEdit = (budget) => {
+      setEditingBudget(budget);
+      setIsModalOpen(true);
+  };
 
   const generatePublicToken = () => {
     if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -327,6 +333,14 @@ export function Budgets() {
                     <div style={{ display: 'flex', gap: '4px' }}>
                         <button 
                             className="btn btn-icon" 
+                            title="Visão Geral & Editar"
+                            onClick={() => handleEdit(budget)}
+                            style={{ color: 'var(--primary)' }}
+                        >
+                            <Edit size={16} />
+                        </button>
+                        <button 
+                            className="btn btn-icon" 
                             title="Enviar WhatsApp"
                             onClick={() => handleSendWhatsapp(budget)}
                             style={{ color: '#25D366' }}
@@ -381,8 +395,9 @@ export function Budgets() {
 
       <NewBudgetModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => { setIsModalOpen(false); setEditingBudget(null); }}
         onBudgetCreated={fetchBudgets} 
+        editingBudget={editingBudget}
       />
     </div>
   );

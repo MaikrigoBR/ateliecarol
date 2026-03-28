@@ -4,7 +4,7 @@ import { X, Save, Plus, Trash2, Wrench, Package } from 'lucide-react';
 import db from '../services/database.js';
 import { calculateFractionalCost, getSubUnits } from '../utils/units';
 
-export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
+export function NewBudgetModal({ isOpen, onClose, onBudgetCreated, editingBudget }) {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [equipments, setEquipments] = useState([]);
@@ -36,6 +36,8 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
       baseUnit: 'un'
   });
 
+  const [relatedOrders, setRelatedOrders] = useState([]);
+
   const [productSearch, setProductSearch] = useState('');
   const [materialSearch, setMaterialSearch] = useState('');
   const [equipSearch, setEquipSearch] = useState('');
@@ -54,14 +56,27 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                 setEquipments(Array.isArray(loadedEquips) ? loadedEquips : []);
                 setMaterials(Array.isArray(loadedInventory) ? loadedInventory.filter(i => i.type === 'material') : []);
 
-                const nextWeek = new Date();
-                nextWeek.setDate(nextWeek.getDate() + 7);
-                
-                setFormData({
-                    customer: '',
-                    validUntil: nextWeek.toISOString().split('T')[0],
-                    items: []
-                });
+                if (editingBudget) {
+                    setFormData({
+                        customer: editingBudget.customerName || '',
+                        validUntil: editingBudget.validUntil || '',
+                        items: editingBudget.items || []
+                    });
+                    
+                    const allOrders = await db.getAll('orders');
+                    const filteredOrders = (allOrders || []).filter(o => String(o.fromBudget) === String(editingBudget.id));
+                    setRelatedOrders(filteredOrders);
+                } else {
+                    const nextWeek = new Date();
+                    nextWeek.setDate(nextWeek.getDate() + 7);
+                    
+                    setFormData({
+                        customer: '',
+                        validUntil: nextWeek.toISOString().split('T')[0],
+                        items: []
+                    });
+                    setRelatedOrders([]);
+                }
                 setCurrentItem({ productId: '', quantity: 1, price: 0 });
                 setCurrentMachine({ equipId: '', minutes: 30, hourCost: 0 });
                 setCurrentMaterial({ materialId: '', quantity: 1, usageUnit: 'un', cost: 0, baseUnit: 'un' });
@@ -79,7 +94,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
         }
     };
     loadData();
-  }, [isOpen]);
+  }, [isOpen, editingBudget]);
 
   const handleProductSelect = (e) => {
     const pId = e.target.value;
@@ -241,18 +256,27 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
     e.preventDefault();
     if (!formData.customer || formData.items.length === 0) return;
 
-    const newBudget = {
-        id: `ORC-${Math.floor(Math.random() * 10000)}`, // Simple ID
-        customerName: formData.customer,
-        date: new Date().toISOString().split('T')[0],
-        validUntil: formData.validUntil,
-        items: formData.items,
-        total: calculateTotal(),
-        status: 'Rascunho' // Starts as Draft
-    };
-
-    // Usamos db.set com o custom ID para amarrá-lo ao Firestore doc id
-    await db.set('budgets', newBudget.id, newBudget);
+    if (editingBudget) {
+        const updatedBudget = {
+            ...editingBudget,
+            customerName: formData.customer,
+            validUntil: formData.validUntil,
+            items: formData.items,
+            total: calculateTotal()
+        };
+        await db.update('budgets', String(editingBudget.id), updatedBudget);
+    } else {
+        const newBudget = {
+            id: `ORC-${Math.floor(Math.random() * 10000)}`, // Simple ID
+            customerName: formData.customer,
+            date: new Date().toISOString().split('T')[0],
+            validUntil: formData.validUntil,
+            items: formData.items,
+            total: calculateTotal(),
+            status: 'Rascunho' // Starts as Draft
+        };
+        await db.set('budgets', newBudget.id, newBudget);
+    }
     
     if (onBudgetCreated) onBudgetCreated();
     onClose();
@@ -264,7 +288,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
     <div className="modal-overlay">
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
         <div className="modal-header">
-          <h2 className="modal-title">Novo Orçamento</h2>
+          <h2 className="modal-title">{editingBudget ? `Editar Orçamento #${editingBudget.id}` : 'Novo Orçamento'}</h2>
           <button className="btn btn-icon" onClick={onClose} type="button">
             <X size={20} />
           </button>
@@ -522,6 +546,53 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
                 <span className="modal-total-value">R$ {calculateTotal().toFixed(2)}</span>
             </div>
 
+            {editingBudget && relatedOrders.length > 0 && (
+                <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
+                    <h4 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', fontSize: '1rem' }}>
+                        <Package size={18} /> Histórico de Pedidos Gerados (Integração de Produção e Financeiro)
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {relatedOrders.map(order => (
+                            <div key={order.id} style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '8px', backgroundColor: 'var(--surface)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                    <strong style={{fontSize: '1.1rem', color: 'var(--primary)'}}>Pedido #{order.id}</strong>
+                                    <span className="badge badge-primary">{order.status}</span>
+                                </div>
+                                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                    <div style={{ display: 'flex', gap: '24px', marginBottom: '8px' }}>
+                                        <span><strong>Criado em:</strong> {new Date(order.date).toLocaleDateString()}</span>
+                                        <span><strong>Qtd de Arquivos/Itens:</strong> {order.items}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '24px', padding: '12px', background: 'var(--background)', borderRadius: '6px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valor do Pedido</span>
+                                            <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>R$ {Number(order.total || 0).toFixed(2).replace('.', ',')}</strong>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status Financeiro</span>
+                                            {order.amountPaid >= order.total ? (
+                                                <strong style={{ fontSize: '1rem', color: 'var(--success)' }}>Totalmente Pago (R$ {Number(order.amountPaid).toFixed(2).replace('.', ',')})</strong>
+                                            ) : order.amountPaid > 0 ? (
+                                                <strong style={{ fontSize: '1rem', color: 'var(--warning)' }}>Pagamento Parcial (R$ {Number(order.amountPaid).toFixed(2).replace('.', ',')})</strong>
+                                            ) : (
+                                                <strong style={{ fontSize: '1rem', color: 'var(--danger)' }}>Aguardando Pagamento</strong>
+                                            )}
+                                        </div>
+                                        {order.productionStep && (
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa de Produção</span>
+                                                <strong style={{ fontSize: '1rem', color: 'var(--info)' }}>{order.productionStep}</strong>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+
           </div>
 
           <div className="modal-footer">
@@ -530,7 +601,7 @@ export function NewBudgetModal({ isOpen, onClose, onBudgetCreated }) {
             </button>
             <button type="submit" className="btn btn-primary">
               <Save size={16} />
-              Criar Rascunho
+              {editingBudget ? 'Deseja Salvar Modificações?' : 'Criar Rascunho'}
             </button>
           </div>
         </form>

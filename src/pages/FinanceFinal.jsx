@@ -180,11 +180,19 @@ function FinancialOverviewChart({ data }) {
 
     const CustomXAxisTick = ({ x, y, payload }) => {
         if (!payload || !payload.value) return null;
-        const [day, month] = payload.value.split('/');
+        const val = payload.value;
+        if (val.includes('/')) {
+            const [day, month] = val.split('/');
+            return (
+                <g transform={`translate(${x},${y})`}>
+                    <text x={0} y={0} dy={12} textAnchor="middle" fill="#6b7280" fontSize={11} fontWeight={600}>{day}</text>
+                    <text x={0} y={0} dy={24} textAnchor="middle" fill="#9ca3af" fontSize={10}>{month}</text>
+                </g>
+            );
+        }
         return (
             <g transform={`translate(${x},${y})`}>
-                <text x={0} y={0} dy={12} textAnchor="middle" fill="#6b7280" fontSize={11} fontWeight={600}>{day}</text>
-                <text x={0} y={0} dy={24} textAnchor="middle" fill="#9ca3af" fontSize={10}>{month}</text>
+                <text x={0} y={0} dy={16} textAnchor="middle" fill="#6b7280" fontSize={11} fontWeight={600} textTransform="capitalize">{val}</text>
             </g>
         );
     };
@@ -304,6 +312,7 @@ export function FinanceFinal() {
     
     // Global Dash Filter
     const [globalAccFilter, setGlobalAccFilter] = useState('');
+    const [chartMode, setChartMode] = useState('daily');
     
     // Filters for Transactions Table
     const [transSearchTerm, setTransSearchTerm] = useState('');
@@ -341,7 +350,7 @@ export function FinanceFinal() {
             const filteredTrans = globalAccFilter ? transactions.filter(t => t.accountId === globalAccFilter) : transactions;
 
             // 1. Chart Data
-            const data = calculateFinancialStats(filteredTrans, orders, filteredAccounts, { daysBack: 30, daysForward: 60 });
+            const data = calculateFinancialStats(filteredTrans, orders, filteredAccounts, { mode: chartMode, daysBack: 30, daysForward: 60, monthsBack: 6, monthsForward: 6 });
             setChartData(data);
 
             // 2. KPI Stats
@@ -415,7 +424,7 @@ export function FinanceFinal() {
             });
             setCostCenterData(costCenterFormat);
         }
-    }, [transactions, orders, accounts, loading, globalAccFilter]);
+    }, [transactions, orders, accounts, loading, globalAccFilter, chartMode]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -838,8 +847,16 @@ export function FinanceFinal() {
                     <div className="chart-card" style={{ flex: '1 1 600px', overflow: 'hidden' }}>
                         <div className="chart-header" style={{ justifyContent: 'space-between' }}>
                             <div className="flex items-center gap-2">
-                                <BarChart2 size={20} color="var(--primary)" /> Fluxo Diário
+                                <BarChart2 size={20} color="var(--primary)" /> Fluxo de Caixa
                             </div>
+                            <select 
+                                value={chartMode} 
+                                onChange={e => setChartMode(e.target.value)}
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface-hover)', outline: 'none', color: 'var(--text-main)', cursor: 'pointer' }}
+                            >
+                                <option value="daily">Visão Diária (30d)</option>
+                                <option value="monthly">Tendência Mensal (Sazonal)</option>
+                            </select>
                             <div className="flex gap-2">
                                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Receitas</span>
                                 <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full">Despesas</span>

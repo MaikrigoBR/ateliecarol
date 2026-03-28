@@ -175,20 +175,24 @@ export function Orders() {
     setIsPaymentModalOpen(true);
   };
 
-  const handleConfirmPayment = async (transactionData) => {
+  const handleConfirmPayment = async (transactionsDataArray) => {
       const order = selectedOrderForPayment;
-      if (!order) return;
+      if (!order || !transactionsDataArray || transactionsDataArray.length === 0) return;
 
-      const surcharge = parseFloat(transactionData.surchargeAmount) || 0;
-      // Adjust total only if explicitly adding interest/surcharge, otherwise respect original total
-      // But typically "interest" for installments increases the cost.
-      // If user says "10% interest", we add to total.
+      let totalSurcharge = 0;
+      let totalAmountReceived = 0;
+
+      for (const t of transactionsDataArray) {
+          totalSurcharge += (parseFloat(t.surchargeAmount) || 0);
+          totalAmountReceived += (parseFloat(t.amount) || 0);
+      }
+
+      // Adjust total only if explicitly adding interest/surcharge
       const currentTotal = order.total || 0;
-      const newTotal = currentTotal + surcharge;
+      const newTotal = currentTotal + totalSurcharge;
       
-      const amountReceived = parseFloat(transactionData.amount);
       const previouslyPaid = (order.amountPaid || 0);
-      const totalPaid = previouslyPaid + amountReceived;
+      const totalPaid = previouslyPaid + totalAmountReceived;
 
       // Determine Status
       let newStatus = order.status;
@@ -207,70 +211,67 @@ export function Orders() {
           total: newTotal, // Persist the new total including interest
           amountPaid: totalPaid,
           balanceDue: balanceDue,
-          nextDueDate: balanceDue > 0 ? transactionData.nextDueDate : null,
+          nextDueDate: balanceDue > 0 ? transactionsDataArray[0].nextDueDate : null,
           lastPaymentDate: new Date().toISOString().split('T')[0]
       });
 
-      // 2. Update Account Balance
-      if (transactionData.targetAccountId) {
-          try {
-              const account = await db.getById('accounts', transactionData.targetAccountId);
-              if (account) {
-                  const netAmountToDeposit = amountReceived - (transactionData.gatewayFeeAmount || 0);
-                  await db.update('accounts', account.id, {
-                      balance: (parseFloat(account.balance) || 0) + netAmountToDeposit
-                  });
+      // Executa as finanças e balanços de todas as formas de pagamento em laco
+      for (const t of transactionsDataArray) {
+          const amtReceived = parseFloat(t.amount) || 0;
+          const gatewayFee = parseFloat(t.gatewayFeeAmount) || 0;
+
+          // 2. Update Account Balance
+          if (t.targetAccountId) {
+              try {
+                  const account = await db.getById('accounts', t.targetAccountId);
+                  if (account) {
+                      const netAmountToDeposit = amtReceived - gatewayFee;
+                      await db.update('accounts', account.id, {
+                          balance: (parseFloat(account.balance) || 0) + netAmountToDeposit
+                      });
+                  }
+              } catch (error) {
+                  console.error("Error updating account balance:", error);
               }
-          } catch (error) {
-              console.error("Error updating account balance:", error);
           }
-      }
 
-      // 3. Create Finance Transaction
-      await db.create('transactions', {
-          orderId: order.id,
-          description: `Recebimento Pedido #${order.id.toString().substring(0,8)}... - ${order.customer} (${transactionData.condition === 'installment' ? `${transactionData.installments}x` : 'À vista'})`,
-          amount: amountReceived,
-          type: 'income',
-          category: 'Vendas de Produtos',
-          date: new Date().toISOString().split('T')[0],
-          status: 'paid',
-          paymentMethod: transactionData.method,
-          paymentCondition: transactionData.condition,
-          installments: transactionData.installments,
-          surcharge: surcharge,
-          accountId: transactionData.targetAccountId // Link to account
-      });
-
-      // 4. Create Gateway Fee Deduction (se aplicável)
-      if (transactionData.gatewayFeeAmount && transactionData.gatewayFeeAmount > 0) {
+          // 3. Create Finance Transaction
           await db.create('transactions', {
               orderId: order.id,
-              description: `Taxa de Adquirência (MDR) - Ref. Pedido #${order.id.toString().substring(0,8)}`,
-              amount: transactionData.gatewayFeeAmount,
-              type: 'expense',
-              category: 'Impostos & Taxas',
+              description: `Recebimento Pedido #${order.id.toString().substring(0,8)}... - ${order.customer} (${t.condition === 'installment' ? `${t.installments}x` : 'À vista'})`,
+              amount: amtReceived,
+              type: 'income',
+              category: 'Vendas de Produtos',
               date: new Date().toISOString().split('T')[0],
               status: 'paid',
-              paymentMethod: transactionData.method,
-              accountId: transactionData.targetAccountId, // Withdraws the fee from exactly where it was deposited
-              installments: 1
+              paymentMethod: t.method,
+              paymentCondition: t.condition,
+              installments: t.installments,
+              surcharge: parseFloat(t.surchargeAmount) || 0,
+              accountId: t.targetAccountId // Link to account
           });
+
+          // 4. Create Gateway Fee Deduction (se aplicável)
+          if (gatewayFee > 0) {
+              await db.create('transactions', {
+                  orderId: order.id,
+                  description: `Taxa de Adquirência (MDR) - Ref. Pedido #${order.id.toString().substring(0,8)}`,
+                  amount: gatewayFee,
+                  type: 'expense',
+                  category: 'Impostos & Taxas',
+                  date: new Date().toISOString().split('T')[0],
+                  status: 'paid',
+                  paymentMethod: t.method,
+                  accountId: t.targetAccountId, // Withdraws the fee from exactly where it was deposited
+                  installments: 1
+              });
+          }
       }
 
       // 3. Update Customer Stats
       const customers = await db.getAll('customers');
       const customer = customers.find(c => c.name === order.customer);
       if (customer) {
-          // Increment totalSpent by the *amount received* this time? 
-          // Or by the Order Total? Usually Total Spent = Sum of Order Totals.
-          // But if partial payment...
-          // Let's stick to adding the *Order Total* only once when it's first completed?
-          // Or update it carefully.
-          // Safer: Recalculate from all orders? Expensive.
-          // For now, let's add `amountReceived` to `totalPaidByCustomer`.
-          // And `totalOrders` only if it's the first payment?
-          // This logic is tricky. Let's simplify: Just update lastActive.
           await db.update('customers', customer.id, {
               lastOrderDate: new Date().toISOString().split('T')[0]
           });
