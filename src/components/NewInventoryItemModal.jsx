@@ -22,7 +22,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
     color: '',
     manufacturer: '',
     image: '',
-    materialGroup: ''
+    category: ''
   });
 
   const [createFinance, setCreateFinance] = useState(false);
@@ -33,6 +33,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
   const [financeInstallments, setFinanceInstallments] = useState(1);
   const [accounts, setAccounts] = useState([]);
   const [existingGroups, setExistingGroups] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
   
   // Stock Replenishment specific
   const [replenishMode, setReplenishMode] = useState(false);
@@ -61,7 +62,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                   color: itemToEdit.color || '',
                   manufacturer: itemToEdit.manufacturer || '',
                   image: itemToEdit.image || '',
-                  materialGroup: itemToEdit.materialGroup || ''
+                  category: itemToEdit.category || itemToEdit.materialGroup || ''
               });
           } else {
               setFormData({
@@ -79,13 +80,14 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                  color: '',
                  manufacturer: '',
                  image: '',
-                 materialGroup: ''
+                 category: ''
               });
           }
           db.getAll('accounts').then(res => setAccounts(res || []));
+          db.getAll('categories').then(res => setCategoriesList(res || []));
           db.getAll('inventory').then(res => {
               if (res && res.length > 0) {
-                  const groups = [...new Set(res.filter(i => i.type === 'material' && i.materialGroup).map(i => i.materialGroup))];
+                  const groups = [...new Set(res.filter(i => i.category || i.materialGroup).map(i => i.category || i.materialGroup))];
                   setExistingGroups(groups.sort());
               }
           });
@@ -177,7 +179,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
       color: formData.color,
       manufacturer: formData.manufacturer,
       image: formData.image,
-      materialGroup: formData.type === 'material' ? formData.materialGroup : null,
+      category: formData.category, // Map everything generically to category instead of conditional materialGroup
 
       updatedAt: new Date().toISOString(),
       updatedBy: currentUser?.email || 'Sistema',
@@ -293,6 +295,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
           color: cloneData.color,
           manufacturer: cloneData.manufacturer,
           image: cloneData.image,
+          category: cloneData.category,
           updatedAt: new Date().toISOString(),
           updatedBy: currentUser?.email || 'Sistema',
           createdAt: new Date().toISOString()
@@ -455,15 +458,62 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                       />
                     </div>
 
-                    <div className="input-group">
-                        <label className="form-label">Descrição (Opcional)</label>
-                        <textarea 
-                            className="form-input" 
-                            placeholder="Detalhes adicionais sobre o item..."
-                            value={formData.description}
-                            onChange={e => setFormData({...formData, description: e.target.value})}
-                            rows={2}
-                        />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Categoria do {formData.type === 'equipment' ? 'Equipamento' : 'Insumo'} *</label>
+                            {categoriesList.length > 0 ? (
+                                <select 
+                                    className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" 
+                                    value={formData.category} 
+                                    onChange={e => setFormData({...formData, category: e.target.value})}
+                                    required
+                                >
+                                    <option value="">Selecione um grupo...</option>
+                                    {/* Render Hierarchical Categories */}
+                                    {categoriesList.filter(c => !c.parentId)
+                                        .sort((a,b) => a.name.localeCompare(b.name))
+                                        .map(main => {
+                                            const subs = categoriesList.filter(c => c.parentId === main.id).sort((a,b) => a.name.localeCompare(b.name));
+                                            if (subs.length > 0) {
+                                                return (
+                                                    <optgroup key={main.id} label={main.name}>
+                                                        {subs.map(sub => (
+                                                            <option key={sub.id} value={sub.name}>{sub.name}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                );
+                                            } else {
+                                                return <option key={main.id} value={main.name}>{main.name}</option>;
+                                            }
+                                        })
+                                    }
+                                    {/* Catch any orphaned categories */}
+                                    {categoriesList.filter(c => c.parentId && !categoriesList.find(m => m.id === c.parentId)).map(orphan => (
+                                        <option key={orphan.id} value={orphan.name}>{orphan.name} (Sem Grupo)</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input 
+                                    type="text" 
+                                    className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" 
+                                    placeholder="Nenhuma cadastrada. Digite..."
+                                    value={formData.category}
+                                    onChange={e => setFormData({...formData, category: e.target.value})}
+                                    required
+                                />
+                            )}
+                        </div>
+
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Descrição (Opcional)</label>
+                            <textarea 
+                                className="form-input" 
+                                placeholder="..."
+                                value={formData.description}
+                                onChange={e => setFormData({...formData, description: e.target.value})}
+                                rows={1}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -589,22 +639,7 @@ export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemClon
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
-                        <div className="input-group" style={{ gridColumn: '1 / -1' }}>
-                            <label className="form-label text-orange-600 font-semibold">Grupo ou Tag do Material *</label>
-                            <input 
-                                type="text"
-                                list="material-groups-list"
-                                className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" 
-                                placeholder="Ex: Encadernação, Papéis Especiais, Embalagens..."
-                                value={formData.materialGroup}
-                                onChange={e => setFormData({...formData, materialGroup: e.target.value})}
-                                required={formData.type === 'material'}
-                            />
-                            <datalist id="material-groups-list">
-                                {existingGroups.map(g => <option key={g} value={g} />)}
-                            </datalist>
-                            <span className="text-[11px] text-gray-500 mt-1 block">Usado para organizar e filtrar o estoque em outras telas.</span>
-                        </div>
+                        {/* Material specific fields can go here in the future if needed */}
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-md)' }}>

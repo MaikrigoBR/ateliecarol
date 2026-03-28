@@ -17,6 +17,7 @@ export function Equipments() {
   const [loading, setLoading] = useState(true);
   const [materialsList, setMaterialsList] = useState([]);
   const [existingGroups, setExistingGroups] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [linkedEntityId, setLinkedEntityId] = useState(null);
   const [linkedEntityName, setLinkedEntityName] = useState('');
@@ -111,6 +112,8 @@ export function Equipments() {
         const allEq = await db.getAll('equipments');
         const allInv = await db.getAll('inventory');
         const allAcc = await db.getAll('accounts');
+        const allCats = await db.getAll('categories');
+        setCategoriesList(allCats || []);
         setAccounts(allAcc || []);
         setEquipments(allEq || []);
         if (allInv) {
@@ -838,11 +841,48 @@ export function Equipments() {
                                 <input type="text" className="form-input" required value={equipForm.name} onChange={e => setEquipForm({...equipForm, name: e.target.value})} />
                             </div>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                <label className="text-orange-600 font-semibold">Grupo ou Tag (Ex: Impressão, Recorte, Máquinas Grandes)</label>
-                                <input type="text" list="equip-groups-list" className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" value={equipForm.equipmentGroup} onChange={e => setEquipForm({...equipForm, equipmentGroup: e.target.value})} />
-                                <datalist id="equip-groups-list">
-                                    {existingGroups.map(g => <option key={g} value={g} />)}
-                                </datalist>
+                                <label className="text-orange-600 font-semibold">Grupo ou Tag (Categoria) *</label>
+                                {categoriesList.length > 0 ? (
+                                    <select 
+                                        className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" 
+                                        value={equipForm.equipmentGroup} 
+                                        onChange={e => setEquipForm({...equipForm, equipmentGroup: e.target.value})}
+                                        required
+                                    >
+                                        <option value="">Selecione um grupo...</option>
+                                        {/* Render Hierarchical Categories */}
+                                        {categoriesList.filter(c => !c.parentId)
+                                            .sort((a,b) => a.name.localeCompare(b.name))
+                                            .map(main => {
+                                                const subs = categoriesList.filter(c => c.parentId === main.id).sort((a,b) => a.name.localeCompare(b.name));
+                                                if (subs.length > 0) {
+                                                    return (
+                                                        <optgroup key={main.id} label={main.name}>
+                                                            {subs.map(sub => (
+                                                                <option key={sub.id} value={sub.name}>{sub.name}</option>
+                                                            ))}
+                                                        </optgroup>
+                                                    );
+                                                } else {
+                                                    return <option key={main.id} value={main.name}>{main.name}</option>;
+                                                }
+                                            })
+                                        }
+                                        {/* Catch any orphaned categories */}
+                                        {categoriesList.filter(c => c.parentId && !categoriesList.find(m => m.id === c.parentId)).map(orphan => (
+                                            <option key={orphan.id} value={orphan.name}>{orphan.name} (Sem Grupo)</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input 
+                                        type="text" 
+                                        className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" 
+                                        placeholder="Nenhuma cadastrada. Digite..."
+                                        value={equipForm.equipmentGroup}
+                                        onChange={e => setEquipForm({...equipForm, equipmentGroup: e.target.value})}
+                                        required
+                                    />
+                                )}
                                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Usado para associar e pesquisar esta máquina mais facilmente.</span>
                             </div>
                             <div className="form-group">

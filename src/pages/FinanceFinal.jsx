@@ -31,6 +31,7 @@ const EXPENSE_CATEGORIES = [
 const INCOME_CATEGORIES = [
     'Vendas de Produtos',
     'Serviços Prestados',
+    'Aporte de Sócios / Empréstimo',
     'Aportes / Rendimentos',
     'Outros'
 ];
@@ -46,6 +47,7 @@ const CATEGORY_COLORS = {
     'Outros': '#9ca3af',
     'Vendas de Produtos': '#10b981',
     'Serviços Prestados': '#3b82f6',
+    'Aporte de Sócios / Empréstimo': '#0284c7',
     'Aportes / Rendimentos': '#8b5cf6'
 };
 
@@ -282,6 +284,7 @@ export function FinanceFinal() {
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [orders, setOrders] = useState([]); // For projections
+    const [equipments, setEquipments] = useState([]); // For linking
     const [loading, setLoading] = useState(true);
     const [chartData, setChartData] = useState([]);
     const [costCenterData, setCostCenterData] = useState([]);
@@ -322,10 +325,11 @@ export function FinanceFinal() {
     const [editAccId, setEditAccId] = useState(null);
     const [editTransId, setEditTransId] = useState(null);
     const [newAccount, setNewAccount] = useState({ name: '', type: 'checking', balance: 0, limit: 0, dueDay: 10, color: '#3b82f6' });
-    const [newTrans, setNewTrans] = useState({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
+    const [newTrans, setNewTrans] = useState({ description: '', amount: '', type: 'expense', category: 'Geral', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12, referenceId: '', referenceType: null });
     const [selectedCreditCard, setSelectedCreditCard] = useState(null);
     const [selectedDetailTrans, setSelectedDetailTrans] = useState(null);
     const [transDateFilter, setTransDateFilter] = useState('');
+    const [visibleTransactionsLimit, setVisibleTransactionsLimit] = useState(50);
 
 
     // Calculations
@@ -418,6 +422,7 @@ export function FinanceFinal() {
         const originalAccs = await db.getAll('accounts') || [];
         const trans = await db.getAll('transactions') || [];
         const allOrders = await db.getAll('orders') || [];
+        const allEquips = await db.getAll('equipments') || [];
         
         // Fetch Categories
         let dbCategories = await db.getAll('categories') || [];
@@ -462,6 +467,7 @@ export function FinanceFinal() {
         setAccounts(recalculatedAccs);
         setTransactions(trans.sort((a,b) => new Date(b.date) - new Date(a.date)));
         setOrders(pendingOrders);
+        setEquipments(allEquips);
         setLoading(false);
     };
 
@@ -547,7 +553,9 @@ export function FinanceFinal() {
              status: t.status || 'paid',
              installments: t.installments || 1,
              isRecurring: false,
-             recurrenceMonths: 12
+             recurrenceMonths: 12,
+             referenceId: t.referenceId || '',
+             referenceType: t.referenceType || null
         });
         setEditTransId(t.id);
         setIsTransModalOpen(true);
@@ -565,6 +573,34 @@ export function FinanceFinal() {
             ...newTrans,
             amount: amount
         };
+
+        // --- Verificação Anti-Duplicidade (Terminais não Sincronizados) ---
+        if (!editTransId) {
+            // Reconsulta direto no Firebase/IndexedDB para pegar os dados MAIS recentes, e não os do estado atual (que podem estar atrasados no cache do browser)
+            const freshTrans = await db.getAll('transactions') || [];
+            const recentDuplicate = freshTrans.find(t => 
+                t.description.trim().toLowerCase() === newTrans.description.trim().toLowerCase() && 
+                Number(t.amount) === amount && 
+                t.type === newTrans.type && 
+                t.date === newTrans.date &&
+                t.accountId === newTrans.accountId &&
+                t.parentId === undefined // Não checa sobre filhos de parcela ou recorrência já criados
+            );
+
+            if (recentDuplicate) {
+                const proceed = window.confirm(
+                    `ALERTA DE DUPLICIDADE (MÚLTIPLOS ACESSOS)\n\n` +
+                    `O sistema identificou que este exato lançamento acabou de ser criado (provavelmente em outro terminal ou aba desatualizada):\n` +
+                    `- Descrição: ${newTrans.description}\n` +
+                    `- Valor: R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+                    `- Data: ${newTrans.date.split('-').reverse().join('/')}\n\n` +
+                    `Isso irá corromper seu caixa se for uma repetição inadvertida.\n\n` +
+                    `Deseja realmente ignorar a trava e criar esse LANÇAMENTO DUPLICADO? Se sim, clique OK.`
+                );
+                if (!proceed) return; // Cancela silenciosamente sem recarregar e mantem a tela preenchida
+            }
+        }
+        // --- Fim Verificação Anti-Duplicidade ---
 
         if (editTransId) {
             await db.update('transactions', editTransId, payload);
@@ -629,7 +665,7 @@ export function FinanceFinal() {
         // We don't need manual balance updates anymore, fetchData recalculates it cleanly!
         setIsTransModalOpen(false);
         setEditTransId(null);
-        setNewTrans({ description: '', amount: '', type: 'expense', category: 'Outros', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
+        setNewTrans({ description: '', amount: '', type: 'expense', category: 'Outros', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12, referenceId: '', referenceType: null });
         fetchData();
     };
 
@@ -1089,9 +1125,9 @@ export function FinanceFinal() {
                         .filter(t => {
                             const acc = accounts.find(a => a.id === t.accountId);
                             // Esconde lançamentos de cartão da visão geral
-                            if (acc?.type === 'credit' && transAccFilter === '' && globalAccFilter === '') {
-                                return false;
-                            }
+                            // if (acc?.type === 'credit' && transAccFilter === '' && globalAccFilter === '') {
+                            //     return false;
+                            // }
 
                             const search = transSearchTerm.toLowerCase();
                             const matchesSearch = t.description?.toLowerCase().includes(search) || t.category?.toLowerCase().includes(search);
@@ -1107,7 +1143,7 @@ export function FinanceFinal() {
                             
                             return matchesSearch && matchesType && matchesAcc && matchesDate;
                         })
-                        .slice(0, 50)
+                        .slice(0, visibleTransactionsLimit)
                         .map(t => {
                         const acc = accounts.find(a => a.id === t.accountId);
                         const isExpense = t.type === 'expense';
@@ -1168,6 +1204,27 @@ export function FinanceFinal() {
                     )}
                 </tbody>
             </table>
+            {transactionsWithBalance.filter(t => {
+                const search = transSearchTerm.toLowerCase();
+                const matchesSearch = t.description?.toLowerCase().includes(search) || t.category?.toLowerCase().includes(search);
+                const matchesType = transTypeFilter === '' || t.type === transTypeFilter;
+                const matchesAcc = transAccFilter === '' || t.accountId === transAccFilter;
+                let matchesDate = true;
+                if (transDateFilter) {
+                    const tMonth = t.date.substring(0, 7);
+                    matchesDate = tMonth === transDateFilter;
+                }
+                return matchesSearch && matchesType && matchesAcc && matchesDate;
+            }).length > visibleTransactionsLimit && (
+                <div style={{ padding: '1rem', textAlign: 'center', borderTop: '1px solid var(--border)' }}>
+                    <button 
+                        className="btn btn-secondary" 
+                        onClick={() => setVisibleTransactionsLimit(prev => prev + 50)}
+                    >
+                        Carregar Mais Lançamentos
+                    </button>
+                </div>
+            )}
             </div>
         </div>
 
@@ -1319,6 +1376,14 @@ export function FinanceFinal() {
                                             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                         </select>
                                     </div>
+                                </div>
+
+                                <div className="input-group">
+                                     <label className="form-label flex items-center gap-1.5"><Hammer size={14} className="text-gray-400" /> Vincular a Equipamento (Opcional)</label>
+                                     <select className="form-input w-full" value={newTrans.referenceId || ''} onChange={e => setNewTrans({...newTrans, referenceId: e.target.value, referenceType: e.target.value ? 'Equipment' : null})}>
+                                         <option value="">Nenhum / Não aplicável</option>
+                                         {equipments.map(eq => <option key={eq.id} value={eq.id}>{eq.name} ({eq.patrimonyId})</option>)}
+                                     </select>
                                 </div>
                                 
                                 {(() => {

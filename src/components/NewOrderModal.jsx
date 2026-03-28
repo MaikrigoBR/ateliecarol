@@ -6,6 +6,7 @@ import db from '../services/database.js';
 export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) {
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [designs, setDesigns] = useState([]);
   const [formData, setFormData] = useState({
     customer: '',
     paymentMethod: 'pix',
@@ -21,6 +22,7 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
   const [currentProductId, setCurrentProductId] = useState('');
   const [currentQuantity, setCurrentQuantity] = useState(1);
   const [productSearch, setProductSearch] = useState('');
+  const [currentDesignId, setCurrentDesignId] = useState('');
 
   const paymentMethods = [
     { value: 'pix', label: 'Pix' },
@@ -35,8 +37,11 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
         if (isOpen) {
             const allProducts = await db.getAll('products');
             const allCustomers = await db.getAll('customers');
+            const allDesigns = await db.getAll('designs') || [];
+            
             setProducts(allProducts);
             setCustomers(allCustomers);
+            setDesigns(allDesigns.sort((a,b) => (a.name || '').localeCompare(b.name || '')));
             
             // If editing, populate form
             if (orderToEdit) {
@@ -81,6 +86,7 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
                 setCurrentProductId('');
                 setCurrentQuantity(1);
                 setProductSearch('');
+                setCurrentDesignId('');
             }
         }
     };
@@ -116,13 +122,16 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
           productId: selectedProduct.id,
           name: selectedProduct.name,
           price: Number(selectedProduct.price || 0),
-          quantity: Number(currentQuantity)
+          quantity: Number(currentQuantity),
+          designId: currentDesignId,
+          designName: currentDesignId ? designs.find(d => String(d.id) === String(currentDesignId))?.name || '' : ''
       };
       
       setCartItems([...cartItems, newItem]);
       setCurrentProductId('');
       setCurrentQuantity(1);
       setProductSearch('');
+      setCurrentDesignId('');
   };
 
   const handleRemoveFromCart = (index) => {
@@ -221,55 +230,78 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
             </div>
 
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mt-4 mb-4">
-                <h4 className="text-sm font-bold text-gray-700 mb-2">Produtos do Pedido</h4>
+                <div className="flex items-center gap-2 mb-4 border-b border-gray-200 pb-2">
+                    <h4 className="text-sm font-bold text-gray-700">Compor Cesta de Produtos</h4>
+                </div>
 
-                <div className="mb-3">
+                <div className="flex flex-col gap-3 mb-5 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                     <input 
                         type="text" 
-                        placeholder="Pesquisar produto ou categoria..." 
-                        className="form-input text-sm w-full bg-white"
+                        placeholder="Buscar produto base ou categoria rapidamente..." 
+                        className="form-input text-sm w-full bg-gray-50/50"
                         value={productSearch}
                         onChange={e => setProductSearch(e.target.value)}
                     />
-                </div>
-                
-                <div className="flex gap-2 items-end mb-4">
-                    <div className="flex-1">
-                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Produto</label>
-                        <select 
-                            className="form-input text-sm bg-white"
-                            value={currentProductId}
-                            onChange={e => setCurrentProductId(e.target.value)}
-                        >
-                            <option value="">Selecione um produto da lista...</option>
-                            {sortedCategories.map(category => (
-                                <optgroup key={category} label={category}>
-                                    {groupedProducts[category].map(product => (
-                                        <option key={product.id} value={product.id}>
-                                            {product.name} (R$ {Number(product.price || 0).toFixed(2)})
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                        <div className="md:col-span-5">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Produto Base de Estoque *</label>
+                            <select 
+                                className="form-input text-sm bg-white w-full border-slate-300"
+                                value={currentProductId}
+                                onChange={e => setCurrentProductId(e.target.value)}
+                            >
+                                <option value="">--- Selecione da lista ---</option>
+                                {sortedCategories.map(category => (
+                                    <optgroup key={category} label={category}>
+                                        {groupedProducts[category].map(product => (
+                                            <option key={product.id} value={product.id}>
+                                                {product.name} (R$ {Number(product.price || 0).toFixed(2)})
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="md:col-span-5">
+                            <label className="text-[11px] font-bold text-purple-600 uppercase tracking-wider flex items-center gap-1 mb-1">
+                                🎨 Molde / Arte Central (Opcional)
+                            </label>
+                            <select 
+                                className="form-input text-sm bg-purple-50/30 border-purple-200 text-purple-900 w-full"
+                                value={currentDesignId}
+                                onChange={e => setCurrentDesignId(e.target.value)}
+                            >
+                                <option value="">[Não aplicar / Arte Genérica]</option>
+                                {designs.map(design => (
+                                    <option key={design.id} value={design.id}>
+                                        {design.name} {design.category && `(${design.category})`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">QTD</label>
+                            <input 
+                                type="number" 
+                                className="form-input text-sm w-full font-bold text-center" 
+                                min="1"
+                                value={currentQuantity}
+                                onChange={e => setCurrentQuantity(e.target.value)}
+                            />
+                        </div>
                     </div>
-                    <div className="w-24">
-                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Qtd</label>
-                        <input 
-                            type="number" 
-                            className="form-input text-sm" 
-                            min="1"
-                            value={currentQuantity}
-                            onChange={e => setCurrentQuantity(e.target.value)}
-                        />
-                    </div>
+                    
                     <button 
                         type="button" 
                         onClick={handleAddToCart}
                         disabled={!currentProductId}
-                        className="btn btn-primary h-[38px] px-3 flex items-center gap-1 disabled:opacity-50"
+                        className="btn btn-primary w-full mt-1 bg-slate-800 hover:bg-slate-700 text-white border-none shadow-sm disabled:opacity-50 disabled:bg-slate-300 transition-colors flex justify-center items-center gap-2"
+                        style={{ height: '42px' }}
                     >
-                        <Plus size={16} /> Adicionar
+                        <Plus size={18} /> Adicionar à Cesta do Pedido
                     </button>
                 </div>
 
@@ -287,7 +319,14 @@ export function NewOrderModal({ isOpen, onClose, onOrderCreated, orderToEdit }) 
                             <tbody className="divide-y divide-gray-100">
                                 {cartItems.map((item, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="px-3 py-2 font-medium text-gray-700">{item.name}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="font-medium text-gray-700">{item.name}</div>
+                                            {item.designId && (
+                                                <div className="text-[10px] text-purple-600 font-bold bg-purple-50 inline-block px-1.5 py-0.5 rounded border border-purple-100 mt-0.5">
+                                                    🎨 Arte: {item.designName || designs.find(d => String(d.id) === String(item.designId))?.name || 'Modelo Genérico'}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-3 py-2 text-gray-500 text-[12px]">{item.quantity} un x R$ {item.price.toFixed(2)}</td>
                                         <td className="px-3 py-2 text-right font-bold text-gray-800">
                                             R$ {(item.quantity * item.price).toFixed(2)}

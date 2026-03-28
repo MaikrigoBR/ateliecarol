@@ -3,12 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Send, CheckCircle, XCircle, FileText } from 'lucide-react';
 import db from '../services/database.js';
 import { NewBudgetModal } from '../components/NewBudgetModal.jsx';
+import { getPublicAppBaseUrl } from '../utils/publicRuntime.js';
 
 export function Budgets() {
   const [budgets, setBudgets] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  const generatePublicToken = () => {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    return `prop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  };
 
   const fetchBudgets = async () => {
     try {
@@ -41,8 +47,18 @@ export function Budgets() {
     let fallbackTab = null;
 
     try {
-        const baseUrl = window.location.href.split('#')[0];
-        const proposalLink = `${baseUrl}#/proposal/${budget.id}`;
+        const baseUrl = getPublicAppBaseUrl();
+        const publicToken = budget.publicToken || generatePublicToken();
+        const sharedAt = new Date().toISOString();
+
+        await db.update('budgets', String(budget.id), {
+            publicToken,
+            publicAccess: true,
+            sharedAt,
+            status: budget.status === 'Rascunho' ? 'Enviado' : budget.status
+        });
+
+        const proposalLink = `${baseUrl}/#/proposal/${budget.id}?t=${encodeURIComponent(publicToken)}`;
         
         let companyName = 'nossa equipe';
         try {
@@ -62,8 +78,8 @@ export function Budgets() {
         const customers = await db.getAll('customers');
         const customerObj = customers.find(c => c.name === budget.customerName);
         
-        if (customerObj && customerObj.phone) {
-            num = customerObj.phone.replace(/\D/g, '');
+        if (customerObj && (customerObj.phone || customerObj.whatsapp)) {
+            num = String(customerObj.phone || customerObj.whatsapp).replace(/\D/g, '');
         }
 
         if (num.length >= 10) {
@@ -112,11 +128,7 @@ export function Budgets() {
             window.open(url, '_blank') || (window.location.href = url);
         }
 
-        // Update status to 'Sent' if it was 'Draft'
-        if (budget.status === 'Rascunho') {
-            await db.update('budgets', budget.id.toString(), { status: 'Enviado' });
-            fetchBudgets();
-        }
+        fetchBudgets();
     } catch(err) {
         console.error(err);
     }

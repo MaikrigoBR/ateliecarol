@@ -329,6 +329,11 @@ export function OrderDetailsModal({ isOpen, onClose, order, companyConfig, onEdi
                                     <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'var(--background)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                                         <div>
                                             <p style={{ fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>{item.quantity}x {item.name || item.productName || 'Item Indefinido'}</p>
+                                            {item.designId && (
+                                                <div style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 700, backgroundColor: 'var(--surface-hover)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', marginTop: '4px', border: '1px solid var(--border)' }}>
+                                                    🎨 Arte Lincada: {item.designName || 'Modelo Genérico'}
+                                                </div>
+                                            )}
                                         </div>
                                         <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
                                             R$ {(item.quantity * parseFloat(item.price || 0)).toFixed(2).replace('.', ',')}

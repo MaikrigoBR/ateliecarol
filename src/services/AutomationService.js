@@ -158,6 +158,9 @@ class AutomationService {
                     const totalTax = mpData.fee_details ? mpData.fee_details.reduce((acc, f) => acc + (f.amount || 0), 0) : 0;
                     const netAmount = mpData.transaction_details?.net_received_amount || (totalOrder - totalTax);
 
+                    const allTransactions = await db.getAll('transactions') || [];
+                    const hasTransaction = allTransactions.some(t => String(t.orderId) === String(order.id) && t.type === 'income');
+
                     await db.update('orders', order.id, {
                         paymentStatus: 'Recebido',
                         amountPaid: totalOrder,
@@ -169,18 +172,20 @@ class AutomationService {
                         gatewayMethodId: mpData.payment_method_id || order.paymentMethod
                     });
 
-                    await db.create('transactions', {
-                        type: 'income',
-                        description: `Venda E-commerce: Pedido #${String(order.id).substring(0,8)}`,
-                        amount: Number(netAmount || totalOrder), 
-                        date: new Date().toISOString().split('T')[0],
-                        category: 'Venda de Produtos',
-                        paymentMethod: mpData.payment_method_id === 'pix' ? 'PIX' : 'Cartão de Crédito',
-                        status: 'paid', // Strict para FinanceFinal
-                        orderId: order.id,
-                        accountId: '1', 
-                        auditData: { gross: totalOrder, tax: totalTax } 
-                    });
+                    if (!hasTransaction) {
+                        await db.create('transactions', {
+                            type: 'income',
+                            description: `Venda E-commerce: Pedido #${String(order.id).substring(0,8)}`,
+                            amount: Number(netAmount || totalOrder), 
+                            date: new Date().toISOString().split('T')[0],
+                            category: 'Venda de Produtos',
+                            paymentMethod: mpData.payment_method_id === 'pix' ? 'PIX' : 'Cartão de Crédito',
+                            status: 'paid', // Strict para FinanceFinal
+                            orderId: order.id,
+                            accountId: '1', 
+                            auditData: { gross: totalOrder, tax: totalTax } 
+                        });
+                    }
 
                     await db.create('system_notifications', {
                         type: 'PAYMENT_RECEIVED',

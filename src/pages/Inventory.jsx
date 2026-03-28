@@ -197,6 +197,7 @@ export function Inventory() {
                                 <td>
                                     <div style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{item.name}</div>
                                     <div className="flex gap-2 flex-wrap mt-1">
+                                        {item.category && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-bold">Cat: {item.category}</span>}
                                         {item.manufacturer && <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200">Fab: {item.manufacturer}</span>}
                                         {item.model && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">Mod: {item.model}</span>}
                                         {item.color && <span className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100">Cor: {item.color}</span>}

@@ -617,7 +617,28 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                             {categoriesList.length > 0 ? (
                                 <select name="category" className={`form-input ${errors.category ? 'border-red-500' : ''}`} value={values.category} onChange={handleChange}>
                                     <option value="">Selecione...</option>
-                                    {categoriesList.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                    {/* Render Hierarchical Categories */}
+                                    {categoriesList.filter(c => !c.parentId)
+                                        .sort((a,b) => a.name.localeCompare(b.name))
+                                        .map(main => {
+                                            const subs = categoriesList.filter(c => c.parentId === main.id).sort((a,b) => a.name.localeCompare(b.name));
+                                            if (subs.length > 0) {
+                                                return (
+                                                    <optgroup key={main.id} label={main.name}>
+                                                        {subs.map(sub => (
+                                                            <option key={sub.id} value={sub.name}>{sub.name}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                );
+                                            } else {
+                                                return <option key={main.id} value={main.name}>{main.name}</option>;
+                                            }
+                                        })
+                                    }
+                                    {/* Catch any orphaned categories */}
+                                    {categoriesList.filter(c => c.parentId && !categoriesList.find(m => m.id === c.parentId)).map(orphan => (
+                                        <option key={orphan.id} value={orphan.name}>{orphan.name} (Sem Grupo)</option>
+                                    ))}
                                 </select>
                             ) : (
                                 <input name="category" type="text" className={`form-input ${errors.category ? 'border-red-500' : ''}`} placeholder="Ex: Papelaria" value={values.category} onChange={handleChange} />

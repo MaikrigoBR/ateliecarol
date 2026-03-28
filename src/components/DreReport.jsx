@@ -17,12 +17,15 @@ export function DreReport({ transactions }) {
         let cmv = 0; // Custos Variáveis
         let despesasFixas = 0; // OPEX Fixos
         let outrasReceitas = 0; // Não operacionais
+        let aportesSociais = 0; // Injeção de Sócios e Empréstimos
 
         filtered.forEach(t => {
             const val = Number(t.amount) || 0;
             if (t.type === 'income') {
                 if (['Vendas de Produtos', 'Serviços Prestados'].includes(t.category)) {
                     recOperacional += val;
+                } else if (['Aporte de Sócios / Empréstimo'].includes(t.category)) {
+                    aportesSociais += val;
                 } else {
                     outrasReceitas += val;
                 }
@@ -42,7 +45,7 @@ export function DreReport({ transactions }) {
         const lucroLiquido = margemContribuicao - despesasFixas + outrasReceitas;
 
         return {
-            recOperacional, deducoes, recLiquida, cmv, margemContribuicao, despesasFixas, outrasReceitas, lucroLiquido
+            recOperacional, deducoes, recLiquida, cmv, margemContribuicao, despesasFixas, outrasReceitas, aportesSociais, lucroLiquido
         };
     }, [transactions, regime]);
 
@@ -176,6 +179,22 @@ export function DreReport({ transactions }) {
                             <td className="px-6 py-6 text-right text-xl">{formatBRL(dreData.lucroLiquido)}</td>
                             <td className={`px-6 py-6 text-right font-mono text-sm ${isProfit ? 'text-emerald-600' : 'text-red-600'}`}>{formatPct(dreData.lucroLiquido, dreData.recOperacional)}</td>
                         </tr>
+
+                        {/* 9. Aportes / Fluxos de Caixa Não-Operacionais (Extra DRE) */}
+                        {dreData.aportesSociais > 0 && (
+                            <tr className="bg-sky-50/50 border-t-2 border-dashed border-sky-100">
+                                <td className="px-6 py-4">
+                                    <span className="font-bold text-sky-700 flex items-center gap-2 relative">
+                                        <TrendingUp size={14}/> 9. Aporte de Sócios / Empréstimos Bancários
+                                    </span>
+                                    <span className="text-[10px] text-sky-600/70 block mt-0.5 font-bold uppercase tracking-wider">
+                                        Dinheiro Injetado no caixa: NÃO contabilizado como Lucro
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-right text-sky-700 font-bold border-l border-sky-100">+{formatBRL(dreData.aportesSociais)}</td>
+                                <td className="px-6 py-4 text-right text-sky-600/50 font-mono text-xs border-l border-sky-100">-</td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

@@ -1,0 +1,9 @@
+{
+  "name": "training-hub-independente",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Aplicacao standalone de curso on-line para testes locais.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
