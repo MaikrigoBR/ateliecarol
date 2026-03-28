@@ -242,7 +242,7 @@ export function Coupons() {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="input-group">
-                                        <label className="form-label">Valor Mínimo na Sacola (R$)</label>
+                                        <label className="form-label">Valor Mínimo no Carrinho (R$)</label>
                                         <input 
                                             type="number" 
                                             min="0"

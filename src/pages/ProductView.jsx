@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingBag, Star, Image as ImageIcon, MessageCircle, PlayCircle, Heart, Send, ShoppingCart, Plus, Minus, ChevronLeft, ChevronRight, X as CloseIcon, ZoomIn } from 'lucide-react';
+import { ShoppingBag, Star, Image as ImageIcon, MessageCircle, PlayCircle, Heart, Send, ShoppingCart, Plus, Minus, ChevronLeft, ChevronRight, X as CloseIcon, ZoomIn, User } from 'lucide-react';
 import db from '../services/database';
 import { useCart } from '../contexts/CartContext';
 import { CartDrawer } from '../components/CartDrawer';
@@ -115,14 +115,17 @@ export function ProductView() {
         <div style={{ minHeight: '100vh', backgroundColor: '#faf5ff', paddingBottom: '40px' }}>
             <CartDrawer companyConfig={companyConfig} />
             {/* Header */}
-            <header style={{ backgroundColor: '#ffffff', padding: '16px 24px', boxShadow: '0 1px 3px rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+            <header style={{ backgroundColor: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(12px)', padding: '16px 24px', boxShadow: '0 4px 20px -10px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid rgba(147, 51, 234, 0.1)' }}>
                 <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#6b21a8', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ backgroundColor: '#f3e8ff', padding: '6px', borderRadius: '8px' }}>
                         <ShoppingBag size={20} color="#9333ea" />
                     </div>
                     {companyConfig.companyName || 'Catálogo de Produtos'}
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Link to="/meus-pedidos" style={{ padding: '8px 12px', backgroundColor: 'transparent', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }} onMouseOver={e => {e.currentTarget.style.backgroundColor='#f1f5f9';}} onMouseOut={e => {e.currentTarget.style.backgroundColor='transparent';}}>
+                        Área do Cliente
+                    </Link>
                     <Link to="/loja" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 700, color: '#9333ea', textDecoration: 'none', backgroundColor: '#f3e8ff', padding: '8px 16px', borderRadius: '20px' }}>
                         <ShoppingBag size={14} /> Ver Feed
                     </Link>
@@ -260,7 +263,7 @@ export function ProductView() {
                                 onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.backgroundColor = '#9333ea'; }}
                             >
                                 <ShoppingCart size={20} />
-                                Adicionar à Sacola
+                                Adicionar ao Carrinho
                             </button>
                         </div>
                         

@@ -59,7 +59,7 @@ export function Checkout() {
         return (
             <div style={{ minHeight: '100vh', backgroundColor: '#faf5ff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                 <div style={{ backgroundColor: 'white', padding: '40px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(168,85,247,0.1)', textAlign: 'center', maxWidth: '400px', width: '100%' }}>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4c1d95', marginBottom: '16px' }}>Sacola Vazia</h2>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4c1d95', marginBottom: '16px' }}>Carrinho Vazio</h2>
                     <p style={{ color: '#6b21a8', marginBottom: '24px' }}>Você não tem itens no carrinho para finalizar a compra.</p>
                     <Link to="/loja" style={{ display: 'inline-block', backgroundColor: '#9333ea', color: 'white', textDecoration: 'none', padding: '14px 24px', borderRadius: '12px', fontWeight: 700 }}>
                         Voltar para a Loja
