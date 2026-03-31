@@ -52,6 +52,8 @@ export function Production() {
         localStorage.setItem('stationery_notif_mode', notificationMode);
     }, [notificationMode]);
 
+    const [designs, setDesigns] = useState([]);
+
     const fetchOrders = async () => {
         setLoading(true);
         try {
@@ -59,6 +61,7 @@ export function Production() {
             const allProducts = await db.getAll('products') || [];
             const allCustomers = await db.getAll('customers') || [];
             const allStaff = await db.getAll('staff') || [];
+            const allDesigns = await db.getAll('designs') || [];
             
             // Filter orders that are active in production
             const activeOrders = allOrders.filter(o => 
@@ -70,6 +73,7 @@ export function Production() {
             setProducts(allProducts);
             setCustomers(allCustomers);
             setStaff(allStaff);
+            setDesigns(allDesigns);
         } catch (e) {
             console.error("Erro ao carregar produção", e);
         } finally {
@@ -89,6 +93,8 @@ export function Production() {
                 order.cartItems.forEach((item, index) => {
                     const currentStep = item.productionStep || order.productionStep || 'pending';
                     if (currentStep !== 'completed') {
+                        // Resolve design thumbnail
+                        const design = item.designId ? designs.find(d => String(d.id) === String(item.designId)) : null;
                         tasks.push({
                             ...order,
                             _isItem: true,
@@ -99,7 +105,11 @@ export function Production() {
                             productionStep: currentStep,
                             productionHistory: item.productionHistory || order.productionHistory || [],
                             assigneeId: item.assigneeId || order.assigneeId || null,
-                            lastStepUpdatedAt: item.lastStepUpdatedAt || order.lastStepUpdatedAt || order.date
+                            lastStepUpdatedAt: item.lastStepUpdatedAt || order.lastStepUpdatedAt || order.date,
+                            // Design/model fields
+                            designId: item.designId || null,
+                            designName: item.designName || design?.name || null,
+                            designThumb: design?.imageBase64 || design?.thumbnail || design?.image || null,
                         });
                     }
                 });
@@ -117,13 +127,16 @@ export function Production() {
                         productionStep: order.productionStep || 'pending',
                         productionHistory: order.productionHistory || [],
                         assigneeId: order.assigneeId || null,
-                        lastStepUpdatedAt: order.lastStepUpdatedAt || order.date
+                        lastStepUpdatedAt: order.lastStepUpdatedAt || order.date,
+                        designId: null,
+                        designName: null,
+                        designThumb: null,
                     });
                 }
             }
         });
         return tasks;
-    }, [orders, products]);
+    }, [orders, products, designs]);
 
     // Helper: Formats the phone for WA
     const formatWaPhone = (phoneStr) => {
@@ -694,6 +707,27 @@ export function Production() {
                                         <div className="text-xs font-semibold text-gray-700 mb-sm bg-gray-50 p-1.5 rounded border border-gray-100 line-clamp-2">
                                             {`${task.itemQty}x ${task.itemName}`}
                                         </div>
+
+                                        {/* Design/Modelo vinculado */}
+                                        {task.designId && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '8px', backgroundColor: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '6px', padding: '6px 8px' }}>
+                                                {task.designThumb ? (
+                                                    <img
+                                                        src={task.designThumb}
+                                                        alt={task.designName}
+                                                        style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0, border: '1px solid #d8b4fe' }}
+                                                    />
+                                                ) : (
+                                                    <div style={{ width: '36px', height: '36px', backgroundColor: '#ede9fe', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                        <Palette size={16} color="#8b5cf6" />
+                                                    </div>
+                                                )}
+                                                <div style={{ overflow: 'hidden' }}>
+                                                    <div style={{ fontSize: '9px', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Arte / Molde</div>
+                                                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#4c1d95', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{task.designName || `ID ${task.designId}`}</div>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Assignee Selection */}
                                         <div className="mb-sm flex items-center gap-1 text-xs">

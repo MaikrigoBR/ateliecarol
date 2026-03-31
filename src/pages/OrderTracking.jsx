@@ -9,6 +9,7 @@ import { QRCodeSVG } from 'qrcode.react';
 export function OrderTracking() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
+  const [designs, setDesigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [companyConfig, setCompanyConfig] = useState({ companyName: 'Estúdio Criativo', logoBase64: null, instagram: '' });
   const [pixData, setPixData] = useState(null);
@@ -20,9 +21,11 @@ export function OrderTracking() {
     const fetchOrder = async () => {
       try {
         const allOrders = await db.getAll('orders');
+        const allDesigns = await db.getAll('designs') || [];
         // Handle string/int matching
         const found = allOrders.find(o => String(o.id) === String(id));
         setOrder(found || null);
+        setDesigns(allDesigns);
 
         // Fetch company branding
         try {
@@ -185,19 +188,28 @@ export function OrderTracking() {
   };
 
   const itemsToTrack = (order.cartItems && order.cartItems.length > 0) 
-      ? order.cartItems.map((item, idx) => ({
-          id: idx,
-          name: item.name || 'Produto Base',
-          quantity: item.quantity || 1,
-          productionStep: item.productionStep || order.productionStep || 'Novo',
-          status: item.productionStep === 'completed' ? 'Concluído' : order.status
-      }))
+      ? order.cartItems.map((item, idx) => {
+          const design = item.designId ? designs.find(d => String(d.id) === String(item.designId)) : null;
+          return {
+              id: idx,
+              name: item.name || 'Produto Base',
+              quantity: item.quantity || 1,
+              productionStep: item.productionStep || order.productionStep || 'Novo',
+              status: item.productionStep === 'completed' ? 'Concluído' : order.status,
+              designId: item.designId || null,
+              designName: item.designName || design?.name || null,
+              designThumb: design?.imageBase64 || design?.thumbnail || design?.image || null,
+          };
+      })
       : [{
           id: 0,
           name: order.productName || 'Itens do Pedido',
           quantity: order.items || 1,
           productionStep: order.productionStep || 'Novo',
-          status: order.status
+          status: order.status,
+          designId: null,
+          designName: null,
+          designThumb: null,
       }];
 
   const isAllCompleted = itemsToTrack.every(i => getActiveIndex(i.productionStep, i.status) === 3);
@@ -340,9 +352,31 @@ export function OrderTracking() {
                   
                   return (
                       <div key={item.id} style={{ paddingTop: idx > 0 ? '40px' : '0', borderTop: idx > 0 ? '1px dashed #e2e8f0' : 'none' }}>
-                          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#334155', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#334155', marginBottom: item.designId ? '16px' : '30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <Package size={20} style={{ color: 'var(--primary)' }} /> {item.quantity}x {item.name}
                           </h3>
+
+                          {/* Design / Modelo vinculado */}
+                          {item.designId && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '12px 16px', marginBottom: '24px' }}>
+                                  {item.designThumb ? (
+                                      <img
+                                          src={item.designThumb}
+                                          alt={item.designName}
+                                          style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0, border: '2px solid #d8b4fe', boxShadow: '0 2px 8px rgba(124,58,237,0.15)' }}
+                                      />
+                                  ) : (
+                                      <div style={{ width: '56px', height: '56px', backgroundColor: '#ede9fe', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                          <Palette size={24} color="#8b5cf6" />
+                                      </div>
+                                  )}
+                                  <div>
+                                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Arte / Molde Vinculado</div>
+                                      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#4c1d95' }}>{item.designName || `Modelo #${item.designId}`}</div>
+                                      <div style={{ fontSize: '0.78rem', color: '#8b5cf6', marginTop: '2px' }}>Este molde está sendo utilizado na produção do seu item.</div>
+                                  </div>
+                              </div>
+                          )}
                           
                           {/* Vertical Timeline */}
                           <div style={{ position: 'relative' }}>
