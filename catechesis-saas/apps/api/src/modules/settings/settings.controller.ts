@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Patch, UseGuards } from '@nestjs/common';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { TenantContext } from '../../common/tenant/tenant-context.decorator.js';
@@ -24,7 +24,7 @@ class TenantSettingsPatchDto {
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(@Inject(SettingsService) private readonly settingsService: SettingsService) {}
 
   @Get('effective')
   async getEffective(@TenantContext() tenantContext?: TenantContextValue) {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { CourseSummary } from '@catechesis-saas/types';
 import { TenantClientFactory } from '../../database/tenant-client.factory.js';
 import {
@@ -9,7 +9,9 @@ import {
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly tenantClientFactory: TenantClientFactory) {}
+  constructor(
+    @Inject(TenantClientFactory) private readonly tenantClientFactory: TenantClientFactory
+  ) {}
 
   async getCoursesForTenant(tenantSlug: string): Promise<CourseSummary[]> {
     const tenant = getFallbackTenant(tenantSlug);

@@ -26,6 +26,7 @@ import { Reports } from './pages/Reports';
 import { Production } from './pages/Production';
 import { ProductivityReport } from './pages/ProductivityReport';
 import { DesignLibrary } from './pages/DesignLibrary';
+import { CrmAnalytics } from './pages/CrmAnalytics';
 import { OrderTracking } from './pages/OrderTracking';
 import { ProposalView } from './pages/ProposalView';
 import { ProductView } from './pages/ProductView';
@@ -124,6 +125,7 @@ function App() {
                   <Route path="/users" element={<Users />} />
                   <Route path="/staff" element={<Staff />} />
                   <Route path="/reports" element={<Reports />} />
+                  <Route path="/crm" element={<CrmAnalytics />} />
                   <Route path="/comments" element={<CommentsModeration />} />
                   <Route path="/coupons" element={<Coupons />} />
                 </Route>

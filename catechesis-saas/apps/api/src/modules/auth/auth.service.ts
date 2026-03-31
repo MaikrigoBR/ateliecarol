@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { AuthenticatedUser, Role } from '@catechesis-saas/types';
 import { signJwt } from '../../common/auth/jwt.util.js';
 import { verifyPassword } from '../../common/auth/password.util.js';
@@ -9,7 +9,9 @@ import { TenantService } from '../tenant/tenant.service.js';
 @Injectable()
 export class AuthService {
   constructor(
+    @Inject(ControlPlanePrismaService)
     private readonly controlPlanePrisma: ControlPlanePrismaService,
+    @Inject(TenantService)
     private readonly tenantService: TenantService
   ) {}
 

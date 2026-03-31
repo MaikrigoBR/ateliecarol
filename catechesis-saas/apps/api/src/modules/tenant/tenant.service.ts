@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { mergeTenantSettings, platformDefaults } from '@catechesis-saas/config';
 import type { TenantSettings } from '@catechesis-saas/types';
 import { ControlPlanePrismaService } from '../../database/control-plane-prisma.service.js';
@@ -13,7 +13,9 @@ import {
 @Injectable()
 export class TenantService {
   constructor(
+    @Inject(ControlPlanePrismaService)
     private readonly controlPlanePrisma: ControlPlanePrismaService,
+    @Inject(TenantClientFactory)
     private readonly tenantClientFactory: TenantClientFactory
   ) {}
 

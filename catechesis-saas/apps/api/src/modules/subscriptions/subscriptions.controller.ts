@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import type { AuthenticatedUser } from '@catechesis-saas/types';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
@@ -21,7 +21,9 @@ class CreateSubscriptionDto {
 
 @Controller('subscriptions')
 export class SubscriptionsController {
-  constructor(private readonly subscriptionsService: SubscriptionsService) {}
+  constructor(
+    @Inject(SubscriptionsService) private readonly subscriptionsService: SubscriptionsService
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -25,6 +25,19 @@ export function ProductView() {
                 }
             } catch(e) { console.error("Could not fetch settings", e); }
 
+            // CRM Analytics: Register product view
+            if (prod) {
+                try {
+                    await db.set('analytics', "pv_${Date.now()}_${Math.random().toString(36).slice(2,7)}", {
+                        type: 'product_view',
+                        productId: String(id),
+                        productName: prod.name || '',
+                        category: prod.category || '',
+                        timestamp: new Date().toISOString(),
+                    });
+                } catch(e) { /* silent */ }
+            }
+
             const fetchedComments = await db.getAll('productComments') || [];
             setComments(fetchedComments.filter(c => c.productId === id && c.status === 'approved').sort((a,b) => new Date(b.date) - new Date(a.date)));
 

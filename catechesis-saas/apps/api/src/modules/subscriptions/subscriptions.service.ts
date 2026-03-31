@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { createPlanSnapshot } from '@catechesis-saas/config';
 import { TenantClientFactory } from '../../database/tenant-client.factory.js';
 import { getFallbackPlan, getFallbackTenant } from '../../demo/fallback-data.js';
@@ -7,7 +7,9 @@ import { TenantService } from '../tenant/tenant.service.js';
 @Injectable()
 export class SubscriptionsService {
   constructor(
+    @Inject(TenantService)
     private readonly tenantService: TenantService,
+    @Inject(TenantClientFactory)
     private readonly tenantClientFactory: TenantClientFactory
   ) {}
 

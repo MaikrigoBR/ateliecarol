@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, UseGuards } from '@nestjs/common';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import type { AuthenticatedUser } from '@catechesis-saas/types';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
@@ -20,7 +20,7 @@ class LoginDto {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Post('login')
   async login(@Body() body: LoginDto) {

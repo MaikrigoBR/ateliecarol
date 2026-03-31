@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp, CreditCard, Wrench, Ticket, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, FileText, Package, PieChart, Settings, LogOut, Briefcase, UserCog, PenTool, DollarSign, Hammer, Users, X, Columns, FolderHeart, TrendingUp, CreditCard, Wrench, Ticket, MessageSquare, BarChart2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const SectionTitle = ({ title, color, bgColor }) => (
@@ -82,6 +82,10 @@ export function Sidebar({ onClose }) {
         <Link to="/reports" className={`nav-item ${isActive('/reports')}`}>
           <PieChart size={20} />
           <span>Relatórios</span>
+        </Link>
+        <Link to="/crm" className={`nav-item ${isActive('/crm')}`}>
+          <BarChart2 size={20} />
+          <span>CRM Analytics</span>
         </Link>
 
         <SectionTitle title="Vendas & Operações" color="#7c3aed" bgColor="#f3e8ff" />

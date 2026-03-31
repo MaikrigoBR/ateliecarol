@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, Param, UseGuards } from '@nestjs/common';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
@@ -6,7 +6,7 @@ import { TenantService } from './tenant.service.js';
 
 @Controller('tenants')
 export class TenantController {
-  constructor(private readonly tenantService: TenantService) {}
+  constructor(@Inject(TenantService) private readonly tenantService: TenantService) {}
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)

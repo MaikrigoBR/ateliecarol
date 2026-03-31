@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { mergeTenantSettings, platformDefaults } from '@catechesis-saas/config';
 import type { DeepPartial, TenantSettings } from '@catechesis-saas/types';
 import { TenantService } from '../tenant/tenant.service.js';
 
 @Injectable()
 export class SettingsService {
-  constructor(private readonly tenantService: TenantService) {}
+  constructor(@Inject(TenantService) private readonly tenantService: TenantService) {}
 
   async getEffectiveSettings(slug: string) {
     return this.tenantService.getEffectiveSettings(slug);
