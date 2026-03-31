@@ -1,150 +1,127 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Send, CheckCircle, XCircle, FileText, Edit } from 'lucide-react';
+import { Plus, Send, CheckCircle, XCircle, FileText, LayoutGrid, List, TrendingUp, Clock, DollarSign, Users } from 'lucide-react';
 import db from '../services/database.js';
 import { NewBudgetModal } from '../components/NewBudgetModal.jsx';
+import { BudgetDetailModal } from '../components/BudgetDetailModal.jsx';
 import { getPublicAppBaseUrl } from '../utils/publicRuntime.js';
 
+const STATUS_CONFIG = {
+    'Rascunho':  { bg: '#f1f5f9', color: '#475569',  border: '#cbd5e1', dot: '#94a3b8',  label: 'Rascunho' },
+    'Enviado':   { bg: '#eff6ff', color: '#1d4ed8',  border: '#bfdbfe', dot: '#3b82f6',  label: 'Enviado' },
+    'Aprovado':  { bg: '#f0fdf4', color: '#15803d',  border: '#bbf7d0', dot: '#22c55e',  label: 'Aprovado' },
+    'Rejeitado': { bg: '#fef2f2', color: '#dc2626',  border: '#fecaca', dot: '#f87171',  label: 'Rejeitado' },
+};
+
 export function Budgets() {
-  const [budgets, setBudgets] = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [editingBudget, setEditingBudget] = useState(null);
+    const [budgets, setBudgets] = useState([]);
+    const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [editingBudget, setEditingBudget] = useState(null);
+    // Detail popup state
+    const [detailBudget, setDetailBudget] = useState(null);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
+    const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
 
-  const handleEdit = (budget) => {
-      setEditingBudget(budget);
-      setIsModalOpen(true);
-  };
+    const generatePublicToken = () => {
+        if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+        return `prop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    };
 
-  const generatePublicToken = () => {
-    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-    return `prop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  };
-
-  const fetchBudgets = async () => {
-    try {
-        const allBudgets = await db.getAll('budgets');
-        setBudgets(Array.isArray(allBudgets) ? allBudgets : []);
-    } catch (error) {
-        console.error("Error fetching budgets:", error);
-        setBudgets([]);
-    }
-  };
-
-  useEffect(() => {
-    fetchBudgets();
-  }, []);
-
-  const handleCreate = async (data) => {
-    await db.create('budgets', data);
-    fetchBudgets();
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja excluir este orçamento?')) {
-        await db.delete('budgets', id);
-        fetchBudgets();
-    }
-  };
-
-  const handleSendWhatsapp = async (budget) => {
-    // Abrir a aba síncronamente antes de qualquer 'await' para burlar o popup blocker
-    let fallbackTab = null;
-
-    try {
-        const baseUrl = getPublicAppBaseUrl();
-        const publicToken = budget.publicToken || generatePublicToken();
-        const sharedAt = new Date().toISOString();
-
-        await db.update('budgets', String(budget.id), {
-            publicToken,
-            publicAccess: true,
-            sharedAt,
-            status: budget.status === 'Rascunho' ? 'Enviado' : budget.status
-        });
-
-        const proposalLink = `${baseUrl}/#/proposal/${budget.id}?t=${encodeURIComponent(publicToken)}`;
-        
-        let companyName = 'nossa equipe';
+    const fetchBudgets = async () => {
         try {
-            const saved = localStorage.getItem('stationery_config');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (parsed.companyName) companyName = parsed.companyName;
-            }
-        } catch(e) {}
-
-        const firstName = budget.customerName.split(' ')[0];
-        const message = `Olá, ${firstName}!\n✨ Preparamos com todo o carinho a sua proposta comercial.\n\nVocê pode conferir todos os detalhes, valores e aprovar o seu orçamento diretamente pelo nosso link interativo:\n\n${proposalLink}\n\nQualquer dúvida, a ${companyName} está à disposição!`;
-
-        let sentViaApi = false;
-        
-        let num = '';
-        const customers = await db.getAll('customers');
-        const customerObj = customers.find(c => c.name === budget.customerName);
-        
-        if (customerObj && (customerObj.phone || customerObj.whatsapp)) {
-            num = String(customerObj.phone || customerObj.whatsapp).replace(/\D/g, '');
+            const allBudgets = await db.getAll('budgets');
+            const sorted = Array.isArray(allBudgets)
+                ? [...allBudgets].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+                : [];
+            setBudgets(sorted);
+        } catch (error) {
+            console.error('Error fetching budgets:', error);
+            setBudgets([]);
         }
+    };
 
-        if (num.length >= 10) {
-            try {
-                const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
-                const res = await fetch(`${apiUrl}/api/campaign`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        targets: [{ phone: num, message: message }]
-                    })
-                });
-                
-                if (res.ok) {
-                    sentViaApi = true;
-                    
-                    // Show Automation Toast
-                    const toast = document.createElement('div');
-                    toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; z-index: 9999; display: flex; align-items: center; gap: 12px; transition: all 0.3s ease; transform: translateY(100px); opacity: 0;';
-                    toast.innerHTML = `
-                        <div style="background: #25D366; padding: 8px; border-radius: 50%; display: flex;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                        </div>
-                        <div>
-                            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">Proposta Comercial (CRM)</div>
-                            <div style="color: #64748b; font-size: 0.75rem;">Link enviado via API p/ <strong>${firstName}</strong></div>
-                        </div>
-                    `;
-                    document.body.appendChild(toast);
-                    setTimeout(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; }, 100);
-                    setTimeout(() => { toast.style.transform = 'translateY(100px)'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
-                }
-            } catch(e) { console.warn("Background API Failed", e); }
-        }
+    useEffect(() => { fetchBudgets(); }, []);
 
-        if (!sentViaApi) {
-            let finalNum = num;
-            if (finalNum.length >= 10) finalNum = `55${finalNum}`;
-            const url = finalNum.length >= 10 
-                ? `https://wa.me/${finalNum}?text=${encodeURIComponent(message)}`
-                : `https://wa.me/?text=${encodeURIComponent(message)}`;
-            
-            // Aqui decidimos abrir a aba no momento do fallback mesmo, ou usar uma pre-criada.
-            // O ideal seria criar no início e redirecionar.
-            // Porém o bloqueador costuma respeitar pequenos delays. Usaremos direct navigation aqui ou _blank direto.
-            window.open(url, '_blank') || (window.location.href = url);
-        }
+    const openDetail = (budget) => {
+        setDetailBudget(budget);
+        setIsDetailOpen(true);
+    };
 
+    const closeDetail = () => {
+        setIsDetailOpen(false);
+        // Refresh after closing in case edits were made
         fetchBudgets();
-    } catch(err) {
-        console.error(err);
-    }
-  };
+    };
 
-  const handleApprove = async (budget) => {
-      if (window.confirm('Confirmar aprovação do cliente? Isso pode gerar um pedido automaticamente.')) {
+    const handleSendWhatsapp = async (budget) => {
+        try {
+            const baseUrl = getPublicAppBaseUrl();
+            const publicToken = budget.publicToken || generatePublicToken();
+            const sharedAt = new Date().toISOString();
+
+            await db.update('budgets', String(budget.id), {
+                publicToken,
+                publicAccess: true,
+                sharedAt,
+                status: budget.status === 'Rascunho' ? 'Enviado' : budget.status
+            });
+
+            const proposalLink = `${baseUrl}/#/proposal/${budget.id}?t=${encodeURIComponent(publicToken)}`;
+
+            let companyName = 'nossa equipe';
+            try {
+                const saved = localStorage.getItem('stationery_config');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.companyName) companyName = parsed.companyName;
+                }
+            } catch (e) {}
+
+            const firstName = budget.customerName.split(' ')[0];
+            const message = `Olá, ${firstName}!\n✨ Preparamos com todo o carinho a sua proposta comercial.\n\nVocê pode conferir todos os detalhes, valores e aprovar o seu orçamento diretamente pelo nosso link interativo:\n\n${proposalLink}\n\nQualquer dúvida, a ${companyName} está à disposição!`;
+
+            let sentViaApi = false;
+            let num = '';
+            const customers = await db.getAll('customers');
+            const customerObj = customers.find(c => c.name === budget.customerName);
+
+            if (customerObj && (customerObj.phone || customerObj.whatsapp)) {
+                num = String(customerObj.phone || customerObj.whatsapp).replace(/\D/g, '');
+            }
+
+            if (num.length >= 10) {
+                try {
+                    const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
+                    const res = await fetch(`${apiUrl}/api/campaign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ targets: [{ phone: num, message }] })
+                    });
+                    if (res.ok) sentViaApi = true;
+                } catch (e) { console.warn('Background API Failed', e); }
+            }
+
+            if (!sentViaApi) {
+                let finalNum = num;
+                if (finalNum.length >= 10) finalNum = `55${finalNum}`;
+                const url = finalNum.length >= 10
+                    ? `https://wa.me/${finalNum}?text=${encodeURIComponent(message)}`
+                    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+                window.open(url, '_blank') || (window.location.href = url);
+            }
+
+            fetchBudgets();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleApprove = async (budget) => {
+        if (!window.confirm('Confirmar aprovação do cliente? Isso pode gerar um pedido automaticamente.')) return;
         await db.update('budgets', budget.id, { status: 'Aprovado' });
-        
-        // Optional: Create Order
+
         if (window.confirm('Deseja criar um Pedido de Venda agora?')) {
             const mappedItems = budget.items?.map(it => ({
                 productId: it.productId || '',
@@ -152,253 +129,337 @@ export function Budgets() {
                 quantity: it.quantity || 1,
                 price: it.price || 0,
                 total: it.total || 0,
-                productionStep: 'pending' // inicia fila
+                productionStep: 'pending'
             })) || [];
 
             const newOrder = {
                 customer: budget.customerName,
                 date: new Date().toISOString().split('T')[0],
                 status: 'Novo',
-                items: budget.items.length,
+                items: budget.items?.length || 0,
                 total: budget.total,
                 fromBudget: budget.id,
                 cartItems: mappedItems
             };
-            
+
             const createdOrder = await db.create('orders', newOrder);
-            
-            // ---------- AUTOMAÇÃO WHATSAPP (CRM) ----------
+
+            // CRM WhatsApp automation
             try {
                 const customers = await db.getAll('customers');
-                const cName = budget.customerName || '';
-                
-                const customerObj = customers.find(c => c.name === cName);
-                
-                const showToast = (title, message, type = 'success') => {
-                    const toast = document.createElement('div');
-                    const isError = type === 'error';
-                    const color = isError ? '#ef4444' : '#25D366';
-                    const icon = isError 
-                        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
-                        : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
-
-                    toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; z-index: 9999; display: flex; align-items: center; gap: 12px; transition: all 0.3s ease; transform: translateY(100px); opacity: 0;';
-                    toast.innerHTML = `
-                        <div style="background: ${color}; padding: 8px; border-radius: 50%; display: flex;">
-                            ${icon}
-                        </div>
-                        <div>
-                            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">${title}</div>
-                            <div style="color: #64748b; font-size: 0.75rem; max-width: 250px;">${message}</div>
-                        </div>
-                    `;
-                    document.body.appendChild(toast);
-                    setTimeout(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; }, 100);
-                    setTimeout(() => { toast.style.transform = 'translateY(100px)'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 5000);
-                };
-
-                if (customerObj && customerObj.phone) {
+                const customerObj = customers.find(c => c.name === budget.customerName);
+                if (customerObj?.phone) {
                     const num = customerObj.phone.replace(/\D/g, '');
                     if (num.length >= 10) {
                         let companyName = 'nossa equipe';
-                        try {
-                            const saved = localStorage.getItem('stationery_config');
-                            if (saved) {
-                                const parsed = JSON.parse(saved);
-                                if (parsed.companyName) companyName = parsed.companyName;
-                            }
-                        } catch(e) {}
-
+                        try { const s = localStorage.getItem('stationery_config'); if (s) { const p = JSON.parse(s); if (p.companyName) companyName = p.companyName; } } catch (e) {}
                         const baseUrl = window.location.href.split('#')[0];
                         const finalId = createdOrder?.id || 'ID-Novo';
                         const trackingLink = `${baseUrl}#/status/${finalId}`;
                         const firstName = customerObj.name.split(' ')[0];
-                        
-                        const msgText = `Olá ${firstName}!\n✨ O seu pedido #${finalId.toString().substring(0,8)} acaba de entrar na nossa *[Fila de Produção]*.\n\nAcompanhe a mágica acontecendo em tempo real com a ${companyName} pelo Link abaixo:\n\n${trackingLink}`;
-                        
+                        const msgText = `Olá ${firstName}!\n✨ O seu pedido #${finalId.toString().substring(0,8)} acaba de entrar na nossa *[Fila de Produção]*.\n\nAcompanhe em tempo real:\n\n${trackingLink}`;
                         const apiUrl = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001';
-                        
-                        fetch(`${apiUrl}/api/campaign`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                targets: [{ phone: num, message: msgText }]
-                            })
-                        }).then(res => {
-                            if(res.ok) {
-                                showToast('Automação CRM', `WhatsApp enviado para ${firstName}!`, 'success');
-                            } else {
-                                showToast('Falha no Envio', `A API recusou a conexão (Erro ${res.status}).`, 'error');
-                            }
-                        }).catch(e => {
-                            showToast('Servidor Offline', `Erro de conexão: ${e.message}`, 'error');
-                        });
-                    } else {
-                        showToast('Telefone Inválido', `O número de ${cName} está incompleto.`, 'error');
+                        fetch(`${apiUrl}/api/campaign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targets: [{ phone: num, message: msgText }] }) }).catch(() => {});
                     }
-                } else {
-                    showToast('Sem Contato', `Não encontramos o Zap de: ${cName}`, 'error');
                 }
-            } catch (err) {
-                console.error(err);
-            }
-            // ----------------------------------------------
-        } // Close 'Deseja criar um Pedido de Venda agora'
+            } catch (err) { console.error(err); }
+        }
 
         fetchBudgets();
-      }
-  };
+        setIsDetailOpen(false);
+    };
 
-  const handleReject = async (budget) => {
-      if (window.confirm('Marcar orçamento como rejeitado?')) {
-          await db.update('budgets', budget.id, { status: 'Rejeitado' });
-          fetchBudgets();
-      }
-  };
+    const handleReject = async (budget) => {
+        if (window.confirm('Marcar orçamento como rejeitado?')) {
+            await db.update('budgets', budget.id, { status: 'Rejeitado' });
+            fetchBudgets();
+            setIsDetailOpen(false);
+        }
+    };
 
-  return (
-    <div className="animate-fade-in">
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-        <div>
-            <h2 className="title">Orçamentos & Propostas</h2>
-            <p className="text-muted">Gerencie propostas comerciais e envie via WhatsApp.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <input 
-                type="text" 
-                placeholder="Buscar (Cliente ou ID)..." 
-                className="form-input" 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <select 
-                className="form-input" 
-                value={statusFilter} 
-                onChange={e => setStatusFilter(e.target.value)}
-                style={{ backgroundColor: 'var(--surface)' }}
-            >
-                <option value="">Status (Todos)</option>
-                <option value="Rascunho">Rascunho</option>
-                <option value="Enviado">Enviado</option>
-                <option value="Aprovado">Aprovado</option>
-                <option value="Rejeitado">Rejeitado</option>
-            </select>
-            <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-              <Plus size={16} />
-              Novo Orçamento
-            </button>
-        </div>
-      </div>
+    const handleDelete = async (budget) => {
+        if (window.confirm('Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.')) {
+            await db.delete('budgets', budget.id);
+            fetchBudgets();
+            setIsDetailOpen(false);
+        }
+    };
 
-      <div className="card">
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Cliente</th>
-                <th>Data</th>
-                <th>Validade</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {budgets
-                .filter(b => {
-                    const search = searchTerm.toLowerCase();
-                    const idStr = b.id ? b.id.toString() : '';
-                    const matchSearch = b.customerName?.toLowerCase().includes(search) || idStr.includes(search);
-                    const matchStatus = statusFilter === '' || b.status === statusFilter;
-                    return matchSearch && matchStatus;
-                })
-                .map(budget => (
-                <tr key={budget.id}>
-                  <td className="text-muted">#{budget.id}</td>
-                  <td style={{ fontWeight: 500 }}>{budget.customerName}</td>
-                  <td className="text-muted">{new Date(budget.date).toLocaleDateString('pt-BR')}</td>
-                  <td className="text-muted">{new Date(budget.validUntil).toLocaleDateString('pt-BR')}</td>
-                  <td style={{ fontWeight: 600 }}>R$ {Number(budget.total || 0).toFixed(2).replace('.', ',')}</td>
-                  <td>
-                    <span className={`badge ${
-                        budget.status === 'Aprovado' ? 'badge-success' :
-                        budget.status === 'Rejeitado' ? 'badge-danger' :
-                        budget.status === 'Enviado' ? 'badge-primary' : 'badge-neutral'
-                    }`}>
-                        {budget.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                        <button 
-                            className="btn btn-icon" 
-                            title="Visão Geral & Editar"
-                            onClick={() => handleEdit(budget)}
-                            style={{ color: 'var(--primary)' }}
-                        >
-                            <Edit size={16} />
-                        </button>
-                        <button 
-                            className="btn btn-icon" 
-                            title="Enviar WhatsApp"
-                            onClick={() => handleSendWhatsapp(budget)}
-                            style={{ color: '#25D366' }}
-                        >
-                            <Send size={16} />
-                        </button>
-                        
-                        {budget.status !== 'Aprovado' && budget.status !== 'Rejeitado' && (
-                            <>
-                                <button 
-                                    className="btn btn-icon" 
-                                    title="Aprovar"
-                                    onClick={() => handleApprove(budget)}
-                                    style={{ color: 'var(--success)' }}
-                                >
-                                    <CheckCircle size={16} />
-                                </button>
-                                <button 
-                                    className="btn btn-icon" 
-                                    title="Rejeitar"
-                                    onClick={() => handleReject(budget)}
-                                    style={{ color: 'var(--danger)' }}
-                                >
-                                    <XCircle size={16} />
-                                </button>
-                            </>
-                        )}
-                        
-                        <button 
-                            className="btn btn-icon" 
-                            title="Excluir"
-                            onClick={() => handleDelete(budget.id)}
-                            style={{ color: 'var(--text-muted)' }}
-                        >
-                            <Trash2 size={16} />
-                        </button>
+    const filteredBudgets = budgets.filter(b => {
+        const search = searchTerm.toLowerCase();
+        const idStr = b.id ? b.id.toString() : '';
+        const matchSearch = b.customerName?.toLowerCase().includes(search) || idStr.toLowerCase().includes(search);
+        const matchStatus = statusFilter === '' || b.status === statusFilter;
+        return matchSearch && matchStatus;
+    });
+
+    // KPI summary
+    const kpis = {
+        total: budgets.length,
+        approved: budgets.filter(b => b.status === 'Aprovado').length,
+        pending: budgets.filter(b => b.status === 'Enviado').length,
+        totalValue: budgets.reduce((acc, b) => acc + (Number(b.total) || 0), 0),
+    };
+
+    return (
+        <div className="animate-fade-in">
+            {/* ── PAGE HEADER ── */}
+            <div style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                    <div>
+                        <h2 className="title">Orçamentos & Propostas</h2>
+                        <p className="text-muted">Gerencie propostas comerciais e acompanhe o ciclo de aprovação.</p>
                     </div>
-                  </td>
-                </tr>
-              ))}
-               {budgets.length === 0 && (
-                  <tr>
-                      <td colSpan="7" className="text-center p-4 text-muted">
-                          Nenhum orçamento encontrado.
-                      </td>
-                  </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    <button className="btn btn-primary" onClick={() => { setEditingBudget(null); setIsNewModalOpen(true); }}>
+                        <Plus size={16} /> Novo Orçamento
+                    </button>
+                </div>
 
-      <NewBudgetModal 
-        isOpen={isModalOpen} 
-        onClose={() => { setIsModalOpen(false); setEditingBudget(null); }}
-        onBudgetCreated={fetchBudgets} 
-        editingBudget={editingBudget}
-      />
-    </div>
-  );
+                {/* KPI Strip */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginTop: '20px' }}>
+                    {[
+                        { label: 'Total de Orçamentos', value: kpis.total, icon: <FileText size={16} />, color: '#7c3aed', bg: '#faf5ff' },
+                        { label: 'Aprovados', value: kpis.approved, icon: <CheckCircle size={16} />, color: '#15803d', bg: '#f0fdf4' },
+                        { label: 'Aguardando Resposta', value: kpis.pending, icon: <Clock size={16} />, color: '#b45309', bg: '#fffbeb' },
+                        { label: 'Volume Total', value: `R$ ${kpis.totalValue.toFixed(2).replace('.', ',')}`, icon: <DollarSign size={16} />, color: '#0369a1', bg: '#f0f9ff' },
+                    ].map((k, i) => (
+                        <div key={i} style={{ backgroundColor: k.bg, border: `1px solid ${k.color}22`, borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: k.color + '18', color: k.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {k.icon}
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: 1.2 }}>{k.label}</div>
+                                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: k.color }}>{k.value}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── FILTERS & VIEW TOGGLE ── */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
+                <input
+                    type="text"
+                    placeholder="🔍 Buscar por cliente ou ID..."
+                    className="form-input"
+                    style={{ flex: '1', minWidth: '200px' }}
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                />
+                <select
+                    className="form-input"
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                    style={{ backgroundColor: 'var(--surface)', minWidth: '150px' }}
+                >
+                    <option value="">Todos os Status</option>
+                    <option value="Rascunho">Rascunho</option>
+                    <option value="Enviado">Enviado</option>
+                    <option value="Aprovado">Aprovado</option>
+                    <option value="Rejeitado">Rejeitado</option>
+                </select>
+                <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                    <button
+                        onClick={() => setViewMode('grid')}
+                        style={{ padding: '8px 12px', background: viewMode === 'grid' ? 'var(--primary)' : 'var(--surface)', color: viewMode === 'grid' ? 'white' : 'var(--text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        title="Visualização em cards"
+                    >
+                        <LayoutGrid size={16} />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('list')}
+                        style={{ padding: '8px 12px', background: viewMode === 'list' ? 'var(--primary)' : 'var(--surface)', color: viewMode === 'list' ? 'white' : 'var(--text-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        title="Visualização em lista"
+                    >
+                        <List size={16} />
+                    </button>
+                </div>
+            </div>
+
+            {/* ── GRID VIEW ── */}
+            {viewMode === 'grid' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                    {filteredBudgets.length === 0 && (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+                            <FileText size={40} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                            <p style={{ margin: 0, fontWeight: 600 }}>Nenhum orçamento encontrado.</p>
+                        </div>
+                    )}
+                    {filteredBudgets.map(budget => {
+                        const cfg = STATUS_CONFIG[budget.status] || STATUS_CONFIG['Rascunho'];
+                        const validDate = budget.validUntil ? new Date(budget.validUntil + 'T00:00:00') : null;
+                        const isExpired = validDate && validDate < new Date() && budget.status !== 'Aprovado' && budget.status !== 'Rejeitado';
+
+                        return (
+                            <div
+                                key={budget.id}
+                                onClick={() => openDetail(budget)}
+                                style={{
+                                    backgroundColor: 'var(--surface, white)',
+                                    border: `1px solid ${isExpired ? '#fca5a5' : cfg.border}`,
+                                    borderRadius: '16px',
+                                    padding: '20px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 28px rgba(0,0,0,0.1)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+                            >
+                                {/* Accent bar */}
+                                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '3px', backgroundColor: cfg.dot }} />
+
+                                {/* Header */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                    <div>
+                                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                            #{String(budget.id).substring(0, 10)}
+                                        </div>
+                                        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)', marginTop: '2px' }}>
+                                            {budget.customerName}
+                                        </div>
+                                    </div>
+                                    <span style={{ backgroundColor: cfg.bg, color: cfg.color, padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cfg.dot, display: 'inline-block' }} />
+                                        {budget.status || 'Rascunho'}
+                                    </span>
+                                </div>
+
+                                {/* Value */}
+                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary, #7c3aed)', marginBottom: '12px' }}>
+                                    R$ {Number(budget.total || 0).toFixed(2).replace('.', ',')}
+                                </div>
+
+                                {/* Meta */}
+                                <div style={{ display: 'flex', gap: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        <FileText size={11} /> {budget.items?.length || 0} {budget.items?.length === 1 ? 'item' : 'itens'}
+                                    </span>
+                                    {validDate && (
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: isExpired ? '#dc2626' : 'inherit' }}>
+                                            <Clock size={11} /> {isExpired ? '⚠️ Vencido' : `Válido até ${validDate.toLocaleDateString('pt-BR')}`}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Quick Actions */}
+                                <div style={{ display: 'flex', gap: '6px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border, #f1f5f9)' }}
+                                    onClick={e => e.stopPropagation()}
+                                >
+                                    <button
+                                        onClick={() => handleSendWhatsapp(budget)}
+                                        title="Enviar WhatsApp"
+                                        style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid #bbf7d0', backgroundColor: '#f0fdf4', color: '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                    >
+                                        <Send size={12} /> Enviar
+                                    </button>
+                                    {budget.status !== 'Aprovado' && budget.status !== 'Rejeitado' && (
+                                        <button
+                                            onClick={() => handleApprove(budget)}
+                                            title="Aprovar"
+                                            style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid #bbf7d0', backgroundColor: '#22c55e', color: 'white', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                        >
+                                            <CheckCircle size={12} /> Aprovar
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => openDetail(budget)}
+                                        style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                    >
+                                        <FileText size={12} /> Detalhes
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* ── LIST VIEW ── */}
+            {viewMode === 'list' && (
+                <div className="card">
+                    <div className="table-container">
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Cliente</th>
+                                    <th>Data</th>
+                                    <th>Validade</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredBudgets.map(budget => {
+                                    const cfg = STATUS_CONFIG[budget.status] || STATUS_CONFIG['Rascunho'];
+                                    return (
+                                        <tr key={budget.id} style={{ cursor: 'pointer' }} onClick={() => openDetail(budget)}>
+                                            <td className="text-muted" style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>#{String(budget.id).substring(0,10)}</td>
+                                            <td style={{ fontWeight: 600 }}>{budget.customerName}</td>
+                                            <td className="text-muted">{budget.date ? new Date(budget.date + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                                            <td className="text-muted">{budget.validUntil ? new Date(budget.validUntil + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                                            <td style={{ fontWeight: 700, color: 'var(--primary)' }}>R$ {Number(budget.total || 0).toFixed(2).replace('.', ',')}</td>
+                                            <td>
+                                                <span style={{ backgroundColor: cfg.bg, color: cfg.color, padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cfg.dot }} />
+                                                    {budget.status || 'Rascunho'}
+                                                </span>
+                                            </td>
+                                            <td onClick={e => e.stopPropagation()}>
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <button className="btn btn-icon" title="Ver Detalhes" onClick={() => openDetail(budget)} style={{ color: 'var(--primary)' }}>
+                                                        <FileText size={16} />
+                                                    </button>
+                                                    <button className="btn btn-icon" title="Enviar WhatsApp" onClick={() => handleSendWhatsapp(budget)} style={{ color: '#25D366' }}>
+                                                        <Send size={16} />
+                                                    </button>
+                                                    {budget.status !== 'Aprovado' && budget.status !== 'Rejeitado' && (
+                                                        <>
+                                                            <button className="btn btn-icon" title="Aprovar" onClick={() => handleApprove(budget)} style={{ color: 'var(--success)' }}>
+                                                                <CheckCircle size={16} />
+                                                            </button>
+                                                            <button className="btn btn-icon" title="Rejeitar" onClick={() => handleReject(budget)} style={{ color: 'var(--danger)' }}>
+                                                                <XCircle size={16} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {filteredBudgets.length === 0 && (
+                                    <tr>
+                                        <td colSpan="7" className="text-center p-4 text-muted">Nenhum orçamento encontrado.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODALS ── */}
+            <NewBudgetModal
+                isOpen={isNewModalOpen}
+                onClose={() => { setIsNewModalOpen(false); setEditingBudget(null); }}
+                onBudgetCreated={fetchBudgets}
+                editingBudget={editingBudget}
+            />
+
+            <BudgetDetailModal
+                isOpen={isDetailOpen}
+                budget={detailBudget}
+                onClose={closeDetail}
+                onSaved={fetchBudgets}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onSendWhatsapp={handleSendWhatsapp}
+                onDelete={handleDelete}
+            />
+        </div>
+    );
 }

@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../apps/api/generated/control-plane"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum PaymentOwnershipMode {
+  TENANT
+  PLATFORM
+  HYBRID
+}
+
+enum GlobalRole {
+  DEVELOPER
+  PLATFORM_OPERATOR
+}
+
+model Tenant {
+  id                String               @id @default(cuid())
+  slug              String               @unique
+  schemaName        String               @unique
+  displayName       String
+  status            TenantStatus         @default(ACTIVE)
+  paymentMode       PaymentOwnershipMode @default(HYBRID)
+  primaryDomainId   String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  domains           TenantDomain[]
+  memberships       TenantMembership[]
+  billingConnectors BillingConnector[]
+}
+
+model TenantDomain {
+  id         String   @id @default(cuid())
+  tenantId    String
+  host        String   @unique
+  isPrimary   Boolean  @default(false)
+  isWildcard  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Identity {
+  id             String             @id @default(cuid())
+  email          String             @unique
+  passwordHash   String
+  mfaEnabled     Boolean            @default(false)
+  lastLoginAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  memberships    TenantMembership[]
+  platformRoles  PlatformUserRole[]
+}
+
+model TenantMembership {
+  id          String   @id @default(cuid())
+  tenantId     String
+  identityId   String
+  displayName  String
+  roles        String[]
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  identity     Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, identityId])
+}
+
+model PlatformUserRole {
+  id          String     @id @default(cuid())
+  identityId   String
+  role         GlobalRole
+  createdAt    DateTime   @default(now())
+  identity      Identity   @relation(fields: [identityId], references: [id], onDelete: Cascade)
+}
+
+model BillingConnector {
+  id                String               @id @default(cuid())
+  tenantId           String
+  provider           String
+  ownershipMode      PaymentOwnershipMode
+  accountAlias       String
+  encryptedPayload   String
+  isDefault          Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model PlatformSetting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @updatedAt
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String
+  tenantId    String?
+  enabled     Boolean  @default(false)
+  payload     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GlobalAuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  tenantId    String?
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+}

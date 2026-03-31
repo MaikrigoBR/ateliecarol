@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../apps/api/generated/tenant"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELED
+}
+
+enum ModuleReleaseMode {
+  MANUAL
+  SCHEDULED
+  PERFORMANCE_BASED
+}
+
+enum ModuleStatus {
+  LOCKED
+  AVAILABLE
+  IN_PROGRESS
+  AWAITING_TEACHER
+  COMPLETED
+}
+
+model TenantSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
+  updatedAt   DateTime @updatedAt
+}
+
+model AudienceProfile {
+  id                   String   @id @default(cuid())
+  label                String
+  youthFirst           Boolean  @default(true)
+  inclusiveForAdults   Boolean  @default(true)
+  toneOfVoice          String
+  consentMode          String
+  minAge               Int?
+  maxAge               Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  courses              Course[]
+}
+
+model Course {
+  id                String        @id @default(cuid())
+  slug              String        @unique
+  title             String
+  summary           String
+  audienceProfileId String?
+  isPublished       Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  audienceProfile   AudienceProfile? @relation(fields: [audienceProfileId], references: [id], onDelete: SetNull)
+  modules           CourseModule[]
+  plans             CoursePlan[]
+  enrollments       Enrollment[]
+}
+
+model CourseModule {
+  id                String     @id @default(cuid())
+  courseId          String
+  title             String
+  orderIndex        Int
+  releaseMode       ModuleReleaseMode @default(MANUAL)
+  passingScore      Decimal    @db.Decimal(5,2)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  course            Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons           Lesson[]
+  assessments       Assessment[]
+}
+
+model Lesson {
+  id                String     @id @default(cuid())
+  moduleId          String
+  title             String
+  contentType       String
+  contentBody       Json
+  estimatedMinutes  Int
+  orderIndex        Int
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  module            CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+}
+
+model Assessment {
+  id                String     @id @default(cuid())
+  moduleId          String
+  title             String
+  minimumGrade      Decimal    @db.Decimal(5,2)
+  maxAttempts       Int
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  module            CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questions         Question[]
+}
+
+model Question {
+  id                String     @id @default(cuid())
+  assessmentId      String
+  prompt            String
+  kind              String
+  options           Json?
+  answerKey         Json?
+  orderIndex        Int
+  assessment        Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+}
+
+model CoursePlan {
+  id                  String     @id @default(cuid())
+  courseId            String
+  title               String
+  priceCents          Int
+  billingInterval     Int
+  billingIntervalUnit String
+  gracePeriodDays     Int
+  releaseMode         ModuleReleaseMode
+  minimumGrade        Decimal    @db.Decimal(5,2)
+  maxAttempts         Int
+  isActive            Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  course              Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrollments         Enrollment[]
+}
+
+model Enrollment {
+  id                String     @id @default(cuid())
+  studentIdentityId String
+  courseId          String
+  planId            String
+  status            String
+  planSnapshot      Json
+  pricingSnapshot   Json
+  policySnapshot    Json
+  startedAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  course            Course     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  plan              CoursePlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  subscription      Subscription?
+  releases          ModuleRelease[]
+  attempts          AssessmentAttempt[]
+  sessions          StudySession[]
+  metrics           StudentMetric[]
+}
+
+model Subscription {
+  id                  String             @id @default(cuid())
+  enrollmentId        String             @unique
+  status              SubscriptionStatus @default(PENDING)
+  provider            String
+  providerReference   String?
+  nextBillingAt       DateTime?
+  canceledAt          DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  enrollment          Enrollment         @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  invoices            Invoice[]
+}
+
+model Invoice {
+  id                  String        @id @default(cuid())
+  subscriptionId      String
+  externalReference   String?
+  amountCents         Int
+  dueAt               DateTime
+  paidAt              DateTime?
+  status              String
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  subscription        Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  paymentEvents       PaymentEvent[]
+}
+
+model PaymentEvent {
+  id                  String    @id @default(cuid())
+  invoiceId           String
+  providerEventId     String?
+  eventType           String
+  payload             Json
+  createdAt           DateTime  @default(now())
+  invoice             Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Settlement {
+  id                  String    @id @default(cuid())
+  invoiceId           String?
+  ownershipMode       String
+  grossAmountCents    Int
+  feeAmountCents      Int
+  payableToTenantCents Int
+  settledAt           DateTime?
+  createdAt           DateTime  @default(now())
+}
+
+model ModuleRelease {
+  id                  String       @id @default(cuid())
+  enrollmentId        String
+  moduleId            String
+  status              ModuleStatus @default(LOCKED)
+  releasedBy          String?
+  releasedAt          DateTime?
+  enrollment          Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model AssessmentAttempt {
+  id                  String     @id @default(cuid())
+  enrollmentId        String
+  assessmentId        String
+  score               Decimal    @db.Decimal(5,2)
+  status              String
+  reopenedBy          String?
+  createdAt           DateTime   @default(now())
+  enrollment          Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model StudySession {
+  id                  String     @id @default(cuid())
+  enrollmentId        String
+  lessonId            String?
+  startedAt           DateTime
+  endedAt             DateTime?
+  validatedMinutes    Int        @default(0)
+  enrollment          Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model StudentMetric {
+  id                  String     @id @default(cuid())
+  enrollmentId        String
+  metricKey           String
+  metricValue         Json
+  measuredAt          DateTime   @default(now())
+  enrollment          Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id                  String     @id @default(cuid())
+  recipientIdentityId String
+  channel             String
+  templateKey         String
+  payload             Json
+  sentAt              DateTime?
+  createdAt           DateTime   @default(now())
+}
+
+model TenantAuditLog {
+  id                  String     @id @default(cuid())
+  actorIdentityId     String?
+  action              String
+  entityType          String
+  entityId            String?
+  metadata            Json?
+  createdAt           DateTime   @default(now())
+}

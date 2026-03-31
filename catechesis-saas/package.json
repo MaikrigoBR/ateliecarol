@@ -1,0 +1,35 @@
+{
+  "name": "catechesis-saas",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "db:provision:demo": "tsx scripts/provision-demo.ts",
+    "db:seed:demo": "tsx scripts/seed-demo.ts",
+    "dev:api": "npm run dev -w @catechesis-saas/api",
+    "dev:local": "start-local-test.cmd",
+    "dev:web": "npm run dev -w @catechesis-saas/web",
+    "dev:worker": "npm run dev -w @catechesis-saas/worker",
+    "lint": "npm run lint --workspaces --if-present",
+    "prisma:generate": "npm run prisma:generate:control && npm run prisma:generate:tenant",
+    "prisma:generate:control": "prisma generate --schema prisma/control-plane.prisma",
+    "prisma:generate:tenant": "prisma generate --schema prisma/tenant.prisma",
+    "prisma:push:control": "prisma db push --schema prisma/control-plane.prisma",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "pg": "^8.16.3",
+    "prisma": "^6.6.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  }
+}

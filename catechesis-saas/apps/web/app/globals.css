@@ -1,0 +1,237 @@
+:root {
+  --font-title: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --font-body: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  --background: #fffdfa;
+  --foreground: #25180f;
+  --muted: #7d6b5f;
+  --panel: rgba(255, 255, 255, 0.78);
+  --border: rgba(93, 54, 22, 0.08);
+  --shadow: 0 24px 80px rgba(88, 55, 27, 0.12);
+  --accent: #d4622f;
+  --accent-soft: #f2c46d;
+  --tenant-primary: #d4622f;
+  --tenant-accent: #f2c46d;
+  --tenant-surface: #fff8ef;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-body), sans-serif;
+  color: var(--foreground);
+  background:
+    radial-gradient(circle at top, rgba(244, 210, 126, 0.42), transparent 28%),
+    radial-gradient(circle at right top, rgba(212, 98, 47, 0.15), transparent 22%),
+    linear-gradient(180deg, #fff7ef 0%, #fffdfa 100%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-title), serif;
+  letter-spacing: -0.03em;
+}
+
+p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.page-shell {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 64px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 24px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,247,238,0.82));
+  box-shadow: var(--shadow);
+}
+
+.compact-hero {
+  grid-template-columns: 1fr;
+}
+
+.tenant-shell {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--tenant-accent) 28%, transparent), transparent 30%),
+    linear-gradient(180deg, var(--tenant-surface), #ffffff);
+  border-radius: 32px;
+  padding-inline: 20px;
+}
+
+.tenant-hero {
+  border-color: color-mix(in srgb, var(--tenant-primary) 14%, white);
+}
+
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hero h1 {
+  font-size: clamp(2.6rem, 5vw, 4.8rem);
+  line-height: 0.96;
+  max-width: 12ch;
+}
+
+.eyebrow {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cta-row,
+.pill-row,
+.link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.primary-link,
+.secondary-link,
+.link-list a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 0 18px;
+  font-weight: 700;
+}
+
+.primary-link {
+  color: white;
+  background: linear-gradient(135deg, var(--tenant-primary), #8f3d1f);
+  box-shadow: 0 12px 32px rgba(172, 81, 38, 0.26);
+}
+
+.secondary-link,
+.link-list a {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.8);
+}
+
+.hero-stack,
+.grid {
+  display: grid;
+  gap: 18px;
+}
+
+.two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 24px;
+}
+
+.three-up {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 24px;
+}
+
+.panel,
+.metric-card,
+.course-card {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.metric-card strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 2rem;
+  font-family: var(--font-title), serif;
+}
+
+.metric-card span,
+.metric-card p {
+  color: var(--muted);
+}
+
+.course-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tenant-accent) 20%, white);
+  font-size: 0.9rem;
+}
+
+.simple-list {
+  display: grid;
+  gap: 10px;
+  padding-left: 18px;
+  margin: 0;
+}
+
+.code-block {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(37, 24, 15, 0.05);
+  font-family: Consolas, "Courier New", monospace;
+  overflow-x: auto;
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .two-up,
+  .three-up {
+    grid-template-columns: 1fr;
+  }
+
+  .page-shell {
+    width: min(100vw - 20px, 1180px);
+    padding-top: 20px;
+  }
+
+  .hero h1 {
+    max-width: none;
+  }
+}
