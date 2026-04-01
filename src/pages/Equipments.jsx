@@ -522,11 +522,11 @@ export function Equipments() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
             <div className="card" style={{ padding: '20px', borderLeft: '4px solid #3b82f6' }}>
                 <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Total Investido (Compra)</div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', marginTop: '8px' }}>R$ {totalEquipmentsValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', marginTop: '8px' }}>R$ {Number(Math.floor(totalEquipmentsValue * 100) / 100).toFixed(2).replace('.', ',')}</div>
             </div>
             <div className="card" style={{ padding: '20px', borderLeft: '4px solid #ef4444' }}>
                 <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Custo Total Manutenções</div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', marginTop: '8px' }}>R$ {totalMaintenanceCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', marginTop: '8px' }}>R$ {Number(Math.floor(totalMaintenanceCost * 100) / 100).toFixed(2).replace('.', ',')}</div>
             </div>
             <div className="card" style={{ padding: '20px', borderLeft: '4px solid #10b981' }}>
                 <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Ativos Registrados</div>
@@ -610,7 +610,7 @@ export function Equipments() {
                                     <td>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                             <span style={{ fontSize: '0.85rem', color: maintTotal > 0 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
-                                                Manutenções: R$ {maintTotal.toFixed(2)}
+                                                Manutenções: R$ {Number(Math.floor(maintTotal * 100) / 100).toFixed(2).replace('.', ',')}
                                             </span>
                                             <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                                                 {eq.maintenanceHistory?.length || 0} registro(s) no log
@@ -625,14 +625,14 @@ export function Equipments() {
                                     </td>
                                     <td>
                                         <div style={{ fontSize: '0.85rem' }}>
-                                            <strong>Compra:</strong> R$ {(eq.purchasePrice || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}<br/>
-                                            <strong style={{ color: '#0ea5e9' }}>Atual (Depreciado):</strong> R$ {currentValor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}<br/>
+                                            <strong>Compra:</strong> R$ {Number(Math.floor(Number(eq.purchasePrice || 0) * 100) / 100).toFixed(2).replace('.', ',')}<br/>
+                                            <strong style={{ color: '#0ea5e9' }}>Atual (Depreciado):</strong> R$ {Number(Math.floor(currentValor * 100) / 100).toFixed(2).replace('.', ',')}<br/>
                                             <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Vida Útil: {eq.lifespanMonths} meses</span>
                                         </div>
                                     </td>
                                     <td>
                                         <div style={{ backgroundColor: '#f0fdfa', border: '1px solid #ccfbf1', color: '#0f766e', padding: '8px 12px', borderRadius: '8px', display: 'inline-block', fontWeight: 700 }}>
-                                            R$ {hourCost.toFixed(2)} <span style={{ fontSize: '0.7rem', fontWeight: 400 }}>/hora de uso</span>
+                                            R$ {Number(Math.floor(hourCost * 100) / 100).toFixed(2).replace('.', ',')} <span style={{ fontSize: '0.7rem', fontWeight: 400 }}>/hora de uso</span>
                                         </div>
                                         <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: '#94a3b8' }}>*Sugerido para precificação</p>
                                     </td>

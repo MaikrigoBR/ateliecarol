@@ -404,8 +404,8 @@ export function ProposalView() {
                   </div>
 
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>R$ {(item.price || 0).toFixed(2).replace('.', ',')} un</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}>R$ {(item.total || 0).toFixed(2).replace('.', ',')}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>R$ {Number(Math.floor(Number(item.price || 0) * 100) / 100).toFixed(2).replace('.', ',')} un</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}>R$ {Number(Math.floor(Number(item.total || 0) * 100) / 100).toFixed(2).replace('.', ',')}</div>
                   </div>
                 </div>
               );
@@ -415,7 +415,7 @@ export function ProposalView() {
           <div style={{ backgroundColor: 'var(--primary)', color: 'white', borderRadius: '12px', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
             <div>
               <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Investimento Total</div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>R$ {(budget.total || 0).toFixed(2).replace('.', ',')}</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>R$ {Number(Math.floor(Number(budget.total || 0) * 100) / 100).toFixed(2).replace('.', ',')}</div>
             </div>
           </div>
 
