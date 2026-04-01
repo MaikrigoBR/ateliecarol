@@ -59,7 +59,7 @@ function StatCard({ title, value, icon: Icon, color, subtext }) {
 import { useData } from '../contexts/DataContext';
 
 export function Dashboard() {
-    const { orders, customers, inventory: accounts, loading } = useData();
+    const { orders, customers, accounts, transactions, loading } = useData();
     
     // Local KPI State (derived from context data)
     const [stats, setStats] = useState({
@@ -69,7 +69,9 @@ export function Dashboard() {
         revenue: 0,
         avgTicket: 0,
         receivables: 0,
-        totalBalance: 0
+        totalBalance: 0,
+        payableToday: 0,
+        payableMonth: 0
     });
     const [salesData, setSalesData] = useState([]);
     const [statusData, setStatusData] = useState([]);
@@ -79,7 +81,7 @@ export function Dashboard() {
 
     // Recalculate stats whenever context data changes
     useEffect(() => {
-        if (loading.orders || loading.customers) return;
+        if (loading.orders || loading.customers || loading.transactions || loading.accounts) return;
 
         // 1. Calculate KPI Stats
         const revenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
@@ -91,38 +93,42 @@ export function Dashboard() {
         
         const avgTicket = orders.length > 0 ? revenue / orders.length : 0;
         
-        // Financials
+        // Financials (Orders Receivables)
         const receivables = orders.reduce((sum, o) => sum + Number(o.balanceDue || 0), 0);
-        // Note: 'inventory' in context is actually 'inventory items', NOT accounts.
-        // Wait, did I map 'inventory' to 'accounts' in the destructuring above? 
-        // No, I need accounts. Context has transactions, inventory, customers, orders, products.
-        // Context DOES NOT have 'accounts'. I need to add 'accounts' to DataContext or fetch it here.
-        // For now, let's fetch accounts locally as it's financial data, or better:
-        // Assume 'accounts' logic should be moved to DataContext, but I can't edit it right now without another step.
-        // Let's keep 'accounts' fetch local for now or assume 0 until I fix Context.
-        // ACTUALLY, I should have added 'accounts' to DataContext. My bad.
-        // I will fetch accounts locally here to preserve functionality.
         
-        const calculateWithAccounts = async () => {
-             // Quick fetch for accounts since it's not in context yet
-             // In a real refactor, I'd add it to Context.
-             const accs = await db.getAll('accounts');
-             const totalBalance = accs.reduce((sum, a) => sum + Number(a.balance || 0), 0);
-             
-             setStats({
-                totalSales: orders.length,
-                pendingOrders: pending,
-                activeCustomers: customers.length,
-                revenue,
-                avgTicket,
-                receivables,
-                totalBalance
-            });
-        };
-        calculateWithAccounts();
+        // Financials (Accounts Payable - Transactions)
+        const todayStr = new Date().toISOString().split('T')[0];
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+
+        const pendingExpenses = (transactions || []).filter(t => t.type === 'expense' && t.status === 'pending');
+        
+        const payableToday = pendingExpenses
+            .filter(t => t.date === todayStr)
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+            
+        const payableMonth = pendingExpenses
+            .filter(t => {
+                const d = new Date(t.date);
+                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            })
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        const totalBalance = (accounts || []).reduce((sum, a) => sum + Number(a.balance || 0), 0);
+        
+        setStats({
+            totalSales: orders.length,
+            pendingOrders: pending,
+            activeCustomers: customers.length,
+            revenue,
+            avgTicket,
+            receivables,
+            totalBalance,
+            payableToday,
+            payableMonth
+        });
 
         // 2. Prepare Sales Chart Data (Current Year - Monthly)
-        const currentYear = new Date().getFullYear();
         const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         
         const monthlyData = months.map((monthName, index) => {
@@ -241,7 +247,7 @@ export function Dashboard() {
             </div>
 
             {/* KPI Grid */}
-            <div className="dashboard-grid">
+            <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 <StatCard 
                     title="Caixa & Bancos" 
                     value={`R$ ${stats.totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
@@ -257,13 +263,20 @@ export function Dashboard() {
                     subtext="De clientes"
                 />
                 <StatCard 
-                    title="Pedidos em Aberto" 
-                    value={stats.pendingOrders} 
-                    icon={ShoppingBag} 
-                    color="purple"
-                    subtext="Fila de produção"
+                    title="Pagar (Hoje)" 
+                    value={`R$ ${stats.payableToday.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                    icon={ArrowDownRight} 
+                    color="red"
+                    subtext="Compromissos hoje"
                 />
-                 <StatCard 
+                <StatCard 
+                    title="Pagar (Mês)" 
+                    value={`R$ ${stats.payableMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                    icon={TrendingUp} 
+                    color="orange"
+                    subtext="Total provisionado"
+                />
+                <StatCard 
                     title="Faturamento" 
                     value={`R$ ${stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
                     icon={DollarSign} 
@@ -271,6 +284,47 @@ export function Dashboard() {
                     subtext="Total vendas"
                 />
             </div>
+
+            {/* Card Limit Alerts */}
+            {(() => {
+                const creditCards = (accounts || []).filter(a => a.type === 'credit');
+                const alerts = creditCards
+                    .map(card => {
+                        const cardTrans = (transactions || []).filter(t => t.accountId === card.id);
+                        const expenses = cardTrans.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+                        const incomes = cardTrans.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+                        const debt = expenses - incomes;
+                        const limit = Number(card.limit || 0);
+                        const usagePercent = limit > 0 ? (debt / limit) * 100 : 0;
+                        return { card, usagePercent, debt, limit };
+                    })
+                    .filter(a => a.usagePercent >= 90);
+
+                if (alerts.length > 0) {
+                    return (
+                        <div className="animate-slide-up mb-6">
+                            {alerts.map((alert, i) => (
+                                <div key={i} className="flex items-center justify-between p-4 rounded-xl mb-2" style={{ backgroundColor: '#fef2f2', border: '1px solid #fee2e2', boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.1)' }}>
+                                    <div className="flex items-center gap-3">
+                                        <div style={{ backgroundColor: '#ef4444', color: 'white', padding: '8px', borderRadius: '12px', display: 'flex' }}>
+                                            <AlertCircle size={20} />
+                                        </div>
+                                        <div>
+                                            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#991b1b' }}>LIMITE CRÍTICO: {alert.card.name.toUpperCase()}</h4>
+                                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#ef4444', fontWeight: 600 }}>O cartão atingiu {alert.usagePercent.toFixed(1)}% de utilização do limite.</p>
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontSize: '0.7rem', color: '#991b1b', textTransform: 'uppercase', fontWeight: 800 }}>Dívida Atual</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#b91c1c' }}>R$ {alert.debt.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    );
+                }
+                return null;
+            })()}
 
             {/* Charts Grid */}
             <div className="charts-layout">

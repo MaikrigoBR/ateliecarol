@@ -9,6 +9,10 @@
 
 ### 1. Sistema Financeiro "Invoice Engine" — Concluído
 - [x] **Pagamento em Lote (Bulk Pay)**: Interface de seleção múltipla com barra de ações flutuante para baixa rápida de despesas.
+- [x] **Dashboard Financeiro**: Incluir resumos de "Contas a Pagar no Dia" e "Intervalo do Mês". (Concluído em 2026-04-01)
+- [x] **Filtros Inteligentes**: Aprimorar os critérios de pesquisa no módulo de Inteligência Financeira para facilitar a baixa de títulos vencidos. (Concluído em 2026-04-01)
+- [x] **Correção DRE**: Ajustada a lógica de cálculo para regime de competência (incluindo pendentes). (Concluído em 2026-04-01)
+- [x] **Gestão de Cartões**: Apresentação de faturas em "blocos" de competência no módulo financeiro. (Concluído em 2026-04-01)
 - [x] **Alertas de Vencimento Dinâmicos**: Indicadores "VENCIDO" e "VENCE HOJE" em tempo real na listagem financeira.
 - [x] **Gestão de Cartões de Crédito**:
   - [x] Agrupamento inteligente de despesas por ciclo de fatura (Fechamento vs. Vencimento).
@@ -24,13 +28,12 @@
 
 ## 🟡 Pendências em Aberto / Melhorias de UX
 
-### 1. Filtros Avançados no Fluxo de Caixa (Financeiro)
-- [ ] Implementar filtros por **Período Customizado** (atualmente é por Mês/Ano fechado).
-- [ ] Adicionar filtro por **Status de Confirmação** (Conciliado vs. Estimado).
+- [x] Implementar filtros por **Período Customizado** (Concluído em 2026-04-01).
+- [x] Adicionar filtro por **Status de Confirmação** (Conciliado vs. Estimado) (Concluído em 2026-04-01).
 
 ### 2. Monitoramento de Ciclos de Cartão
-- [ ] Observar comportamento do `closeDay` em produção para cartões com viradas de mês atípicas.
-- [ ] Adicionar aviso visual quando um cartão está com >90% do limite utilizado na tela principal do dashboard.
+- [x] Observar comportamento do `closeDay` e permitir edição manual no cadastro de contas (Concluído em 2026-04-01).
+- [x] Adicionar aviso visual quando um cartão está com >90% do limite utilizado na tela principal do dashboard (Concluído em 2026-04-01).
 
 ---
 

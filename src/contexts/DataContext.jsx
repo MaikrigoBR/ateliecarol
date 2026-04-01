@@ -24,13 +24,15 @@ export function DataProvider({ children }) {
     const [customers, setCustomers] = useState([]);
     const [inventory, setInventory] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [accounts, setAccounts] = useState([]);
     
     const [loading, setLoading] = useState({
         orders: false,
         products: false,
         customers: false,
         inventory: false,
-        transactions: false
+        transactions: false,
+        accounts: false
     });
 
     const [lastFetched, setLastFetched] = useState({
@@ -38,7 +40,8 @@ export function DataProvider({ children }) {
         products: 0,
         customers: 0,
         inventory: 0,
-        transactions: 0
+        transactions: 0,
+        accounts: 0
     });
 
     // Config: Cache duration in ms (e.g., 5 minutes for stale data)
@@ -73,6 +76,7 @@ export function DataProvider({ children }) {
     const refreshCustomers = (force) => fetchData('customers', setCustomers, force);
     const refreshInventory = (force) => fetchData('inventory', setInventory, force);
     const refreshTransactions = (force) => fetchData('transactions', setTransactions, force);
+    const refreshAccounts = (force) => fetchData('accounts', setAccounts, force);
 
     const refreshAll = () => {
         refreshOrders(true);
@@ -80,6 +84,7 @@ export function DataProvider({ children }) {
         refreshCustomers(true);
         refreshInventory(true);
         refreshTransactions(true);
+        refreshAccounts(true);
     };
 
     // Auto-fetch critical data on mount only when Authenticated
@@ -88,6 +93,8 @@ export function DataProvider({ children }) {
             refreshOrders();
             refreshProducts();
             refreshCustomers();
+            refreshTransactions();
+            refreshAccounts();
         }
     }, [currentUser]);
 
@@ -97,12 +104,14 @@ export function DataProvider({ children }) {
         customers,
         inventory,
         transactions,
+        accounts,
         loading,
         refreshOrders,
         refreshProducts,
         refreshCustomers,
         refreshInventory,
         refreshTransactions,
+        refreshAccounts,
         refreshAll
     };
 
