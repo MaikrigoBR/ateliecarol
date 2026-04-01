@@ -5,6 +5,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, PieChart, Pie
 } from 'recharts';
 import { FinanceTransactionDetailsModal } from '../components/FinanceTransactionDetailsModal';
+import { formatCurrency, groupByInvoiceCycle } from '../utils/financeUtils';
 import '../css/pages.css';
 
 export function CreditCards() {
@@ -135,45 +136,28 @@ export function CreditCards() {
         return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth();
     };
 
+    // Agrupamento de faturas por ciclo de fechamento
+    const invoiceGroups = useMemo(() => {
+        return groupByInvoiceCycle(transactions, selectedCard);
+    }, [transactions, selectedCard]);
+
     // Fatura do cartão e mês selecionados
-    const currentInvoiceTrans = useMemo(() => {
-        if (!selectedCard) return [];
+    const currentInvoiceData = useMemo(() => {
+        if (!selectedCard || invoiceGroups.length === 0) return { transactions: [], total: 0 };
         
         const base = new Date();
         const targetDate = new Date(base.getFullYear(), base.getMonth() + selectedMonthOffset, 1);
+        const key = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        return invoiceGroups.find(g => g.key === key) || { transactions: [], total: 0 };
+    }, [invoiceGroups, selectedMonthOffset, selectedCard]);
 
-        return transactions.filter(t => {
-            if (t.accountId !== selectedCard.id) return false;
-            // Mostramos apenas despesas para compor o valor da fatura
-            if (t.type !== 'expense') return false; 
-            
-            const [y, m, d] = t.date.split('-');
-            const transDate = new Date(y, m - 1, d);
-            return isSameMonth(transDate, targetDate);
-        }).sort((a,b) => new Date(b.date) - new Date(a.date));
-    }, [transactions, selectedCard, selectedMonthOffset]);
+    const currentInvoiceTrans = currentInvoiceData.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
+    const invoiceTotal = currentInvoiceData.total;
 
-    const invoiceTotal = currentInvoiceTrans.reduce((acc, t) => acc + Number(t.amount || 0), 0);
-
-    // Soma os pagamentos de fatura feitos *neste mesmo range* para descontar da fatura "Em Aberto"
-    const invoicePaidTotal = useMemo(() => {
-        if (!selectedCard) return 0;
-        const base = new Date();
-        const targetDate = new Date(base.getFullYear(), base.getMonth() + selectedMonthOffset, 1);
-
-        return transactions.filter(t => {
-            if (t.accountId !== selectedCard.id) return false;
-            // Pagamentos da fatura são registrados como 'income' (entradas que restauram o limite)
-            if (t.type !== 'income') return false; 
-            
-            // Filtra só os pagamentos que caem no mês desta fatura
-            const [y, m, d] = t.date.split('-');
-            const transDate = new Date(y, m - 1, d);
-            return isSameMonth(transDate, targetDate);
-        }).reduce((acc, t) => acc + Number(t.amount || 0), 0);
-    }, [transactions, selectedCard, selectedMonthOffset]);
-
-    const invoiceBalance = Math.max(0, invoiceTotal - invoicePaidTotal);
+    // Pagamento da fatura parcial (se houver pagamentos avulsos que ainda não foram agrupados ou para controle visual)
+    // Nota:groupByInvoiceCycle já desconta incomes (pagamentos) do total.
+    const invoiceBalance = Math.max(0, invoiceTotal);
 
     const openInvoicePayment = () => {
         setPaymentAccId('');
@@ -205,7 +189,7 @@ export function CreditCards() {
         // Entrada de dinheiro no cartão (restaurando balance negativo / liberando limite)
         const incomePayload = {
             description: `Pagamento Fatura ${selectedCard.name} (${monthKey})`,
-            amount: invoiceBalance,
+            amount: invoiceTotal,
             type: 'income',
             category: 'Cartão de Crédito',
             accountId: selectedCard.id,
@@ -259,12 +243,18 @@ export function CreditCards() {
         return data;
     }, [transactions, selectedCard]);
 
+    const monthKey = `${timelineMonths.find(m => m.offset === selectedMonthOffset)?.year}-${String(timelineMonths.find(m => m.offset === selectedMonthOffset)?.date.getMonth() + 1).padStart(2, '0')}`;
+    const isPaid = selectedCard?.paidInvoices?.includes(monthKey);
+
     let statusText = 'Em Aberto';
     let statusColor = '#3b82f6';
 
-    if (selectedMonthOffset < 0) {
-        statusText = 'Fechada / Paga';
+    if (isPaid) {
+        statusText = 'Paga';
         statusColor = '#10b981';
+    } else if (selectedMonthOffset < 0) {
+        statusText = 'Fechada / Pendente';
+        statusColor = '#ef4444';
     } else if (selectedMonthOffset > 0) {
         statusText = 'Fatura Futura';
         statusColor = '#8b5cf6';
@@ -284,14 +274,24 @@ export function CreditCards() {
         return balances;
     }, [allAccounts, transactions]);
 
-    const used = selectedCard ? (accBalances[selectedCard.id] < 0 ? Math.abs(accBalances[selectedCard.id]) : 0) : 0;
+    // Endividamento Total (Soma de todos os faturamentos negativos/uados)
+    const totalCreditDebt = accounts.reduce((sum, card) => {
+        const bal = accBalances[card.id] || 0;
+        return sum + (bal < 0 ? Math.abs(bal) : 0);
+    }, 0);
+
+    const totalLimit = accounts.reduce((sum, card) => sum + Number(card.limit || 0), 0);
+    const overallLimitUsage = totalLimit > 0 ? (totalCreditDebt / totalLimit) * 100 : 0;
+
+    const currentCardBal = selectedCard ? (accBalances[selectedCard.id] || 0) : 0;
+    const used = currentCardBal < 0 ? Math.abs(currentCardBal) : 0;
     const limit = selectedCard ? Number(selectedCard.limit || 0) : 0;
-    const available = selectedCard ? Math.max(0, limit - used) : 0;
+    const available = Math.max(0, limit - used);
 
     return (
         <div className="animate-fade-in page-content">
             {/* Header */}
-            <div className="dashboard-header">
+            <div className="dashboard-header" style={{ marginBottom: '1.5rem' }}>
                 <div>
                     <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
                         Gestão de Cartões
@@ -318,6 +318,46 @@ export function CreditCards() {
                             Foco: <b>{selectedCard.name}</b>
                         </div>
                     )}
+                </div>
+            </div>
+            {/* Dashboard de Endividamento Expositivo */}
+            <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
+                <div className="stat-card" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: 'white', border: 'none' }}>
+                    <div className="flex-1">
+                        <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', marginBottom: '0.5rem' }}>Exposição Total ao Crédito</p>
+                        <h3 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#ef4444' }}>R$ {formatCurrency(totalCreditDebt)}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '1rem' }}>
+                           <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ width: `${Math.min(100, overallLimitUsage)}%`, height: '100%', background: overallLimitUsage > 80 ? '#ef4444' : '#3b82f6' }}></div>
+                           </div>
+                           <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{overallLimitUsage.toFixed(1)}% do Limite</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="flex-1">
+                        <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Próximos Vencimentos</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {accounts.slice(0, 2).map(card => {
+                                const bal = accBalances[card.id] || 0;
+                                const used = bal < 0 ? Math.abs(bal) : 0;
+                                return (
+                                    <div key={card.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
+                                        <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{card.name} (Dia {card.dueDay})</span>
+                                        <span style={{ color: used > 0 ? 'var(--text-main)' : 'var(--success)', fontWeight: 700 }}>R$ {formatCurrency(used)}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+                <div className="stat-card" style={{ background: 'var(--primary)', color: 'white', border: 'none' }}>
+                    <div className="flex-1">
+                        <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', marginBottom: '0.5rem' }}>Eficiência de Caixa</p>
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 900 }}>Saudável</h3>
+                        <p style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.5rem' }}>Limite livre: R$ {formatCurrency(totalLimit - totalCreditDebt)}</p>
+                    </div>
+                    <CheckCircle size={32} style={{ opacity: 0.3 }} />
                 </div>
             </div>
 
@@ -368,10 +408,10 @@ export function CreditCards() {
                                     )}
                                 </div>
                                 <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
-                                    R$ {cardUsed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    R$ {formatCurrency(cardUsed)}
                                 </h3>
                                 <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
-                                    Limite: R$ {cardLimit.toLocaleString('pt-BR')} <span style={{ opacity: 0.5, margin: '0 4px' }}>|</span> Dia {card.dueDay || 10}
+                                    Limite: R$ {formatCurrency(cardLimit)} <span style={{ opacity: 0.5, margin: '0 4px' }}>|</span> Dia {card.dueDay || 10}
                                 </p>
                             </div>
                             <div className="stat-icon-wrapper" style={{ color: isActive ? 'var(--primary)' : 'var(--text-muted)', backgroundColor: isActive ? 'rgba(79, 70, 229, 0.1)' : 'transparent' }}>
@@ -459,32 +499,27 @@ export function CreditCards() {
                         </div>
 
                         {/* Fatura Value */}
-                        <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                                Total da Fatura ({statusText})
-                            </span>
-                            <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)', margin: '0.5rem 0', lineHeight: 1, textDecoration: invoicePaidTotal >= invoiceTotal && invoiceTotal > 0 ? 'line-through' : 'none' }}>
-                                R$ {invoiceTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                            </h2>
-                            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                                Vencimento dia {selectedCard.dueDay}
-                            </p>
+                             <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)', margin: '0.5rem 0', lineHeight: 1, textDecoration: isPaid && invoiceTotal > 0 ? 'line-through' : 'none' }}>
+                                 R$ {formatCurrency(invoiceTotal)}
+                             </h2>
+                             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                                 Vencimento dia {selectedCard.dueDay}
+                             </p>
 
-                            {invoiceBalance > 0 && selectedMonthOffset <= 0 && (
-                                <button 
-                                    className="btn btn-primary shadow-sm hover:-translate-y-0.5" 
-                                    style={{ marginTop: '1rem', borderRadius: '9999px', padding: '0.5rem 1.5rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s ease' }} 
-                                    onClick={() => openInvoicePayment()}
-                                >
-                                    <CheckCircle size={16} /> Pagar Fatura
-                                </button>
-                            )}
-                            {invoicePaidTotal >= invoiceTotal && invoiceTotal > 0 && (
-                                <p style={{ marginTop: '1rem', fontSize: '0.875rem', fontWeight: 700, color: 'var(--success)' }}>
-                                    ✨ Fatura Liquidada
-                                </p>
-                            )}
-                        </div>
+                             {invoiceBalance > 0 && selectedMonthOffset <= 0 && !isPaid && (
+                                 <button 
+                                     className="btn btn-primary shadow-sm hover:-translate-y-0.5" 
+                                     style={{ marginTop: '1rem', borderRadius: '9999px', padding: '0.5rem 1.5rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s ease' }} 
+                                     onClick={() => openInvoicePayment()}
+                                 >
+                                     <CheckCircle size={16} /> Pagar Fatura
+                                 </button>
+                             )}
+                             {isPaid && invoiceTotal > 0 && (
+                                 <p style={{ marginTop: '1rem', fontSize: '0.875rem', fontWeight: 700, color: 'var(--success)' }}>
+                                     ✨ Fatura Liquidada
+                                 </p>
+                             )}
 
                         {/* Donut Chart para Limite Global */}
                         <div style={{ marginTop: '1rem', position: 'relative', minHeight: '160px', width: '100%' }}>
@@ -512,23 +547,23 @@ export function CreditCards() {
                                     />
                                 </PieChart>
                             </ResponsiveContainer>
-                            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                                <span style={{ fontSize: '0.70rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{limit > 0 ? `${((used/limit)*100).toFixed(0)}% Usado` : 'Limite'}</span>
-                                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
-                                    R$ {limit.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                </span>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '0.5rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }}></div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Usado: R$ {used.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#e5e7eb', border: '1px solid #d1d5db' }}></div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Livre: R$ {available.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                            </div>
-                        </div>
+                             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                                 <span style={{ fontSize: '0.70rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{limit > 0 ? `${((used/limit)*100).toFixed(0)}% Usado` : 'Limite'}</span>
+                                 <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
+                                     R$ {formatCurrency(limit)}
+                                 </span>
+                             </div>
+                         </div>
+                         <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '0.5rem' }}>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }}></div>
+                                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Usado: R$ {formatCurrency(used)}</span>
+                             </div>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#e5e7eb', border: '1px solid #d1d5db' }}></div>
+                                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Livre: R$ {formatCurrency(available)}</span>
+                             </div>
+                         </div>
 
                     </div>
                 </div>
@@ -581,9 +616,9 @@ export function CreditCards() {
                                             </span>
                                         ) : '-'}
                                     </td>
-                                    <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>
-                                        {Number(trans.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </td>
+                                     <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>
+                                         R$ {formatCurrency(trans.amount)}
+                                     </td>
                                 </tr>
                             ))}
                             {currentInvoiceTrans.length === 0 && (
@@ -657,17 +692,17 @@ export function CreditCards() {
                         <form onSubmit={handlePayInvoice} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <div style={{ textAlign: 'center', background: 'var(--surface-hover)', padding: '16px', borderRadius: '12px' }}>
                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Valor a pagar</span>
-                                <h3 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', margin: '4px 0 0 0' }}>
-                                    R$ {invoiceBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </h3>
+                                 <h3 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', margin: '4px 0 0 0' }}>
+                                     R$ {formatCurrency(invoiceBalance)}
+                                 </h3>
                             </div>
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>De onde o dinheiro vai sair? <span style={{color: '#ef4444'}}>*</span></label>
                                 <select required style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} value={paymentAccId} onChange={e => setPaymentAccId(e.target.value)}>
                                     <option value="">Selecione uma conta...</option>
-                                    {allAccounts.filter(a => a.type !== 'credit').map(a => (
-                                        <option key={a.id} value={a.id}>{a.name} (Saldo: R$ {(accBalances[a.id] || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})})</option>
-                                    ))}
+                                     {allAccounts.filter(a => a.type !== 'credit').map(a => (
+                                         <option key={a.id} value={a.id}>{a.name} (Saldo: R$ {formatCurrency(accBalances[a.id] || 0)})</option>
+                                     ))}
                                 </select>
                             </div>
                             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>

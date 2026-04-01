@@ -1,39 +1,44 @@
-# Resumo e Plano de Ação: Upgrade do Motor de Cartões de Crédito (Atelier)
+# Plano de Ação Atualizado: Motor de Cartões de Crédito e Gestão de Contas a Pagar
 
-## Contexto
+## 1. Visão Geral
+Este documento atualiza o plano anterior para incluir as diretrizes de inovação em monitoramento de endividamento, agrupamento preciso por ciclo de fechamento e otimização da gestão de contas a pagar (Contas a Pagar) em todo o sistema financeiro.
 
-No final da última sessão, concordamos em reconstruir o sistema de gerenciamento de Cartões de Crédito para torná-lo um verdadeiro "Motor de Faturas" (estilo Nubank/Inter), abandonando a ideia de que um cartão é apenas uma conta corrente com saldo negativo.
+## 2. Inovações em Cartões de Crédito
 
-## O Que Foi Aprovado (A Proposta "Wow")
+### 2.1 Agrupamento por Ciclo de Fechamento (Inteligência Real)
+- **Problema:** Atualmente as despesas são agrupadas por mês civil. Cartões reais têm "Dia de Fechamento".
+- **Solução:** Implementar lógica onde:
+  - Se data da compra <= `diaFechamento`: Pertence à fatura do mês atual.
+  - Se data da compra > `diaFechamento`: Pertence à fatura do próximo mês.
+- **Visualização:** O carrossel de meses mostrará as faturas com base no vencimento, mas os itens dentro serão filtrados pelo ciclo de fechamento.
 
-1. **A Máquina de Parcelamentos:**
-   - Capacidade de lançar uma despesa e dividi-la em `X` parcelas.
-   - O sistema calculará automaticamente o valor de cada parcela (incluindo juros/sobretaxas) e injetará essas parcelas nos meses futuros.
-   - Tags visuais nas faturas (ex: "Compra Insumo (Parcela 1/10)").
+### 2.2 Monitoramento de Endividamento e Limites
+- **Painel de Exposição:** Criar um KPI consolidado de "Endividamento Total em Cartões".
+- **Alerta de Comprometimento:** Visualizar qual % da renda mensal está comprometida com faturas de cartões.
+- **Saúde do Limite:** Dashboard comparativo de Limite Utilizado vs. Limite Disponível em todos os cartões.
 
-2. **Gestor de Fatura (Time Travel):**
-   - Criação de um novo componente principal: `<CreditCardManagerModal />`.
-   - Um modal imersivo e tecnológico que abre ao clicar em um cartão de crédito na tabela de Finanças.
-   - Carrossel de meses no topo (ex: Jan [Paga] -> Fev [Fechada] -> Março [Aberta] -> Abril [Futura]).
-   - Capacidade de navegar pelos meses futuros para ver o comprometimento do limite com parcelas que ainda vão vencer.
+### 2.3 Gestão Eficiente de Faturas
+- **Fluxo de Pagamento:** Facilitar a conciliação ("Pagar Fatura") com seleção automática do saldo disponível em outras contas.
+- **Previsibilidade:** Projeção de faturas futuras considerando parcelamentos pendentes.
 
-3. **Status Inteligentes da Fatura:**
-   - 🟢 **Em Aberto:** Recebendo novas compras.
-   - 🔴 **Fechada:** Aguardando pagamento (dia do fechamento atingido).
-   - ⚪ **Paga:** Ação de conciliação onde o usuário informa de qual conta o dinheiro saiu para pagar a fatura, restaurando o limite.
+## 3. Otimização de Contas a Pagar (Global)
 
-4. **Limímetro Dinâmico:**
-   - A barra de progresso do cartão se tornará elástica e inteligente.
-   - Capacidade de reajustar o Limite Total do cartão (pois o banco muda o limite).
-   - O limite livre volta ao normal automaticamente assim que a fatura do mês é marcada como "Paga".
+### 3.1 Visão Unificada de Obrigações
+- **Agenda de Pagamentos:** Centralizar todos os lançamentos `pending` (pendentes) de todas as contas em uma linha do tempo única.
+- **Alertas de Vencimento:** Diferenciar visualmente contas Vencidas, Vencendo Hoje e Futuras.
+- **Integração com Cartões:** Tratar a fatura do cartão como uma "Conta a Pagar" gigante que precisa de atenção no dia do vencimento.
 
-## Próximos Passos Técnicos (Por Onde a Nova IA Deve Começar)
+### 3.2 Melhorias na Gestão
+- **Pagamento em Lote:** Permitir marcar múltiplas transações pendentes como pagas simultaneamente.
+- **Filtros Avançados:** Filtrar por fornecedor, categoria ou conta específica no módulo de contas a pagar.
 
-1. Analisar a estrutura de dados atual das transações (`transactions`) e contas (`accounts`) no `FinanceFinal.jsx`.
-2. Adicionar os campos na estrutura de dados de transações para suportar parcelamento (ex: `installments`, `currentInstallment`, `parentId`).
-3. Modificar o modal de "Novo Lançamento" (`NewTransactionModal.jsx`) para exibir opções de parcelamento quando o destino for um cartão de crédito.
-4. Criar o novo componente `CreditCardManagerModal.jsx`.
+## 4. Próximos Passos Técnicos
+
+1. **Refatorar Lógica de Ciclo (CreditCardManagerModal & CreditCards.jsx):** Mudar de filtragem por mês civil para filtragem por ciclo de `closeDay`.
+2. **Implementar Dashboard de Endividamento:** Adicionar KPIs de exposição ao crédito em `FinanceFinal.jsx`.
+3. **Módulo de Contas a Pagar Revisitado:** Criar ou aprimorar a aba de obrigações em aberto, integrando com o fluxo de caixa.
+4. **Utilização de Math.floor:** Garantir que toda a exibição monetária nestes novos painéis siga o padrão de 2 casas decimais arredondadas para baixo.
 
 ---
-
-**Instrução para a IA na próxima sessão:** Ao ler este arquivo, confirme com o usuário se ele deseja iniciar a Etapa 1 do "Plano de Upgrade de Cartões de Crédito" e comece a rascunhar as extensões de dados necessárias.
+*Assinado: Antigravity AI*
+*Status: CONCLUÍDO - Deploy realizado em 01/04/2026*

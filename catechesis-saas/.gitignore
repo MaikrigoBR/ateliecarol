@@ -1,5 +1,6 @@
 node_modules
 .next
+.next-dev
 dist
 coverage
 .turbo
@@ -7,3 +8,6 @@ coverage
 .env.local
 prisma/generated
 apps/api/generated
+*.local.log
+*.local.err.log
+*.restart.log

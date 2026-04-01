@@ -16,6 +16,7 @@ import { CreditCardManagerModal } from '../components/CreditCardManagerModal';
 import { FinanceTransactionDetailsModal } from '../components/FinanceTransactionDetailsModal';
 import { FinanceAIInsights, SimpleDRETable } from '../components/FinanceAIInsights';
 import { FinanceBatchEntryModal } from '../components/FinanceBatchEntryModal';
+import { formatCurrency, groupByInvoiceCycle } from '../utils/financeUtils';
 
 const EXPENSE_CATEGORIES = [
     'Administrativo / Fixos',
@@ -168,7 +169,7 @@ function FinancialOverviewChart({ data }) {
                          <div className="mt-2 pt-2 border-t border-gray-50 flex justify-between">
                              <span className="text-xs font-bold text-blue-600">Saldo</span>
                              <span className={`font-mono text-sm font-bold ${d.Saldo >= 0 ? 'text-blue-700' : 'text-red-600'}`}>
-                                 R${d.Saldo.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                 R$ {formatCurrency(d.Saldo)}
                              </span>
                          </div>
                     </div>
@@ -226,7 +227,7 @@ function FinancialOverviewChart({ data }) {
                             tickLine={false} 
                             tick={{fill: '#9ca3af', fontSize: 10}}
                             tickFormatter={(val) => 
-                                `R$ ${Math.abs(val) > 999 ? (val/1000).toLocaleString('pt-BR') + 'k' : val.toLocaleString('pt-BR')}`
+                                `R$ ${Math.abs(val) > 999 ? formatCurrency(val/1000) + 'k' : formatCurrency(val)}`
                             }
                             width={65}
                             domain={[-maxVal, maxVal]}
@@ -288,7 +289,8 @@ function FinancialOverviewChart({ data }) {
 // --- Main Page ---
 
 export function FinanceFinal() {
-    const { currentUser } = useAuth();
+    const { user } = useAuth();
+    const [selectedTransIds, setSelectedTransIds] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [orders, setOrders] = useState([]); // For projections
@@ -601,7 +603,7 @@ export function FinanceFinal() {
                     `ALERTA DE DUPLICIDADE (MÚLTIPLOS ACESSOS)\n\n` +
                     `O sistema identificou que este exato lançamento acabou de ser criado (provavelmente em outro terminal ou aba desatualizada):\n` +
                     `- Descrição: ${newTrans.description}\n` +
-                    `- Valor: R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+                    `- Valor: R$ ${formatCurrency(amount)}\n` +
                     `- Data: ${newTrans.date.split('-').reverse().join('/')}\n\n` +
                     `Isso irá corromper seu caixa se for uma repetição inadvertida.\n\n` +
                     `Deseja realmente ignorar a trava e criar esse LANÇAMENTO DUPLICADO? Se sim, clique OK.`
@@ -690,19 +692,55 @@ export function FinanceFinal() {
     };
 
     const handleConfirmPayment = async (t) => {
-        if(confirm(`Confirmar que o valor de R$ ${Number(t.amount).toLocaleString('pt-BR', {minimumFractionDigits:2})} foi efetivamente ${t.type === 'income' ? 'creditado' : 'debitado'}?`)) {
+        if(confirm(`Confirmar que o valor de R$ ${formatCurrency(t.amount)} foi efetivamente ${t.type === 'income' ? 'creditado' : 'debitado'}?`)) {
             await db.update('transactions', t.id, { ...t, status: 'paid' });
             fetchData();
         }
     };
 
+    const handleBulkPay = async () => {
+        if (selectedTransIds.length === 0) return;
+        if (confirm(`Deseja marcar ${selectedTransIds.length} lançamentos como PAGOS simultaneamente?`)) {
+            const promises = selectedTransIds.map(id => {
+                const item = transactions.find(t => t.id === id);
+                if (item && item.status !== 'paid') {
+                    return db.update('transactions', id, { ...item, status: 'paid' });
+                }
+                return null;
+            }).filter(Boolean);
+            
+            await Promise.all(promises);
+            setSelectedTransIds([]);
+            fetchData();
+            alert('Ação em lote concluída com sucesso!');
+        }
+    };
+
+
+    const accBalances = React.useMemo(() => {
+        const balances = {};
+        accounts.forEach(a => {
+            balances[a.id] = Number(a.initialBalance || 0);
+        });
+        transactions.forEach(t => {
+            if (t.status === 'paid') {
+                const amt = Number(t.amount || 0);
+                if (t.type === 'income') {
+                    balances[t.accountId] = (balances[t.accountId] || 0) + amt;
+                } else {
+                    balances[t.accountId] = (balances[t.accountId] || 0) - amt;
+                }
+            }
+        });
+        return balances;
+    }, [transactions, accounts]);
 
     const transactionsWithBalance = React.useMemo(() => {
         if (!accounts || accounts.length === 0) return transactions;
         
-        const accBalances = {};
+        const tempBalances = {};
         accounts.forEach(a => {
-            accBalances[a.id] = Number(a.initialBalance || 0);
+            tempBalances[a.id] = Number(a.initialBalance || 0);
         });
 
         const sortedTrans = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -711,14 +749,14 @@ export function FinanceFinal() {
             if (t.status === 'paid') {
                 const amt = Number(t.amount || 0);
                 if (t.type === 'income') {
-                    accBalances[t.accountId] = (accBalances[t.accountId] || 0) + amt;
+                    tempBalances[t.accountId] = (tempBalances[t.accountId] || 0) + amt;
                 } else {
-                    accBalances[t.accountId] = (accBalances[t.accountId] || 0) - amt;
+                    tempBalances[t.accountId] = (tempBalances[t.accountId] || 0) - amt;
                 }
             }
             return {
                 ...t,
-                runningBalance: accBalances[t.accountId] || 0
+                runningBalance: tempBalances[t.accountId] || 0
             };
         });
 
@@ -786,31 +824,63 @@ export function FinanceFinal() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px', marginBottom: '32px' }}>
                 <SciFiStatCard 
                     title={globalAccFilter ? "Saldo da Conta" : "Saldo Consolidado"} 
-                    value={`${stats.totalBalance < 0 ? '-' : ''}R$ ${Math.abs(stats.totalBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                    value={`${stats.totalBalance < 0 ? '-' : ''}R$ ${formatCurrency(Math.abs(stats.totalBalance))}`} 
                     icon={Landmark} 
                     color={stats.totalBalance < 0 ? 'red' : 'blue'}
                     subtext={globalAccFilter ? "Atualizado para esta conta" : "Balanço líquido total em caixa"}
                 />
+            </div>
+            
+            {/* Accounts Payable Unified View */}
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up">
+                <div className="stat-card" style={{ background: '#fef2f2', border: '1px solid #fee2e2' }}>
+                    <div className="flex-1">
+                        <p style={{ fontSize: '0.7rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase' }}>Contas a Pagar (30 dias)</p>
+                        <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ef4444', margin: '4px 0' }}>
+                            R$ {formatCurrency(transactions.filter(t => t.type === 'expense' && t.status !== 'paid' && t.date <= new Date(Date.now() + 30*86400000).toISOString()).reduce((s, t) => s + Number(t.amount), 0))}
+                        </h4>
+                    </div>
+                    <div style={{ color: '#ef4444' }}><ListOrdered size={24} /></div>
+                </div>
+
+                <div className="stat-card" style={{ background: '#f5f3ff', border: '1px solid #ede9fe' }}>
+                    <div className="flex-1">
+                        <p style={{ fontSize: '0.7rem', fontWeight: 800, color: '#5b21b6', textTransform: 'uppercase' }}>Faturas Cartão em Aberto</p>
+                        <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#8b5cf6', margin: '4px 0' }}>
+                             R$ {formatCurrency(accounts.filter(a => a.type === 'credit').reduce((sum, card) => {
+                                 const groups = groupByInvoiceCycle(transactions, card);
+                                 const currentKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+                                 const currentGroup = groups.find(g => g.key === currentKey);
+                                 return sum + (currentGroup ? currentGroup.total : 0);
+                             }, 0))}
+                        </h4>
+                    </div>
+                    <div style={{ color: '#8b5cf6' }}><CreditCard size={24} /></div>
+                </div>
+
                 <SciFiStatCard 
-                    title="Faturamento Bruto (Mês)" 
-                    value={`R$ ${(stats.monthIncome + (stats.gatewayTaxes||0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-                    icon={TrendingUp} 
-                    color="emerald"
-                    subtext="Todo o valor que entrou"
-                />
-                <SciFiStatCard 
-                    title="Despesas Operacionais" 
-                    value={`R$ ${stats.monthExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-                    icon={TrendingDown} 
-                    color="red"
-                    subtext="Saídas (Exclui taxas gateway)"
-                />
-                 <SciFiStatCard 
-                    title="Lucro Líquido Real" 
-                    value={`R$ ${(stats.result).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                    title="Previsibilidade Total" 
+                    value={`R$ ${formatCurrency(stats.result)}`} 
                     icon={Zap} 
                     color={(stats.result) >= 0 ? "purple" : "red"}
                     subtext={`Vendas - Despesas = Seu Bolso`}
+                />
+            </div>
+
+            <div className="dashboard-grid mb-6">
+                <SciFiStatCard 
+                    title="Faturamento Bruto" 
+                    value={`R$ ${formatCurrency(stats.monthIncome)}`} 
+                    icon={TrendingUp} 
+                    color="emerald"
+                    subtext="Consolidado (Entradas)"
+                />
+                <SciFiStatCard 
+                    title="Despesas Operacionais" 
+                    value={`R$ ${formatCurrency(stats.monthExpense)}`} 
+                    icon={TrendingDown} 
+                    color="red"
+                    subtext="Saídas (Exclui taxas gateway)"
                 />
             </div>
 
@@ -832,7 +902,7 @@ export function FinanceFinal() {
                             </div>
                             <div style={{ textAlign: 'right' }}>
                                 <div style={{ fontSize: '0.8rem', color: '#c2410c', textTransform: 'uppercase', fontWeight: 700 }}>Valor Bloqueado</div>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ea580c' }}>R$ {totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ea580c' }}>R$ {formatCurrency(totalPending)}</div>
                             </div>
                         </div>
                     );
@@ -894,7 +964,7 @@ export function FinanceFinal() {
                                                 ))}
                                             </Pie>
                                             <Tooltip 
-                                                formatter={(value) => `R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
+                                                formatter={(value) => `R$ ${formatCurrency(value)}`}
                                                 contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                                             />
                                         </PieChart>
@@ -906,7 +976,7 @@ export function FinanceFinal() {
                                                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color, boxShadow: `0 0 8px ${d.color}90` }}></div>
                                                     <span style={{ color: 'var(--text-main)', fontWeight: 600 }} className="truncate max-w-[140px]">{d.name}</span>
                                                 </div>
-                                                <span className="font-bold" style={{ color: 'var(--text-main)' }}>R$ {d.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                                <span className="font-bold" style={{ color: 'var(--text-main)' }}>R$ {formatCurrency(d.value)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -972,7 +1042,7 @@ export function FinanceFinal() {
                                                     </td>
                                                     <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
                                                         <span className={`text-[1.1rem] font-bold ${balance < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                            {balance < 0 ? '-' : ''}R$ {Math.abs(balance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                            {balance < 0 ? '-' : ''}R$ {formatCurrency(Math.abs(balance))}
                                                         </span>
                                                     </td>
                                                     <td style={{ padding: '1rem 1.5rem' }}>
@@ -1015,13 +1085,18 @@ export function FinanceFinal() {
                                         </tr>
                                     ) : (
                                         accounts.filter(a => a.type === 'credit').map(acc => {
-                                            const balance = Number(acc.balance || 0);
                                             const limit = Number(acc.limit || 0);
-                                            const debt = balance < 0 ? -balance : 0;
+                                            const groups = groupByInvoiceCycle(transactions, acc);
+                                            const currentKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+                                            const currentGroup = groups.find(g => g.key === currentKey) || { transactions: [], total: 0 };
+                                            
+                                            // Calcula o endividamento total real do cartão
+                                            const cardBal = accBalances[acc.id] || 0;
+                                            const debt = cardBal < 0 ? -cardBal : 0;
                                             const percent = limit > 0 ? (debt / limit) * 100 : 0;
+                                            
                                             const dueDay = acc.dueDay || 10;
-                                            let bestDay = dueDay - 7;
-                                            if (bestDay <= 0) bestDay += 30; // Approximation for best day
+                                            const closeDay = acc.closeDay || (dueDay - 7 <= 0 ? 30 + (dueDay - 7) : dueDay - 7);
 
                                             return (
                                                 <tr key={acc.id} onClick={() => setSelectedCreditCard(acc)} className="group transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/20 border-t cursor-pointer" style={{ borderColor: 'var(--border)' }}>
@@ -1036,8 +1111,8 @@ export function FinanceFinal() {
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
-                                                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 font-bold text-xs shadow-sm border border-emerald-100" title={`Melhor dia para compra: dia ${bestDay}`}>
-                                                            {bestDay}
+                                                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 font-bold text-xs shadow-sm border border-emerald-100" title={`Melhor dia para compra: dia ${closeDay}`}>
+                                                            {closeDay}
                                                         </span>
                                                     </td>
                                                     <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
@@ -1049,7 +1124,7 @@ export function FinanceFinal() {
                                                         <div className="flex flex-col gap-1.5 w-full">
                                                             <div className="flex justify-between text-[11px] text-gray-500 font-medium">
                                                                 <span>{percent.toFixed(1)}% Usado</span>
-                                                                <span className="font-bold text-gray-400">Livre: R$ {Math.max(0, limit - debt).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                                <span className="font-bold text-gray-400">Livre: R$ {formatCurrency(Math.max(0, limit - debt))}</span>
                                                             </div>
                                                             <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden" style={{ backgroundColor: 'var(--surface-hover)' }}>
                                                                 <div 
@@ -1061,7 +1136,7 @@ export function FinanceFinal() {
                                                     </td>
                                                     <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
                                                         <span className="text-[1.1rem] font-bold text-purple-600 tracking-tight">
-                                                            R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                            R$ {formatCurrency(currentGroup.total)}
                                                         </span>
                                                     </td>
                                                     <td style={{ padding: '1rem 1.5rem' }}>
@@ -1125,10 +1200,59 @@ export function FinanceFinal() {
                      />
                 </div>
             </div>
+
+            {/* Bulk Actions Floating Bar */}
+            {selectedTransIds.length > 0 && (
+                <div style={{ 
+                    position: 'sticky', top: '1rem', zIndex: 50, marginBottom: '1rem',
+                    background: 'linear-gradient(90deg, #1e293b 0%, #334155 100%)', 
+                    color: 'white', padding: '0.75rem 1.5rem', borderRadius: '12px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.4)'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: 800 }}>
+                            {selectedTransIds.length} Selecionados
+                        </div>
+                        <span style={{ fontSize: '0.875rem', opacity: 0.8 }}>Ações disponíveis:</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button 
+                            onClick={handleBulkPay}
+                            style={{ 
+                                background: '#10b981', color: 'white', border: 'none', 
+                                padding: '6px 16px', borderRadius: '8px', fontWeight: 700, 
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                            }}
+                        >
+                            <CheckCircle size={16} /> Marcar como Pago
+                        </button>
+                        <button 
+                            onClick={() => setSelectedTransIds([])}
+                            style={{ 
+                                background: 'transparent', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.2)', 
+                                padding: '6px 12px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer'
+                            }}
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            )}
             <div className="table-container">
             <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                     <tr style={{ background: 'var(--surface-hover)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'center', width: '50px' }}>
+                            <input 
+                                type="checkbox" 
+                                checked={selectedTransIds.length > 0 && selectedTransIds.length === transactionsWithBalance.length}
+                                onChange={(e) => {
+                                    if (e.target.checked) setSelectedTransIds(transactionsWithBalance.map(t => t.id));
+                                    else setSelectedTransIds([]);
+                                }}
+                            />
+                        </th>
                         <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontWeight: 800 }}>Data</th>
                         <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontWeight: 800 }}>Descrição original</th>
                         <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontWeight: 800 }}>Centro de Custo</th>
@@ -1162,10 +1286,23 @@ export function FinanceFinal() {
                         })
                         .slice(0, visibleTransactionsLimit)
                         .map(t => {
-                        const acc = accounts.find(a => a.id === t.accountId);
-                        const isExpense = t.type === 'expense';
+                            const acc = accounts.find(a => a.id === t.accountId);
+                            const isExpense = t.type === 'expense';
+                            const isOverdue = t.status === 'pending' && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
+                            const isToday = t.status === 'pending' && new Date(t.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+
                         return (
                             <tr key={t.id} onClick={() => setSelectedDetailTrans(t)} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group">
+                                <td style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedTransIds.includes(t.id)} 
+                                        onChange={() => {
+                                            if (selectedTransIds.includes(t.id)) setSelectedTransIds(selectedTransIds.filter(id => id !== t.id));
+                                            else setSelectedTransIds([...selectedTransIds, t.id]);
+                                        }}
+                                    />
+                                </td>
                                 <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
                                     <div className="flex items-center gap-2">
                                         <Calendar size={14} className="opacity-50" />
@@ -1177,7 +1314,9 @@ export function FinanceFinal() {
                                         {t.orderId ? <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" title="Pedido Automático"></div> : (t.referenceId ? <Hammer size={12} color="#f59e0b" title="Módulo Derivado" /> : null)}
                                         {t.description}
                                         {t.installmentsTotal > 1 && <span style={{ marginLeft: '6px', fontSize: '9px', color: '#4f46e5', backgroundColor: '#e0e7ff', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{t.installmentNumber}/{t.installmentsTotal}</span>}
-                                        {t.status !== 'paid' && <span style={{ marginLeft: '6px', fontSize: '9px', color: '#b45309', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>PENDENTE</span>}
+                                        {isOverdue && <span style={{ marginLeft: '6px', fontSize: '9px', color: 'white', backgroundColor: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>VENCIDO</span>}
+                                        {isToday && <span style={{ marginLeft: '6px', fontSize: '9px', color: 'white', backgroundColor: '#f59e0b', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>VENCE HOJE</span>}
+                                        {t.status === 'pending' && !isOverdue && !isToday && <span style={{ marginLeft: '6px', fontSize: '9px', color: '#b45309', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>PENDENTE</span>}
                                     </div>
                                 </td>
                                 <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -1197,11 +1336,11 @@ export function FinanceFinal() {
                                     {acc?.name || (!t.accountId ? 'A Definir' : 'Excluída')}
                                 </td>
                                 <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right', fontWeight: 800, color: isExpense ? '#ef4444' : '#10b981', fontSize: '1rem' }}>
-                                    {isExpense ? '-' : '+'} R$ {Number(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    {isExpense ? '-' : '+'} R$ {formatCurrency(t.amount)}
                                 </td>
                                 <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right', fontWeight: 700, color: t.runningBalance < 0 ? '#ef4444' : (globalAccFilter ? 'var(--text-main)' : 'var(--text-muted)'), fontSize: '0.95rem' }}>
                                     {globalAccFilter ? (
-                                        <>{t.runningBalance < 0 ? '-' : ''}R$ {Math.abs(t.runningBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
+                                        <>{t.runningBalance < 0 ? '-' : ''}R$ {formatCurrency(Math.abs(t.runningBalance))}</>
                                     ) : (
                                         <span title="Filtre uma conta específica para visualizar o extrato progressivo" style={{ opacity: 0.3 }}>-</span>
                                     )}
@@ -1416,7 +1555,7 @@ export function FinanceFinal() {
                                                     </label>
                                                     <select className="form-input w-full bg-white dark:bg-gray-800 border-purple-200 focus:border-purple-500 focus:ring-purple-500" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})}>
                                                         {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                                                            <option key={n} value={n}>{n === 1 ? '1x (À vista na próxima fatura)' : `${n}x de R$ ${(Number(newTrans.amount || 0)/n).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}</option>
+                                                            <option key={n} value={n}>{n === 1 ? '1x (À vista na próxima fatura)' : `${n}x de R$ ${formatCurrency(Number(newTrans.amount || 0)/n)}`}</option>
                                                         ))}
                                                     </select>
                                                     <div className="text-[11px] text-purple-600/70 dark:text-purple-300/70 mt-3 flex items-start gap-1">

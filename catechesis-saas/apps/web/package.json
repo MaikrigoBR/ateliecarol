@@ -6,7 +6,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "lint": "next lint",
+    "lint": "eslint .",
     "start": "next start",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -17,5 +17,9 @@
     "next": "^15.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.25.1",
+    "eslint-config-next": "^15.3.0"
   }
 }

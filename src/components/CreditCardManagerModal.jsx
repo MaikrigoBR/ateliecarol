@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, ChevronLeft, ChevronRight, CheckCircle, CreditCard, Calendar, TrendingDown } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import db from '../services/database';
+import { formatCurrency, groupByInvoiceCycle } from '../utils/financeUtils';
 
 export function CreditCardManagerModal({ account, accounts = [], transactions, isOpen, onClose, onUpdate, onEditTrans }) {
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -10,29 +11,7 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
     
     // Derived states
     const invoices = useMemo(() => {
-        if (!account || !transactions) return [];
-        
-        const ccTrans = transactions.filter(t => t.accountId === account.id);
-        
-        let groups = {};
-        ccTrans.forEach(t => {
-            const d = new Date(t.date);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            if (!groups[key]) {
-                groups[key] = {
-                    key,
-                    year: d.getFullYear(),
-                    month: d.getMonth(),
-                    transactions: [],
-                    total: 0
-                };
-            }
-            groups[key].transactions.push(t);
-            if (t.type === 'expense') groups[key].total += Number(t.amount);
-            else groups[key].total -= Number(t.amount); 
-        });
-        
-        return Object.values(groups).sort((a,b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+        return groupByInvoiceCycle(transactions, account);
     }, [account, transactions]);
 
     const handlePrevMonth = () => {
@@ -180,11 +159,11 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
                             <div style={{ marginTop: '24px', display: 'flex', gap: '32px' }}>
                                 <div>
                                     <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '4px' }}>Limite Total</p>
-                                    <p style={{ fontWeight: 600, fontSize: '1.125rem', textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>R$ {limit.toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
+                                    <p style={{ fontWeight: 600, fontSize: '1.125rem', textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>R$ {formatCurrency(limit)}</p>
                                 </div>
                                 <div>
                                     <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '4px' }}>Limite Disponível</p>
-                                    <p style={{ fontWeight: 900, fontSize: '1.25rem', color: '#6ee7b7', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>R$ {availableLimit.toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
+                                    <p style={{ fontWeight: 900, fontSize: '1.25rem', color: '#6ee7b7', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>R$ {formatCurrency(availableLimit)}</p>
                                 </div>
                             </div>
                         </div>
@@ -249,7 +228,7 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
                     <div>
                         <p style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Valor da Fatura</p>
                         <h3 style={{ fontSize: '1.875rem', fontWeight: 800, letterSpacing: '-0.025em', color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            R$ {currentInvoice.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {formatCurrency(currentInvoice.total)}
                         </h3>
                     </div>
                     <div>
@@ -302,7 +281,7 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#334155', margin: 0 }}>
-                                            R$ {Number(t.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                            R$ {formatCurrency(t.amount)}
                                         </p>
                                     </div>
                                 </div>
@@ -327,7 +306,7 @@ export function CreditCardManagerModal({ account, accounts = [], transactions, i
                                     <option value="">Selecione de onde sairá o dinheiro...</option>
                                     {accounts.filter(a => a.type !== 'credit').map(a => (
                                         <option key={a.id} value={a.id}>
-                                            {a.name} • Saldo: R$ {Number(a.balance || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                            {a.name} • Saldo: R$ {formatCurrency(a.balance || 0)}
                                         </option>
                                     ))}
                                 </select>

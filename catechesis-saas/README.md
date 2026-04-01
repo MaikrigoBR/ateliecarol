@@ -72,11 +72,25 @@ Ou pelo npm:
 npm run dev:local
 ```
 
+Para encerrar rapidamente o frontend e a API locais no Windows:
+
+```bash
+stop-local-test.cmd
+```
+
 Depois abra:
 
 - `http://localhost:3000/local-test`
 - `http://localhost:3000/tenant/emmaus`
 - `http://localhost:4000/api/health`
+
+## Testes automatizados
+
+Para rodar os smoke tests atuais:
+
+```bash
+npm run test
+```
 
 ## Rotas demonstrativas
 

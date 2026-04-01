@@ -12,6 +12,11 @@ start "Catechesis SaaS API" cmd /k "cd /d %ROOT% && npm run dev:api"
 
 timeout /t 2 /nobreak >nul
 
+if exist "%ROOT%apps\web\.next-dev" (
+  echo Limpando cache local do frontend...
+  rmdir /s /q "%ROOT%apps\web\.next-dev"
+)
+
 echo Iniciando Web em http://localhost:3000
 start "Catechesis SaaS Web" cmd /k "cd /d %ROOT% && npm run dev:web"
 
