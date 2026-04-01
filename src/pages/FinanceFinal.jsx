@@ -8,7 +8,7 @@ import {
 import db from '../services/database';
 import { useAuth } from '../contexts/AuthContext';
 import { 
-    ComposedChart, Bar, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie
+    ComposedChart, Bar, Line, Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie
 } from 'recharts';
 import '../css/pages.css';
 import { calculateFinancialStats } from '../components/FinanceHelpers';
