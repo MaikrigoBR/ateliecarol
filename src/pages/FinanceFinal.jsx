@@ -1115,138 +1115,131 @@ export function FinanceFinal() {
                         </div>
                     </div>
 
-                    {/* Credit Cards */}
-                    <div className="flex flex-col gap-3 mt-4">
-                        <h4 className="text-[0.8rem] font-bold text-gray-500 tracking-wide pl-1">Cartões de Crédito</h4>
+                    {/* Credit Cards - Premium Modern UI */}
+                    <div className="flex flex-col gap-4 mt-8">
+                        <div className="flex items-center gap-3 mb-2 px-1">
+                            <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-purple-500/20 text-white">
+                                <CreditCard size={20} />
+                            </div>
+                            <div>
+                                <h4 className="text-[1rem] font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none">Inteligência de Cartões</h4>
+                                <p className="text-[0.7rem] font-bold text-slate-400 uppercase tracking-widest mt-1">Limite, Ciclos e Faturas</p>
+                            </div>
+                        </div>
                         
-                        <div className="table-container border rounded-xl overflow-hidden mt-1 shadow-sm" style={{ borderColor: 'var(--border)' }}>
-                            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'var(--surface)' }}>
-                                <thead>
-                                    <tr style={{ background: 'var(--surface-hover)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', fontWeight: 'bold' }}>Cartão</th>
-                                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'center', width: '90px', fontWeight: 'bold' }}>Fechamento</th>
-                                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'center', width: '90px', fontWeight: 'bold' }}>Venc.</th>
-                                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', width: '25%', fontWeight: 'bold' }}>Comprometimento</th>
-                                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right', fontWeight: 'bold' }}>Fatura Atual</th>
-                                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'center', width: '100px', fontWeight: 'bold' }}>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {accounts.filter(a => a.type === 'credit').length === 0 ? (
-                                        <tr>
-                                            <td colSpan="6" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.875rem' }}>
-                                                Nenhum cartão cadastrado.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        accounts.filter(a => a.type === 'credit').map(acc => {
-                                            const limit = Number(acc.limit || 0);
-                                            const groups = groupByInvoiceCycle(transactions, acc);
-                                            
-                                            // Get the most relevant invoices (Current, Next, and Last)
-                                            const now = new Date();
-                                            const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-                                            const nextMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
-                                            const nextKey = `${nextMonth.getUTCFullYear()}-${String(nextMonth.getUTCMonth() + 1).padStart(2, '0')}`;
-                                            
-                                            const currentGroup = groups.find(g => g.key === currentKey) || { transactions: [], total: 0 };
-                                            const nextGroup = groups.find(g => g.key === nextKey) || { transactions: [], total: 0 };
-                                            
-                                            // Calcula o endividamento total real do cartão
-                                            const debt = filteredTrans.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s + Number(t.amount || 0), 0) -
-                                                         filteredTrans.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s + Number(t.amount || 0), 0);
-                                            const percent = limit > 0 ? (debt / limit) * 100 : 0;
-                                            
-                                            const dueDay = acc.dueDay || 10;
-                                            const closeDay = acc.closeDay || (dueDay - 7 <= 0 ? 30 + (dueDay - 7) : dueDay - 7);
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            {accounts.filter(a => a.type === 'credit').length === 0 ? (
+                                <div className="col-span-full p-12 rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50/50 dark:bg-slate-800/20 dark:border-slate-700 flex flex-col items-center justify-center gap-4 group">
+                                    <div className="p-5 rounded-full bg-white dark:bg-slate-800 shadow-xl group-hover:scale-110 transition-transform duration-500">
+                                        <CreditCard size={32} className="text-slate-300" />
+                                    </div>
+                                    <div className="text-center">
+                                        <span className="block text-slate-500 dark:text-slate-400 font-black text-lg tracking-tight">Nenhum cartão cadastrado</span>
+                                        <p className="text-slate-400 text-sm font-medium">Cadastre seus cartões para gerenciar ciclos de fatura</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            setEditAccId(null);
+                                            setNewAccount({ name: '', type: 'credit', balance: 0, limit: 0, dueDay: 10, closeDay: 3, color: '#8b5cf6' });
+                                            setIsAccModalOpen(true);
+                                        }}
+                                        className="mt-2 btn btn-primary btn-sm rounded-xl px-6"
+                                    >
+                                        Adicionar Primeiro Cartão
+                                    </button>
+                                </div>
+                            ) : (
+                                accounts.filter(a => a.type === 'credit').map(acc => {
+                                    const limit = Number(acc.limit || 0);
+                                    const groups = groupByInvoiceCycle(transactions, acc);
+                                    
+                                    const now = new Date();
+                                    const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+                                    const nextMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+                                    const nextKey = `${nextMonth.getUTCFullYear()}-${String(nextMonth.getUTCMonth() + 1).padStart(2, '0')}`;
+                                    
+                                    const currentGroup = groups.find(g => g.key === currentKey) || { transactions: [], total: 0 };
+                                    const nextGroup = groups.find(g => g.key === nextKey) || { transactions: [], total: 0 };
+                                    
+                                    const debt = filteredTrans.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s + Number(t.amount || 0), 0) -
+                                                 filteredTrans.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s + Number(t.amount || 0), 0);
+                                    const percent = limit > 0 ? (debt / limit) * 100 : 0;
+                                    
+                                    const dueDay = acc.dueDay || 10;
+                                    const closeDay = acc.closeDay || (dueDay - 7 <= 0 ? 30 + (dueDay - 7) : dueDay - 7);
 
-                                            return (
-                                                <React.Fragment key={acc.id}>
-                                                    <tr onClick={() => setSelectedCreditCard(acc)} className="group transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/20 border-t cursor-pointer" style={{ borderColor: 'var(--border)' }}>
-                                                        <td style={{ padding: '1rem 1.5rem' }}>
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 text-purple-600 shrink-0">
-                                                                    <CreditCard size={18} />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[0.95rem] font-bold text-gray-800" style={{ color: 'var(--text-main)' }}>{acc.name}</span>
-                                                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Clique para Ver Faturas</span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
-                                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 font-bold text-xs shadow-sm border border-emerald-100" title={`Melhor dia para compra: dia ${closeDay}`}>
-                                                                {closeDay}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
-                                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-red-50 text-red-600 font-bold text-xs shadow-sm border border-red-100" title={`Vencimento da fatura: dia ${dueDay}`}>
-                                                                {dueDay}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.5rem' }}>
-                                                            <div className="flex flex-col gap-1.5 w-full">
-                                                                <div className="flex justify-between text-[11px] text-gray-500 font-medium">
-                                                                    <span>{percent.toFixed(1)}% Usado</span>
-                                                                    <span className="font-bold text-gray-400">Livre: R$ {formatCurrency(Math.max(0, limit - debt))}</span>
-                                                                </div>
-                                                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden" style={{ backgroundColor: 'var(--surface-hover)' }}>
-                                                                    <div 
-                                                                        className={`h-full rounded-full transition-all duration-500 ${percent > 90 ? 'bg-red-500' : (percent > 70 ? 'bg-orange-400' : 'bg-purple-500')}`}
-                                                                        style={{ width: `${Math.min(100, percent)}%` }}
-                                                                    ></div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
-                                                            <div className="flex flex-col items-end">
-                                                                <span className="text-[1.1rem] font-bold text-purple-600 tracking-tight">
-                                                                    R$ {formatCurrency(currentGroup.total)}
-                                                                </span>
-                                                                <span className="text-[9px] text-gray-400 font-bold uppercase">Fatura {currentKey.split('-')[1]}/{currentKey.split('-')[0]}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td style={{ padding: '1rem 1.5rem' }}>
-                                                            <div className="flex flex-row items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button onClick={(e) => { e.stopPropagation(); openEditAccount(acc); }} className="p-2 bg-white outline outline-1 outline-gray-200 dark:bg-gray-800 dark:outline-gray-700 rounded-lg text-gray-400 hover:text-blue-500 transition-colors shadow-sm flex justify-center" title="Editar Conta"><Edit2 size={16} /></button>
-                                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteAccount(acc.id); }} className="p-2 bg-white outline outline-1 outline-gray-200 dark:bg-gray-800 dark:outline-gray-700 rounded-lg text-gray-400 hover:text-red-500 transition-colors shadow-sm flex justify-center" title="Excluir Conta"><Trash2 size={16} /></button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    {/* Invoice Blocks Preview (Accrual Context) */}
-                                                    <tr style={{ borderBottom: 'none' }}>
-                                                        <td colSpan="6" style={{ padding: '0 1.5rem 1rem 1.5rem' }}>
-                                                            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                                                                <div className="p-3 rounded-lg border border-purple-100 bg-purple-50/30 flex flex-col min-w-[140px]">
-                                                                    <span className="text-[10px] text-gray-400 font-bold uppercase mb-1">Mês Atual</span>
-                                                                    <span className="text-[14px] font-bold text-purple-700">R$ {formatCurrency(currentGroup.total)}</span>
-                                                                    <span className="text-[9px] text-purple-400 font-medium">Competência {currentKey}</span>
-                                                                </div>
-                                                                <div className="p-3 rounded-lg border border-gray-100 bg-gray-50/30 flex flex-col min-w-[140px]">
-                                                                    <span className="text-[10px] text-gray-400 font-bold uppercase mb-1">Próxima Fatura</span>
-                                                                    <span className="text-[14px] font-bold text-gray-600">R$ {formatCurrency(nextGroup.total)}</span>
-                                                                    <span className="text-[9px] text-gray-400 font-medium">Competência {nextKey}</span>
-                                                                </div>
-                                                                {groups.filter(g => g.key !== currentKey && g.key !== nextKey).slice(0, 2).map(g => (
-                                                                    <div key={g.key} className="p-3 rounded-lg border border-dashed border-gray-200 bg-transparent flex flex-col min-w-[140px]">
-                                                                        <span className="text-[10px] text-gray-400 font-bold uppercase mb-1">Fatura {g.key}</span>
-                                                                        <span className="text-[14px] font-bold text-gray-400">R$ {formatCurrency(g.total)}</span>
-                                                                        <span className="text-[9px] text-gray-300 font-medium">Outro Ciclo</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </React.Fragment>
-                                            )
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
+                                    return (
+                                        <div 
+                                            key={acc.id} 
+                                            onClick={() => setSelectedCreditCard(acc)}
+                                            className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-all duration-300 cursor-pointer flex flex-col md:flex-row md:items-center p-6 gap-6 shadow-sm hover:shadow-xl"
+                                        >
+                                            {/* Bank/Card Identity */}
+                                            <div className="flex items-center gap-4 min-w-[240px]">
+                                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-700 text-white shadow-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                                    <CreditCard size={28} />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <h5 className="text-[1.15rem] font-black text-slate-800 dark:text-white leading-tight">{acc.name}</h5>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[9px] uppercase border border-emerald-200 dark:border-emerald-500/20">Fech: {String(closeDay).padStart(2, '0')}</span>
+                                                        <span className="px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-[9px] uppercase border border-rose-200 dark:border-rose-500/20">Venc: {String(dueDay).padStart(2, '0')}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Limit Progress Bar - Center */}
+                                            <div className="flex-1 flex flex-col gap-2 min-w-[200px]">
+                                                <div className="flex justify-between items-end mb-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">Uso do Limite</span>
+                                                        <span className={`text-[0.9rem] font-black ${percent > 90 ? 'text-rose-500' : 'text-indigo-500'}`}>{percent.toFixed(1)}%</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest mr-2">Disponível:</span>
+                                                        <span className="text-[0.85rem] font-black text-emerald-500 border-b border-emerald-500/30">R$ {formatCurrency(Math.max(0, limit - debt))}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-200 dark:border-slate-700/50 p-0.5">
+                                                    <div 
+                                                        className={`h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(0,0,0,0.1)] ${percent > 90 ? 'bg-gradient-to-r from-rose-500 to-red-600' : 'bg-gradient-to-r from-indigo-500 to-purple-600'}`}
+                                                        style={{ width: `${Math.min(100, percent)}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+
+                                            {/* Invoices Summary - Right */}
+                                            <div className="flex items-center gap-4 md:gap-8 min-w-[280px]">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[0.6rem] font-black text-purple-400 uppercase tracking-widest block">Fatura Atual</span>
+                                                    <span className="text-[1.1rem] font-black text-purple-700 dark:text-purple-400 leading-tight">R$ {formatCurrency(currentGroup.total)}</span>
+                                                    <span className="text-[9px] font-bold text-slate-400 leading-none">Vencendo em {String(dueDay).padStart(2, '0')}/{String(now.getMonth()+1).padStart(2, '0')}</span>
+                                                </div>
+
+                                                <div className="w-[1px] h-10 bg-slate-200 dark:bg-slate-700"></div>
+
+                                                <div className="flex flex-col">
+                                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest block">Próxima / Reserva</span>
+                                                    <span className="text-[1.1rem] font-black text-slate-500 dark:text-slate-400 leading-tight">R$ {formatCurrency(nextGroup.total)}</span>
+                                                    <span className="text-[9px] font-bold text-slate-400 leading-none">Projeção Futura</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Global Actions */}
+                                            <div className="flex items-center gap-2 border-l border-slate-100 dark:border-slate-800 pl-4 h-full">
+                                                <button onClick={(e) => { e.stopPropagation(); openEditAccount(acc); }} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/20 transition-all shadow-sm" title="Editar"><Edit2 size={16} /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteAccount(acc.id); }} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/20 transition-all shadow-sm" title="Excluir"><Trash2 size={16} /></button>
+                                                <div className="ml-2 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all">
+                                                    <ArrowRight size={20} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            )}
                         </div>
                     </div>
                 </div>
-            </div>
         <div className="chart-card" style={{ padding: 0, overflow: 'hidden', backgroundColor: 'var(--surface)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
