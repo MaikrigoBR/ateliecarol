@@ -25,6 +25,55 @@ export function ProductPortfolio() {
                     document.title = `${settings.tabTitle || settings.companyName || 'Catálogo'} | Portfólio Central`;
                 }
 
+                // === SEO: Carregar parâmetros de Presença na Web ===
+                try {
+                    const webSeo = await db.getById('settings', 'web_presence');
+                    if (webSeo) {
+                        // Meta title override
+                        if (webSeo.metaTitle) document.title = webSeo.metaTitle;
+
+                        // Meta description
+                        let descTag = document.querySelector('meta[name="description"]');
+                        if (!descTag) { descTag = document.createElement('meta'); descTag.name = 'description'; document.head.appendChild(descTag); }
+                        if (webSeo.metaDescription) descTag.content = webSeo.metaDescription;
+
+                        // Meta keywords
+                        let kwTag = document.querySelector('meta[name="keywords"]');
+                        if (!kwTag) { kwTag = document.createElement('meta'); kwTag.name = 'keywords'; document.head.appendChild(kwTag); }
+                        if (webSeo.keywords) kwTag.content = webSeo.keywords;
+
+                        // Open Graph
+                        const ogTags = { 'og:title': webSeo.metaTitle, 'og:description': webSeo.metaDescription, 'og:type': 'website', 'og:url': window.location.href };
+                        Object.entries(ogTags).forEach(([prop, val]) => {
+                            if (!val) return;
+                            let tag = document.querySelector(`meta[property="${prop}"]`);
+                            if (!tag) { tag = document.createElement('meta'); tag.setAttribute('property', prop); document.head.appendChild(tag); }
+                            tag.content = val;
+                        });
+
+                        // Google site verification
+                        if (webSeo.googleSiteVerification) {
+                            let verTag = document.querySelector('meta[name="google-site-verification"]');
+                            if (!verTag) { verTag = document.createElement('meta'); verTag.name = 'google-site-verification'; document.head.appendChild(verTag); }
+                            verTag.content = webSeo.googleSiteVerification;
+                        }
+
+                        // Schema.org JSON-LD
+                        if (webSeo.schemaEnabled !== false && webSeo.googleBusinessName) {
+                            const existingLd = document.querySelector('script[type="application/ld+json"][data-schema="atelie"]');
+                            if (existingLd) existingLd.remove();
+                            const ldScript = document.createElement('script');
+                            ldScript.type = 'application/ld+json';
+                            ldScript.setAttribute('data-schema', 'atelie');
+                            const storeUrl = window.location.origin + window.location.pathname + '#/loja';
+                            const sameAs = [webSeo.shopeeStoreUrl, webSeo.etsyStoreUrl, webSeo.lojaIntegradaUrl, webSeo.facebookPageId ? `https://facebook.com/${webSeo.facebookPageId}` : null, webSeo.tiktokHandle ? `https://tiktok.com/@${webSeo.tiktokHandle}` : null, webSeo.pinterestHandle ? `https://pinterest.com/${webSeo.pinterestHandle}` : null].filter(Boolean);
+                            ldScript.textContent = JSON.stringify({ "@context": "https://schema.org", "@type": webSeo.richSnippetType || "LocalBusiness", "name": webSeo.googleBusinessName, "description": webSeo.metaDescription || '', "url": storeUrl, "telephone": webSeo.phone || '', "address": { "@type": "PostalAddress", "streetAddress": webSeo.address || '', "addressLocality": webSeo.city || '', "addressRegion": webSeo.state || '', "postalCode": webSeo.postalCode || '', "addressCountry": "BR" }, "openingHours": webSeo.openingHours || '', "sameAs": sameAs });
+                            document.head.appendChild(ldScript);
+                        }
+                    }
+                } catch(seoErr) { console.warn('SEO load error', seoErr); }
+
+
                 // Analytics - Record Store Visit for CRM
                 const visitId = `visit_${Date.now()}`;
                 await db.set('analytics', visitId, {
@@ -289,9 +338,12 @@ function ProductGrid({ products, isFeatured }) {
         }}>
             {products.map(product => {
                 const mediaItems = product.images && product.images.length > 0 ? product.images : (product.image ? [product.image] : []);
-                const price = product.campaignActive 
+                const rawPrice = product.campaignActive 
                     ? Number(product.price || 0) * (1 - (Number(product.campaignDiscount || 0)/100))
                     : Number(product.price || 0);
+                
+                // Arredondamento para baixo conforme solicitado
+                const price = Math.floor(rawPrice * 100) / 100;
 
                 return (
                     <Link to={`/product/${product.id}`} key={product.id} style={{ textDecoration: 'none', display: 'block', height: '100%' }}>
@@ -343,7 +395,7 @@ function ProductGrid({ products, isFeatured }) {
                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                         {product.campaignActive && (
                                             <span style={{ fontSize: '0.8rem', color: '#94a3b8', textDecoration: 'line-through', marginBottom: '-2px' }}>
-                                                R$ {Number(product.price || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                R$ {Number(Math.floor(Number(product.price || 0) * 100) / 100).toFixed(2).replace('.', ',')}
                                             </span>
                                         )}
                                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>

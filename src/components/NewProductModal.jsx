@@ -346,7 +346,10 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
       const bdiVal = globalPricing.bdiPercentage > 0 ? globalPricing.bdiPercentage : (parseFloat(values.bdiMargin)||0);
       
       if (bdiVal >= 100) return costToProduce * 2; // Prevent divide by zero / negative
-      return costToProduce / (1 - (bdiVal / 100)); // Real Markup margin
+      const rawPrice = costToProduce / (1 - (bdiVal / 100)); // Real Markup margin
+      
+      // Arredondamento para baixo conforme solicitado
+      return Math.floor(rawPrice * 100) / 100;
   };
 
   const handleMarketAnalysis = async (customQuery = null) => {
@@ -784,15 +787,15 @@ export function NewProductModal({ isOpen, onClose, onProductSaved, productToEdit
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                         <div style={{ ...sCardLinear, flex: 1, alignItems: 'center', justifyContent: 'center', alignContent: 'center', padding: '1.5rem 1rem' }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Custo Direto Base (Fábrica)</span>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', fontFamily: 'monospace' }}>R$ {calculateBaseCost().toFixed(2)}</span>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', fontFamily: 'monospace' }}>R$ {(Math.floor(calculateBaseCost() * 100) / 100).toFixed(2)}</span>
                         </div>
                         <div style={{ ...sCardLinear, flex: 1, alignItems: 'center', justifyContent: 'center', alignContent: 'center', padding: '1.5rem 1rem', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#3b82f6', marginBottom: '0.5rem' }}>Custo Produção & Fixo (Indústria)</span>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e40af', fontFamily: 'monospace' }}>R$ {calculateInternalCost().toFixed(2)}</span>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e40af', fontFamily: 'monospace' }}>R$ {(Math.floor(calculateInternalCost() * 100) / 100).toFixed(2)}</span>
                         </div>
                         <div style={{ ...sCardLinear, flex: 1, alignItems: 'center', justifyContent: 'center', alignContent: 'center', padding: '1.5rem 1rem', border: '1px solid #c084fc', backgroundColor: '#faf5ff' }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#7e22ce', marginBottom: '0.5rem' }}>Preço Venda Sugerido (Markup)</span>
-                            <span style={{ fontSize: '2rem', fontWeight: 900, color: '#6b21a8', fontFamily: 'monospace' }}>R$ {calculateSuggestedSellingPrice().toFixed(2)}</span>
+                            <span style={{ fontSize: '2rem', fontWeight: 900, color: '#6b21a8', fontFamily: 'monospace' }}>R$ {(Math.floor(calculateSuggestedSellingPrice() * 100) / 100).toFixed(2)}</span>
                         </div>
                     </div>
 

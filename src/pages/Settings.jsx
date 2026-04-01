@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays, Palette, Info, Truck } from 'lucide-react';
+import { Save, User, Globe, Users, Tags, Plus, Trash2, Edit2, Activity, Clock, Landmark, Wallet, CreditCard, X, FileText, CalendarDays, Palette, Info, Truck, Search, MapPin, Star, ExternalLink, Link, Hash, Eye, Copy, CheckCircle, ShoppingBag, Map, MessageSquare } from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
 import { PromoBannerModal } from '../components/PromoBannerModal';
@@ -1290,6 +1290,494 @@ function SystemSettings() {
     );
 }
 
+function WebPresenceSettings() {
+    const [seo, setSeo] = useState({
+        metaTitle: '',
+        metaDescription: '',
+        keywords: '',
+        googleBusinessName: '',
+        googleBusinessCategory: 'Papelaria',
+        googleMapsUrl: '',
+        address: '',
+        city: '',
+        state: '',
+        postalCode: '',
+        phone: '',
+        openingHours: 'Mo-Fr 08:00-18:00',
+        googleSiteVerification: '',
+        facebookPageId: '',
+        tiktokHandle: '',
+        pinterestHandle: '',
+        shopeeStoreUrl: '',
+        etsyStoreUrl: '',
+        lojaIntegradaUrl: '',
+        schemaEnabled: true,
+        sitemapEnabled: true,
+        richSnippetType: 'LocalBusiness',
+    });
+    const [copied, setCopied] = useState('');
+    const [activeSection, setActiveSection] = useState('seo');
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const data = await db.getById('settings', 'web_presence');
+                if (data && Object.keys(data).length > 0) setSeo(prev => ({ ...prev, ...data }));
+            } catch(e) {}
+        };
+        load();
+    }, []);
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        await db.set('settings', 'web_presence', seo);
+        AuditService.log({ name: 'Admin' }, 'UPDATE', 'Settings', 'web_presence', 'Parâmetros de Presença na Web atualizados.');
+        alert('✅ Configurações de Presença na Web salvas com sucesso!');
+    };
+
+    const handleCopy = (text, key) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(key);
+            setTimeout(() => setCopied(''), 2000);
+        });
+    };
+
+    // Helpers to build search/map links dynamically
+    const lojaUrl = (() => {
+        try {
+            const cnf = localStorage.getItem('stationery_config');
+            if (cnf) {
+                const parsed = JSON.parse(cnf);
+                // Try to detect app URL from location
+                return window.location.origin + window.location.pathname + '#/loja';
+            }
+        } catch(e) {}
+        return window.location.origin + window.location.pathname + '#/loja';
+    })();
+
+    const googleSearchUrl = seo.googleBusinessName
+        ? `https://www.google.com/search?q=${encodeURIComponent(seo.googleBusinessName + ' ' + (seo.city || ''))}`
+        : '';
+
+    const googleMapsSearchUrl = seo.googleBusinessName
+        ? `https://www.google.com/maps/search/${encodeURIComponent(seo.googleBusinessName + ' ' + (seo.city || ''))}`
+        : '';
+
+    const schemaJson = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": seo.richSnippetType || "LocalBusiness",
+        "name": seo.googleBusinessName || '',
+        "description": seo.metaDescription || '',
+        "url": lojaUrl,
+        "telephone": seo.phone || '',
+        "address": {
+            "@type": "PostalAddress",
+            "streetAddress": seo.address || '',
+            "addressLocality": seo.city || '',
+            "addressRegion": seo.state || '',
+            "postalCode": seo.postalCode || '',
+            "addressCountry": "BR"
+        },
+        "openingHours": seo.openingHours || '',
+        "sameAs": [
+            seo.shopeeStoreUrl,
+            seo.etsyStoreUrl,
+            seo.lojaIntegradaUrl,
+            seo.facebookPageId ? `https://facebook.com/${seo.facebookPageId}` : null,
+            seo.tiktokHandle ? `https://tiktok.com/@${seo.tiktokHandle}` : null,
+            seo.pinterestHandle ? `https://pinterest.com/${seo.pinterestHandle}` : null,
+        ].filter(Boolean)
+    }, null, 2);
+
+    const sectionBtnStyle = (key) => ({
+        padding: '8px 16px',
+        borderRadius: '8px',
+        border: 'none',
+        cursor: 'pointer',
+        fontWeight: 600,
+        fontSize: '0.82rem',
+        transition: 'all 0.2s',
+        background: activeSection === key ? 'var(--primary)' : 'var(--surface-hover)',
+        color: activeSection === key ? 'white' : 'var(--text-muted)',
+    });
+
+    return (
+        <div className="card animate-fade-in">
+            <div className="card-header border-b border-gray-100">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                        <h3 className="card-title flex items-center gap-2" style={{ color: '#6d28d9' }}>
+                            <Search size={20} /> Presença na Web &amp; SEO
+                        </h3>
+                        <p className="text-muted text-sm pb-2">
+                            Configure os metadados, Rich Snippets e links de plataformas para maximizar o encontro da sua loja nos mecanismos de busca.
+                        </p>
+                    </div>
+                    {/* Quick-search badges */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {googleSearchUrl && (
+                            <a href={googleSearchUrl} target="_blank" rel="noopener noreferrer"
+                               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px', background: '#e8f0fe', color: '#1a73e8', fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #c5d8fb' }}
+                               title="Ver como sua loja aparece no Google">
+                                <Search size={13} /> Buscar no Google
+                            </a>
+                        )}
+                        {googleMapsSearchUrl && (
+                            <a href={googleMapsSearchUrl} target="_blank" rel="noopener noreferrer"
+                               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px', background: '#fce8e6', color: '#e8453c', fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #f7c9c9' }}
+                               title="Verificar posição no Google Maps">
+                                <MapPin size={13} /> Google Maps
+                            </a>
+                        )}
+                        <a href={lojaUrl} target="_blank" rel="noopener noreferrer"
+                           style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px', background: '#e6f4ea', color: '#137333', fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #b7dfbf' }}
+                           title="Abrir loja pública">
+                            <ShoppingBag size={13} /> Ver Loja
+                        </a>
+                    </div>
+                </div>
+
+                {/* Sub-section pills */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+                    <button type="button" style={sectionBtnStyle('seo')} onClick={() => setActiveSection('seo')}>
+                        <Search size={13} style={{ display: 'inline', marginRight: '5px' }} /> SEO &amp; Metadados
+                    </button>
+                    <button type="button" style={sectionBtnStyle('gmb')} onClick={() => setActiveSection('gmb')}>
+                        <MapPin size={13} style={{ display: 'inline', marginRight: '5px' }} /> Google Meu Negócio
+                    </button>
+                    <button type="button" style={sectionBtnStyle('social')} onClick={() => setActiveSection('social')}>
+                        <Hash size={13} style={{ display: 'inline', marginRight: '5px' }} /> Redes &amp; Marketplaces
+                    </button>
+                    <button type="button" style={sectionBtnStyle('schema')} onClick={() => setActiveSection('schema')}>
+                        <Eye size={13} style={{ display: 'inline', marginRight: '5px' }} /> Rich Snippet (Schema)
+                    </button>
+                </div>
+            </div>
+
+            <form onSubmit={handleSave}>
+                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                    {/* === SEO Section === */}
+                    {activeSection === 'seo' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }} className="animate-fade-in">
+                            <div style={{ background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', border: '1px solid #ddd6fe', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                <Info size={16} style={{ color: '#7c3aed', flexShrink: 0, marginTop: '2px' }} />
+                                <p style={{ fontSize: '0.8rem', color: '#5b21b6', lineHeight: 1.5, margin: 0 }}>
+                                    Estes campos preenchem automaticamente as <strong>meta tags</strong> da sua loja pública (<code>#/loja</code>), ajudando o Google a indexar e exibir sua vitrine corretamente.
+                                </p>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Título da Página (Meta Title) <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— máx. 60 caracteres</span></label>
+                                <input
+                                    className="form-input"
+                                    value={seo.metaTitle}
+                                    onChange={e => setSeo({ ...seo, metaTitle: e.target.value })}
+                                    maxLength={70}
+                                    placeholder="Ex: Ateliê Carol | Papelaria Personalizada em Barreiras-BA"
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                                    <p className="text-xs text-gray-400">Aparece na aba do navegador e como título no resultado do Google.</p>
+                                    <span style={{ fontSize: '0.72rem', color: seo.metaTitle.length > 60 ? '#ef4444' : '#94a3b8' }}>{seo.metaTitle.length}/60</span>
+                                </div>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Descrição da Página (Meta Description) <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— máx. 155 caracteres</span></label>
+                                <textarea
+                                    className="form-input"
+                                    rows={3}
+                                    value={seo.metaDescription}
+                                    onChange={e => setSeo({ ...seo, metaDescription: e.target.value })}
+                                    maxLength={165}
+                                    placeholder="Ex: Papelaria personalizada artesanal — convites, lembranças e kits decorativos feitos com amor. Encomende pelo WhatsApp!"
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                                    <p className="text-xs text-gray-400">Exibida como subtítulo no resultado de busca. Inclua palavras que o cliente buscaria.</p>
+                                    <span style={{ fontSize: '0.72rem', color: seo.metaDescription.length > 155 ? '#ef4444' : '#94a3b8' }}>{seo.metaDescription.length}/155</span>
+                                </div>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Palavras-chave (Keywords) <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— separadas por vírgula</span></label>
+                                <input
+                                    className="form-input"
+                                    value={seo.keywords}
+                                    onChange={e => setSeo({ ...seo, keywords: e.target.value })}
+                                    placeholder="Ex: papelaria personalizada, convite casamento, lembrança maternidade, Ateliê Carol"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Termos que seu cliente digitaria para encontrar seus produtos.</p>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Google Site Verification Token <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— (opcional)</span></label>
+                                <input
+                                    className="form-input font-mono text-sm bg-gray-50"
+                                    value={seo.googleSiteVerification}
+                                    onChange={e => setSeo({ ...seo, googleSiteVerification: e.target.value })}
+                                    placeholder="Ex: abc123xyz..."
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Código do Google Search Console para verificar propriedade do site.</p>
+                            </div>
+
+                            {/* Preview SERP */}
+                            {(seo.metaTitle || seo.metaDescription) && (
+                                <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', background: '#fff' }}>
+                                    <p style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Prévia — Como aparece no Google</p>
+                                    <div style={{ maxWidth: '600px' }}>
+                                        <div style={{ fontSize: '1.1rem', color: '#1a0dab', fontWeight: 400, marginBottom: '2px', fontFamily: 'Arial, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {seo.metaTitle || 'Título da sua loja'}
+                                        </div>
+                                        <div style={{ fontSize: '0.82rem', color: '#006621', marginBottom: '4px', fontFamily: 'Arial, sans-serif' }}>{lojaUrl}</div>
+                                        <div style={{ fontSize: '0.85rem', color: '#545454', fontFamily: 'Arial, sans-serif', lineHeight: 1.5 }}>
+                                            {seo.metaDescription?.substring(0, 155) || 'Descrição da sua loja...'}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* === Google Meu Negócio Section === */}
+                    {activeSection === 'gmb' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }} className="animate-fade-in">
+                            <div style={{ background: 'linear-gradient(135deg, #fce8e6, #fde8e4)', border: '1px solid #f5c6c3', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                <MapPin size={16} style={{ color: '#e8453c', flexShrink: 0, marginTop: '2px' }} />
+                                <div>
+                                    <p style={{ fontSize: '0.82rem', color: '#b01d15', lineHeight: 1.5, margin: 0, fontWeight: 600 }}>Google Meu Negócio (GMB)</p>
+                                    <p style={{ fontSize: '0.78rem', color: '#c62828', lineHeight: 1.5, margin: '4px 0 0 0' }}>
+                                        Preencha os dados abaixo exatamente como cadastrou no GMB. Eles são usados para gerar o <strong>Schema.org LocalBusiness</strong> que aparece nas pesquisas e no Maps.
+                                    </p>
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div className="input-group">
+                                    <label className="form-label">Nome do Negócio (como no GMB) *</label>
+                                    <input className="form-input" value={seo.googleBusinessName} onChange={e => setSeo({ ...seo, googleBusinessName: e.target.value })} placeholder="Ex: Ateliê Carol" />
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">Categoria Principal</label>
+                                    <input className="form-input" value={seo.googleBusinessCategory} onChange={e => setSeo({ ...seo, googleBusinessCategory: e.target.value })} placeholder="Ex: Papelaria, Artesanato" />
+                                </div>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Link direto para o perfil no Google Maps</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input className="form-input flex-1" value={seo.googleMapsUrl} onChange={e => setSeo({ ...seo, googleMapsUrl: e.target.value })} placeholder="https://maps.app.goo.gl/..." />
+                                    {seo.googleMapsUrl && (
+                                        <a href={seo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '8px 12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <ExternalLink size={14} /> Abrir
+                                        </a>
+                                    )}
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1">Copie o link curto do seu perfil no Google Maps e cole aqui. Clientes poderão acessar direto da loja.</p>
+                            </div>
+                            <div className="input-group">
+                                <label className="form-label">Endereço Completo (Rua, Número, Bairro)</label>
+                                <input className="form-input" value={seo.address} onChange={e => setSeo({ ...seo, address: e.target.value })} placeholder="Ex: Rua das Flores, 123, Centro" />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px' }}>
+                                <div className="input-group">
+                                    <label className="form-label">Cidade</label>
+                                    <input className="form-input" value={seo.city} onChange={e => setSeo({ ...seo, city: e.target.value })} placeholder="Ex: Barreiras" />
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">Estado (UF)</label>
+                                    <input className="form-input" value={seo.state} onChange={e => setSeo({ ...seo, state: e.target.value })} maxLength={2} placeholder="BA" />
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">CEP</label>
+                                    <input className="form-input font-mono" value={seo.postalCode} onChange={e => setSeo({ ...seo, postalCode: e.target.value.replace(/\D/g, '') })} maxLength={8} placeholder="46960000" />
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div className="input-group">
+                                    <label className="form-label">Telefone / WhatsApp</label>
+                                    <input className="form-input" value={seo.phone} onChange={e => setSeo({ ...seo, phone: e.target.value })} placeholder="+55 77 99999-0000" />
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">Horário de Funcionamento (Schema)</label>
+                                    <input className="form-input font-mono text-sm" value={seo.openingHours} onChange={e => setSeo({ ...seo, openingHours: e.target.value })} placeholder="Mo-Fr 08:00-18:00" />
+                                    <p className="text-xs text-gray-400 mt-1">Formato Schema.org: <code>Mo-Fr 08:00-18:00, Sa 08:00-12:00</code></p>
+                                </div>
+                            </div>
+
+                            {/* Quick-action buttons */}
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+                                {googleSearchUrl && (
+                                    <a href={googleSearchUrl} target="_blank" rel="noopener noreferrer"
+                                       style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', borderRadius: '8px', background: '#e8f0fe', color: '#1a73e8', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #c5d8fb' }}>
+                                        <Search size={14} /> Como aparece no Google
+                                    </a>
+                                )}
+                                {googleMapsSearchUrl && (
+                                    <a href={googleMapsSearchUrl} target="_blank" rel="noopener noreferrer"
+                                       style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', borderRadius: '8px', background: '#fce8e6', color: '#e8453c', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #f7c9c9' }}>
+                                        <Map size={14} /> Buscar no Google Maps
+                                    </a>
+                                )}
+                                <a href="https://business.google.com" target="_blank" rel="noopener noreferrer"
+                                   style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', borderRadius: '8px', background: '#f0fdf4', color: '#166534', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #bbf7d0' }}>
+                                    <ExternalLink size={14} /> Google Meu Negócio
+                                </a>
+                                <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer"
+                                   style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', borderRadius: '8px', background: '#fefce8', color: '#854d0e', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #fde68a' }}>
+                                    <ExternalLink size={14} /> Search Console
+                                </a>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* === Social / Marketplaces Section === */}
+                    {activeSection === 'social' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }} className="animate-fade-in">
+                            <div style={{ background: 'linear-gradient(135deg, #fdf4ff, #fae8ff)', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                <Hash size={16} style={{ color: '#9333ea', flexShrink: 0, marginTop: '2px' }} />
+                                <p style={{ fontSize: '0.8rem', color: '#6b21a8', lineHeight: 1.5, margin: 0 }}>
+                                    Estes links são usados no <strong>Schema sameAs</strong> para que o Google entenda que todas essas contas pertencem ao mesmo negócio, aumentando a autoridade.
+                                </p>
+                            </div>
+
+                            <h4 style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Redes Sociais</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div className="input-group">
+                                    <label className="form-label">ID da Página no Facebook</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 10px', background: 'var(--surface-hover)', borderRadius: '8px 0 0 8px', border: '1px solid var(--border)', borderRight: 'none', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>facebook.com/</span>
+                                        <input className="form-input" style={{ borderRadius: '0 8px 8px 0', flex: 1 }} value={seo.facebookPageId} onChange={e => setSeo({ ...seo, facebookPageId: e.target.value })} placeholder="ateliecarol" />
+                                    </div>
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">Usuário TikTok</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 10px', background: 'var(--surface-hover)', borderRadius: '8px 0 0 8px', border: '1px solid var(--border)', borderRight: 'none', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>tiktok.com/@</span>
+                                        <input className="form-input" style={{ borderRadius: '0 8px 8px 0', flex: 1 }} value={seo.tiktokHandle} onChange={e => setSeo({ ...seo, tiktokHandle: e.target.value })} placeholder="ateliecarol" />
+                                    </div>
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">Usuário Pinterest</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 10px', background: 'var(--surface-hover)', borderRadius: '8px 0 0 8px', border: '1px solid var(--border)', borderRight: 'none', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>pinterest.com/</span>
+                                        <input className="form-input" style={{ borderRadius: '0 8px 8px 0', flex: 1 }} value={seo.pinterestHandle} onChange={e => setSeo({ ...seo, pinterestHandle: e.target.value })} placeholder="ateliecarol" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h4 style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '8px 0 0 0' }}>Marketplaces &amp; Lojas Externas</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div className="input-group">
+                                    <label className="form-label">URL da Loja na Shopee</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input className="form-input flex-1" value={seo.shopeeStoreUrl} onChange={e => setSeo({ ...seo, shopeeStoreUrl: e.target.value })} placeholder="https://shopee.com.br/ateliecarol" />
+                                        {seo.shopeeStoreUrl && <a href={seo.shopeeStoreUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}><ExternalLink size={14} /></a>}
+                                    </div>
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">URL da Loja no Etsy</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input className="form-input flex-1" value={seo.etsyStoreUrl} onChange={e => setSeo({ ...seo, etsyStoreUrl: e.target.value })} placeholder="https://www.etsy.com/shop/ateliecarol" />
+                                        {seo.etsyStoreUrl && <a href={seo.etsyStoreUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}><ExternalLink size={14} /></a>}
+                                    </div>
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label">URL de outra Loja / Loja Integrada / Nuvemshop</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input className="form-input flex-1" value={seo.lojaIntegradaUrl} onChange={e => setSeo({ ...seo, lojaIntegradaUrl: e.target.value })} placeholder="https://minha-loja.lojaintegrada.com.br" />
+                                        {seo.lojaIntegradaUrl && <a href={seo.lojaIntegradaUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}><ExternalLink size={14} /></a>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* === Schema.org Section === */}
+                    {activeSection === 'schema' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }} className="animate-fade-in">
+                            <div style={{ background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', border: '1px solid #bae6fd', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                <Eye size={16} style={{ color: '#0369a1', flexShrink: 0, marginTop: '2px' }} />
+                                <div>
+                                    <p style={{ fontSize: '0.82rem', color: '#0c4a6e', lineHeight: 1.5, margin: 0, fontWeight: 600 }}>O que é Rich Snippet?</p>
+                                    <p style={{ fontSize: '0.78rem', color: '#075985', lineHeight: 1.5, margin: '4px 0 0 0' }}>
+                                        São informações estruturadas que aparecem diretamente no resultado do Google — estrelas de avaliação, endereço, horário. Gerado automaticamente com os dados preenchidos.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div className="input-group">
+                                    <label className="form-label">Tipo de Negócio (Schema @type)</label>
+                                    <select className="form-input" value={seo.richSnippetType} onChange={e => setSeo({ ...seo, richSnippetType: e.target.value })}>
+                                        <option value="LocalBusiness">LocalBusiness (Negócio Local)</option>
+                                        <option value="Store">Store (Loja)</option>
+                                        <option value="OnlineStore">OnlineStore (Loja Online)</option>
+                                        <option value="Florist">Florist (Floricultura / Décor)</option>
+                                        <option value="HomeGoodsStore">HomeGoodsStore (Casa &amp; Decoração)</option>
+                                        <option value="ClothingStore">ClothingStore (Moda &amp; Ateliê)</option>
+                                    </select>
+                                    <p className="text-xs text-gray-400 mt-1">Escolha o mais próximo do seu negócio de papelaria/ateliê.</p>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <div className="input-group">
+                                        <label className="form-label">Ativar Schema.org automático</label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                            <input type="checkbox" id="chk-schema" checked={seo.schemaEnabled} onChange={e => setSeo({ ...seo, schemaEnabled: e.target.checked })} style={{ width: '18px', height: '18px', accentColor: '#16a34a', cursor: 'pointer' }} />
+                                            <label htmlFor="chk-schema" style={{ fontSize: '0.85rem', color: '#166534', fontWeight: 600, cursor: 'pointer' }}>Injetar JSON-LD na loja pública</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Preview JSON-LD */}
+                            <div style={{ background: '#0f172a', borderRadius: '12px', padding: '20px', position: 'relative' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Schema.org JSON-LD Gerado</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopy(schemaJson, 'schema')}
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '6px', background: copied === 'schema' ? '#166534' : '#1e293b', color: copied === 'schema' ? '#86efac' : '#94a3b8', border: '1px solid #334155', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+                                    >
+                                        {copied === 'schema' ? <CheckCircle size={12} /> : <Copy size={12} />}
+                                        {copied === 'schema' ? 'Copiado!' : 'Copiar'}
+                                    </button>
+                                </div>
+                                <pre style={{ color: '#7dd3fc', fontSize: '0.75rem', lineHeight: 1.7, overflow: 'auto', maxHeight: '320px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{schemaJson}</pre>
+                            </div>
+
+                            <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: '12px', padding: '16px' }}>
+                                <p style={{ fontSize: '0.8rem', color: '#854d0e', fontWeight: 600, margin: '0 0 6px 0' }}>📋 Como usar este código:</p>
+                                <ol style={{ fontSize: '0.78rem', color: '#713f12', lineHeight: 1.7, margin: 0, paddingLeft: '16px' }}>
+                                    <li>Copie o JSON-LD acima.</li>
+                                    <li>Acesse o <a href="https://search.google.com/test/rich-results" target="_blank" rel="noopener noreferrer" style={{ color: '#1a73e8' }}>Google Rich Results Test</a>.</li>
+                                    <li>Cole o código para validar antes de publicar.</li>
+                                    <li>Com o sistema ativo, ele é injetado automaticamente na página da loja.</li>
+                                </ol>
+                            </div>
+
+                            {/* Quick validator links */}
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                <a href="https://search.google.com/test/rich-results" target="_blank" rel="noopener noreferrer"
+                                   style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', borderRadius: '8px', background: '#e8f0fe', color: '#1a73e8', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #c5d8fb' }}>
+                                    <Star size={14} /> Testar Rich Results
+                                </a>
+                                <a href="https://validator.schema.org/" target="_blank" rel="noopener noreferrer"
+                                   style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', borderRadius: '8px', background: '#f5f3ff', color: '#6d28d9', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #ddd6fe' }}>
+                                    <CheckCircle size={14} /> Validar Schema.org
+                                </a>
+                                <a href="https://developers.google.com/search/docs/appearance/structured-data/local-business" target="_blank" rel="noopener noreferrer"
+                                   style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', borderRadius: '8px', background: '#f0fdf4', color: '#166534', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', border: '1px solid #bbf7d0' }}>
+                                    <ExternalLink size={14} /> Documentação Google
+                                </a>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button type="submit" className="btn btn-primary px-8" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Save size={16} /> Salvar Parâmetros de Presença
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
 function PricingSettings() {
     const [fixedCosts, setFixedCosts] = useState([]);
     const [bdiTaxes, setBdiTaxes] = useState([]);
@@ -1800,6 +2288,13 @@ export function Settings() {
             <Landmark size={16} className="inline mr-2" /> Contas & Caixas
         </button>
         <button 
+            className={`tab-item ${activeTab === 'web_presence' ? 'active' : ''}`}
+            onClick={() => setActiveTab('web_presence')}
+            style={activeTab === 'web_presence' ? { backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd'} : {}}
+        >
+            <Search size={16} className="inline mr-2" /> Presença na Web
+        </button>
+        <button 
             className={`tab-item ${activeTab === 'logs' ? 'active' : ''}`}
             onClick={() => setActiveTab('logs')}
         >
@@ -1829,6 +2324,7 @@ export function Settings() {
       {activeTab === 'categories' && <CategoriesSettings />}
       {activeTab === 'accounts' && <AccountsSettings />}
       {activeTab === 'logs' && <AuditLogViewer />}
+      {activeTab === 'web_presence' && <WebPresenceSettings />}
       {activeTab === 'system' && <SystemSettings />}
       {activeTab === 'danger' && <DangerZoneCleanup />}
 

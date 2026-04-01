@@ -28,7 +28,7 @@ export function ProductView() {
             // CRM Analytics: Register product view
             if (prod) {
                 try {
-                    await db.set('analytics', "pv_${Date.now()}_${Math.random().toString(36).slice(2,7)}", {
+                    await db.set('analytics', `pv_${Date.now()}_${Math.random().toString(36).slice(2,7)}`, {
                         type: 'product_view',
                         productId: String(id),
                         productName: prod.name || '',
@@ -111,9 +111,11 @@ export function ProductView() {
         );
     }
 
-    const price = product.campaignActive 
+    const rawPrice = product.campaignActive 
         ? Number(product.price || 0) * (1 - (Number(product.campaignDiscount || 0)/100))
         : Number(product.price || 0);
+    
+    const price = Math.floor(rawPrice * 100) / 100;
 
     const message = `Olá! Gostei e tenho interesse no produto: ${product.name} (Ref: ${product.id}). Ele ainda está disponível?`;
     
@@ -239,13 +241,13 @@ export function ProductView() {
                         <div style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '28px' }}>
                             {product.campaignActive && (
                                 <div style={{ color: '#94a3b8', textDecoration: 'line-through', fontSize: '0.95rem', marginBottom: '4px', fontWeight: 600 }}>
-                                    De R$ {Number(product.price || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                    De R$ {Number(Math.floor(Number(product.price || 0) * 100) / 100).toFixed(2).replace('.', ',')}
                                 </div>
                             )}
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                                 <span style={{ color: product.campaignActive ? '#e11d48' : '#7e22ce', fontSize: '1.25rem', fontWeight: 800 }}>R$</span>
                                 <span style={{ color: product.campaignActive ? '#e11d48' : '#6b21a8', fontSize: '2.8rem', fontWeight: 900, letterSpacing: '-1px' }}>
-                                    {price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                    {price.toFixed(2).replace('.', ',')}
                                 </span>
                             </div>
                         </div>
@@ -391,7 +393,6 @@ export function ProductView() {
                         </div>
                     )}
 
-                    {/* Lista de Comentários */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {comments.length > 0 ? comments.map(c => {
                             const avatarUrl = c.photoUrl ? c.photoUrl : `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=random&color=fff`;

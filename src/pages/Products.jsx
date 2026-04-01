@@ -276,11 +276,11 @@ export function Products() {
               <span className="product-price flex flex-col">
                   {product.campaignActive ? (
                       <>
-                          <span className="text-[10px] text-gray-400 line-through font-normal">R$ {Number(product.price || 0).toFixed(2).replace('.', ',')}</span>
-                          <span className="text-pink-600">R$ {(Number(product.price||0) * (1 - (Number(product.campaignDiscount||0)/100))).toFixed(2).replace('.', ',')}</span>
+                          <span className="text-[10px] text-gray-400 line-through font-normal">R$ {Number(Math.floor(Number(product.price || 0) * 100) / 100).toFixed(2).replace('.', ',')}</span>
+                          <span className="text-pink-600">R$ {Number(Math.floor((Number(product.price||0) * (1 - (Number(product.campaignDiscount||0)/100))) * 100) / 100).toFixed(2).replace('.', ',')}</span>
                       </>
                   ) : (
-                      <span>R$ {Number(product.price || 0).toFixed(2).replace('.', ',')}</span>
+                      <span>R$ {Number(Math.floor(Number(product.price || 0) * 100) / 100).toFixed(2).replace('.', ',')}</span>
                   )}
               </span>
               <div style={{ textAlign: 'right' }}>
