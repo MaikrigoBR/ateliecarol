@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CreditCard, Calendar, BarChart2, AlertCircle, ShoppingBag, CheckCircle, ChevronLeft, ChevronRight, Edit2, Plus, Trash2, X } from 'lucide-react';
+import { CreditCard, Calendar, BarChart2, AlertCircle, ShoppingBag, CheckCircle, ChevronLeft, ChevronRight, Edit2, Plus, Trash2, X, ArrowRight } from 'lucide-react';
 import db from '../services/database';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, PieChart, Pie
