@@ -400,8 +400,9 @@ export function CreditCards() {
             ) : (
                 <>
                 
-            {/* NEW: Intelligent Data Tags Hud (Selected Card Focus) */}
-            <div className="flex flex-wrap gap-4 mb-2 animate-fade-in">
+
+            {/* NOVO: Dashboard-Style Data Cards (Selected Card Focus) */}
+            <div className="dashboard-grid animate-fade-in" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: '1.5rem' }}>
                 {(() => {
                     const cardBal = accBalances[selectedCard.id] || 0;
                     const cardUsed = cardBal < 0 ? Math.abs(cardBal) : 0;
@@ -412,66 +413,73 @@ export function CreditCards() {
 
                     return (
                         <>
-                            <div className="group px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
-                                <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
-                                    <ShoppingBag size={14} />
+                            <div className="stat-card" style={{ borderLeftColor: '#8b5cf6' }}>
+                                <div className="flex-1">
+                                    <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Gasto Total</p>
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>R$ {formatCurrency(cardUsed)}</h3>
+                                    <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Comprometimento de limite</p>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">Gasto Total</span>
-                                    <span className="text-[0.85rem] font-black text-slate-800 dark:text-white">R$ {formatCurrency(cardUsed)}</span>
+                                <div className="stat-icon-wrapper" style={{ color: '#8b5cf6', backgroundColor: '#8b5cf61A' }}>
+                                    <ShoppingBag size={24} />
                                 </div>
                             </div>
 
-                            <div className="group px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
-                                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-                                    <BarChart2 size={14} />
+                            <div className="stat-card" style={{ borderLeftColor: percent > 90 ? '#ef4444' : '#6366f1' }}>
+                                <div className="flex-1">
+                                    <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Utilização de Limite</p>
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: percent > 90 ? '#ef4444' : 'var(--text-main)', lineHeight: 1.2 }}>{percent.toFixed(1)}%</h3>
+                                    <div style={{ flex: 1, height: '4px', background: 'var(--bg-main)', borderRadius: '2px', overflow: 'hidden', marginTop: '8px' }}>
+                                        <div style={{ width: `${Math.min(100, percent)}%`, height: '100%', background: percent > 90 ? '#ef4444' : '#6366f1' }}></div>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">Utilização</span>
+                                <div className="stat-icon-wrapper" style={{ color: percent > 90 ? '#ef4444' : '#6366f1', backgroundColor: percent > 90 ? '#ef44441A' : '#6366f11A' }}>
+                                    <BarChart2 size={24} />
+                                </div>
+                            </div>
+
+                            <div className="stat-card" style={{ borderLeftColor: '#10b981' }}>
+                                <div className="flex-1">
+                                    <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Limite Disponível</p>
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981', lineHeight: 1.2 }}>R$ {formatCurrency(Math.max(0, cardLimit - cardUsed))}</h3>
+                                    <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Fôlego financeiro</p>
+                                </div>
+                                <div className="stat-icon-wrapper" style={{ color: '#10b981', backgroundColor: '#10b9811A' }}>
+                                    <CheckCircle size={24} />
+                                </div>
+                            </div>
+
+                            <div className="stat-card" style={{ borderLeftColor: '#f59e0b', position: 'relative' }}>
+                                <div className="flex-1">
+                                    <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Ciclo da Fatura</p>
                                     <div className="flex items-center gap-2">
-                                        <span className={`text-[0.85rem] font-black ${percent > 90 ? 'text-rose-600' : 'text-indigo-600'}`}>{percent.toFixed(1)}%</span>
-                                        <div className="w-12 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                            <div className={`h-full rounded-full ${percent > 90 ? 'bg-rose-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(percent, 100)}%` }}></div>
+                                        <div className="flex flex-col">
+                                            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>Dia {String(dueDay).padStart(2, '0')}</span>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>Vencimento</span>
+                                        </div>
+                                        <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
+                                        <div className="flex flex-col">
+                                            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>Dia {String(closeDay).padStart(2, '0')}</span>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>Fechamento</span>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-
-                            <div className="group px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
-                                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                                    <CheckCircle size={14} />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">Disp. Atual</span>
-                                    <span className="text-[0.85rem] font-black text-emerald-600">R$ {formatCurrency(Math.max(0, cardLimit - cardUsed))}</span>
-                                </div>
-                            </div>
-
-                            <div className="group px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
-                                <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
-                                    <Calendar size={14} />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">Ciclo Mensal</span>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-[0.7rem] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-500/10 text-rose-600">Venc: {String(dueDay).padStart(2, '0')}</span>
-                                        <span className="text-[0.7rem] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400">Fech: {String(closeDay).padStart(2, '0')}</span>
+                                    <div className="flex gap-2 mt-4">
+                                        <button onClick={(e) => { e.stopPropagation(); openEditAccount(selectedCard); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all">
+                                            <Edit2 size={14} />
+                                        </button>
+                                        <button onClick={(e) => handleDeleteAccount(selectedCard.id, e)} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-600 transition-all">
+                                            <Trash2 size={14} />
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div className="ml-auto flex items-center gap-2">
-                                <button onClick={(e) => { e.stopPropagation(); openEditAccount(selectedCard); }} className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm">
-                                    <Edit2 size={16} />
-                                </button>
-                                <button onClick={(e) => handleDeleteAccount(selectedCard.id, e)} className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:border-rose-200 transition-all shadow-sm">
-                                    <Trash2 size={16} />
-                                </button>
+                                <div className="stat-icon-wrapper" style={{ color: '#f59e0b', backgroundColor: '#f59e0b1A' }}>
+                                    <Calendar size={24} />
+                                </div>
                             </div>
                         </>
                     );
                 })()}
             </div>
+
 
 
             {/* Layout de Gráficos (Flex estilo Dashboard) */}
