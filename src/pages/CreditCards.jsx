@@ -8,6 +8,84 @@ import { FinanceTransactionDetailsModal } from '../components/FinanceTransaction
 import { formatCurrency, groupByInvoiceCycle } from '../utils/financeUtils';
 import '../css/pages.css';
 
+function StatCard({ title, value, icon: Icon, color, subtext, isActive, onClick }) {
+    const getColor = (c) => {
+        const map = {
+            'primary': 'var(--primary)',
+            'green': '#10b981', 
+            'orange': '#f59e0b', 
+            'purple': '#8b5cf6', 
+            'blue': '#3b82f6',   
+            'red': '#ef4444',
+            'emerald': '#10b981'
+        };
+        return map[c] || c;
+    };
+
+    const activeColor = getColor(color);
+
+    return (
+        <div 
+            className={`stat-card relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-xl ${isActive ? 'active-stat-card ring-2 ring-offset-2 ring-[var(--surface)]' : ''}`} 
+            style={{ 
+                borderLeft: `5px solid ${activeColor}`,
+                cursor: onClick ? 'pointer' : 'default',
+                transform: isActive ? 'translateY(-6px) scale(1.02)' : 'none',
+                boxShadow: isActive ? `0 20px 30px -10px ${activeColor}33, 0 10px 15px -5px ${activeColor}1A` : 'var(--shadow-sm)',
+                border: isActive ? `1.5px solid ${activeColor}40` : '1px solid var(--border)',
+                background: isActive ? `linear-gradient(150deg, var(--surface) 0%, ${activeColor}0D 100%)` : 'var(--surface)',
+                padding: '1.4rem',
+                minHeight: '120px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+            }}
+            onClick={onClick}
+        >
+            {/* Dynamic Glow Form */}
+            {isActive && (
+                <div 
+                    className="animate-pulse"
+                    style={{ 
+                        position: 'absolute', top: '-30%', right: '-30%', width: '120px', height: '120px', 
+                        background: `radial-gradient(circle, ${activeColor}26 0%, transparent 70%)`,
+                        borderRadius: '50%', filter: 'blur(20px)', pointerEvents: 'none', zIndex: 0
+                    }}
+                ></div>
+            )}
+            
+            <div className="flex-1" style={{ position: 'relative', zIndex: 1 }}>
+                <p style={{ 
+                    fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '0.5rem', opacity: 0.8
+                }}>{title}</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <h3 style={{ 
+                        fontSize: '1.45rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em', margin: 0
+                    }}>{value}</h3>
+                </div>
+                {subtext && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '0.8rem' }}>
+                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: activeColor }}></div>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, margin: 0, opacity: 0.9 }}>{subtext}</p>
+                    </div>
+                )}
+            </div>
+            
+            <div className="stat-icon-wrapper shrink-0" style={{ 
+                transform: isActive ? 'rotate(-8deg) scale(1.15)' : 'none',
+                transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                color: activeColor, 
+                backgroundColor: `${activeColor}15`,
+                width: '46px', height: '46px', borderRadius: '14px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: isActive ? `0 8px 15px -4px ${activeColor}33` : 'none'
+            }}>
+                <Icon size={24} />
+            </div>
+        </div>
+    );
+}
+
 export function CreditCards() {
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
@@ -320,165 +398,158 @@ export function CreditCards() {
                     )}
                 </div>
             </div>
-            {/* Dashboard de Endividamento Expositivo */}
-            <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
-                <div className="stat-card" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: 'white', border: 'none' }}>
-                    <div className="flex-1">
-                        <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', marginBottom: '0.5rem' }}>Exposição Total ao Crédito</p>
-                        <h3 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#ef4444' }}>R$ {formatCurrency(totalCreditDebt)}</h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '1rem' }}>
-                           <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-                                <div style={{ width: `${Math.min(100, overallLimitUsage)}%`, height: '100%', background: overallLimitUsage > 80 ? '#ef4444' : '#3b82f6' }}></div>
-                           </div>
-                           <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{overallLimitUsage.toFixed(1)}% do Limite</span>
-                        </div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="flex-1">
-                        <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Próximos Vencimentos</p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {accounts.slice(0, 2).map(card => {
-                                const bal = accBalances[card.id] || 0;
-                                const used = bal < 0 ? Math.abs(bal) : 0;
-                                return (
-                                    <div key={card.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
-                                        <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{card.name} (Dia {card.dueDay})</span>
-                                        <span style={{ color: used > 0 ? 'var(--text-main)' : 'var(--success)', fontWeight: 700 }}>R$ {formatCurrency(used)}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-                <div className="stat-card" style={{ background: 'var(--primary)', color: 'white', border: 'none' }}>
-                    <div className="flex-1">
-                        <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', marginBottom: '0.5rem' }}>Eficiência de Caixa</p>
-                        <h3 style={{ fontSize: '1.5rem', fontWeight: 900 }}>Saudável</h3>
-                        <p style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.5rem' }}>Limite livre: R$ {formatCurrency(totalLimit - totalCreditDebt)}</p>
-                    </div>
-                    <CheckCircle size={32} style={{ opacity: 0.3 }} />
-                </div>
+            {/* Dashboard Dash Style Summary Cards */}
+            <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                <StatCard 
+                    title="Exposição Total" 
+                    value={`R$ ${formatCurrency(totalCreditDebt)}`} 
+                    icon={CreditCard} 
+                    color="red"
+                    subtext={`${overallLimitUsage.toFixed(1)}% do limite global usado`}
+                />
+                <StatCard 
+                    title="Limite Disponível" 
+                    value={`R$ ${formatCurrency(Math.max(0, totalLimit - totalCreditDebt))}`} 
+                    icon={CheckCircle} 
+                    color="green"
+                    subtext="Fôlego financeiro total"
+                />
+                <StatCard 
+                    title="Eficiência" 
+                    value="Saudável" 
+                    icon={BarChart2} 
+                    color="blue"
+                    subtext="Controle de gastos OK"
+                />
             </div>
 
-
-            {/* NOVO: Card Selection Row (Tags Style) */}
-            <div className="flex flex-wrap items-center gap-3 mb-8 mt-2 scrollbar-hide overflow-x-auto pb-2">
+            {/* MEUS CARTÕES - Textos transformados em CARDS */}
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CreditCard size={18} color="var(--primary)" /> Meus Cartões (Selecione para detalhar)
+            </h3>
+            
+            <div className="dashboard-grid animate-fade-in" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
                 {accounts.map(card => {
                     const isActive = selectedCardId === card.id;
                     const cardBal = accBalances[card.id] || 0;
                     const cardUsed = cardBal < 0 ? Math.abs(cardBal) : 0;
+                    const cardLimit = Number(card.limit || 0);
+                    const usagePercent = cardLimit > 0 ? (cardUsed / cardLimit) * 100 : 0;
                     
                     return (
-                        <button 
+                        <StatCard 
                             key={card.id}
+                            title={card.name}
+                            value={`R$ ${formatCurrency(cardUsed)}`}
+                            icon={CreditCard}
+                            color={usagePercent > 90 ? 'red' : (usagePercent > 70 ? 'orange' : 'primary')}
+                            isActive={isActive}
                             onClick={() => setSelectedCardId(card.id)}
-                            className={`flex items-center gap-3 px-5 py-2.5 rounded-[1.2rem] border transition-all duration-300 shadow-sm whitespace-nowrap 
-                                ${isActive ? 'bg-indigo-500 text-white border-indigo-600 shadow-indigo-200 ring-2 ring-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:bg-slate-50'}`}
-                        >
-                            <CreditCard size={16} className={isActive ? 'text-white' : 'text-indigo-400'} />
-                            <div className="flex flex-col items-start leading-none">
-                                <span className={`text-[0.8rem] font-black ${isActive ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>{card.name}</span>
-                                <span className={`text-[0.6rem] font-bold mt-1 ${isActive ? 'text-white/80' : 'text-slate-400'}`}>
-                                    {cardUsed > 0 ? `R$ ${formatCurrency(cardUsed)}` : 'S/ Dívida'}
-                                </span>
-                            </div>
-                            {isActive && <Check size={14} className="ml-1" />}
-                        </button>
+                            subtext={`Lim: R$ ${formatCurrency(cardLimit)} • Vence: Dia ${card.dueDay}`}
+                        />
                     );
                 })}
             </div>
 
             {!selectedCard ? (
-                <div style={{ padding: '3rem', textAlign: 'center', backgroundColor: 'var(--surface-hover)', borderRadius: '16px', border: '1px dashed var(--border)', marginTop: '1rem' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.5rem' }}>Nenhum cartão cadastrado</h3>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Cadastre seu primeiro cartão de crédito para começar a ter inteligência nas suas faturas.</p>
-                    <button onClick={openNewAccount} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 700 }}>
-                        <Plus size={18} /> Adicionar Cartão
+                <div style={{ padding: '4rem', textAlign: 'center', backgroundColor: 'var(--surface)', borderRadius: '24px', border: '2px dashed var(--border)', marginTop: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+                    <div style={{ backgroundColor: 'var(--surface-hover)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
+                        <CreditCard size={32} color="var(--text-muted)" />
+                    </div>
+                    <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.75rem' }}>Nenhum cartão cadastrado</h3>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', maxWidth: '400px', marginInline: 'auto' }}>Cadastre seus cartões de crédito para monitorar limites, faturas futuras e ter total controle do seu endividamento.</p>
+                    <button onClick={openNewAccount} className="btn py-3 px-8 shadow-md" style={{ background: 'var(--primary)', color: 'white', fontWeight: 800, borderRadius: '12px' }}>
+                        Adicionar Meu Primeiro Cartão
                     </button>
                 </div>
             ) : (
                 <>
-                
+                {/* DETALHES DO CARTÃO SELECIONADO */}
+                <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ padding: '8px', borderRadius: '12px', background: 'var(--surface-hover)', border: '1px solid var(--border)' }}>
+                        <BarChart2 size={20} color="var(--primary)" />
+                    </div>
+                    <div>
+                        <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>Inteligência: {selectedCard.name.toUpperCase()}</h4>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Métricas detalhadas e projeção de faturas.</p>
+                    </div>
+                </div>
 
-            {/* NOVO: Dashboard-Style Data Cards (Selected Card Focus) */}
-            <div className="dashboard-grid animate-fade-in" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: '1.5rem' }}>
-                {(() => {
-                    const cardBal = accBalances[selectedCard.id] || 0;
-                    const cardUsed = cardBal < 0 ? Math.abs(cardBal) : 0;
-                    const cardLimit = Number(selectedCard.limit || 0);
-                    const percent = cardLimit > 0 ? (cardUsed / cardLimit) * 100 : 0;
-                    const dueDay = selectedCard.dueDay || 10;
-                    const closeDay = selectedCard.closeDay || (dueDay - 7 <= 0 ? 30 + (dueDay - 7) : dueDay - 7);
+                <div className="dashboard-grid animate-fade-in" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: '1.5rem' }}>
+                    {(() => {
+                        const cardBal = accBalances[selectedCard.id] || 0;
+                        const cardUsed = cardBal < 0 ? Math.abs(cardBal) : 0;
+                        const cardLimit = Number(selectedCard.limit || 0);
+                        const percent = cardLimit > 0 ? (cardUsed / cardLimit) * 100 : 0;
+                        const dueDay = selectedCard.dueDay || 10;
+                        const closeDay = selectedCard.closeDay || (dueDay - 7 <= 0 ? 30 + (dueDay - 7) : dueDay - 7);
 
-                    return (
-                        <>
-                            <div className="stat-card" style={{ borderLeftColor: '#8b5cf6' }}>
-                                <div className="flex-1">
-                                    <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Gasto Total</p>
-                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>R$ {formatCurrency(cardUsed)}</h3>
-                                    <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Comprometimento de limite</p>
-                                </div>
-                                <div className="stat-icon-wrapper" style={{ color: '#8b5cf6', backgroundColor: '#8b5cf61A' }}>
-                                    <ShoppingBag size={24} />
-                                </div>
-                            </div>
+                        return (
+                            <>
+                                <StatCard 
+                                    title="Gasto Atual" 
+                                    value={`R$ ${formatCurrency(cardUsed)}`} 
+                                    icon={ShoppingBag} 
+                                    color="primary"
+                                    subtext="Soma de faturas em aberto"
+                                />
 
-                            <div className="stat-card" style={{ borderLeftColor: percent > 90 ? '#ef4444' : '#6366f1' }}>
-                                <div className="flex-1">
-                                    <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Utilização de Limite</p>
-                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: percent > 90 ? '#ef4444' : 'var(--text-main)', lineHeight: 1.2 }}>{percent.toFixed(1)}%</h3>
-                                    <div style={{ flex: 1, height: '4px', background: 'var(--bg-main)', borderRadius: '2px', overflow: 'hidden', marginTop: '8px' }}>
-                                        <div style={{ width: `${Math.min(100, percent)}%`, height: '100%', background: percent > 90 ? '#ef4444' : '#6366f1' }}></div>
-                                    </div>
-                                </div>
-                                <div className="stat-icon-wrapper" style={{ color: percent > 90 ? '#ef4444' : '#6366f1', backgroundColor: percent > 90 ? '#ef44441A' : '#6366f11A' }}>
-                                    <BarChart2 size={24} />
-                                </div>
-                            </div>
+                                <StatCard 
+                                    title="Uso do Limite" 
+                                    value={`${percent.toFixed(1)}%`} 
+                                    icon={BarChart2} 
+                                    color={percent > 90 ? 'red' : 'blue'}
+                                    subtext={`R$ ${formatCurrency(Math.max(0, cardLimit - cardUsed))} disponíveis`}
+                                />
 
-                            <div className="stat-card" style={{ borderLeftColor: '#10b981' }}>
-                                <div className="flex-1">
-                                    <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Limite Disponível</p>
-                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981', lineHeight: 1.2 }}>R$ {formatCurrency(Math.max(0, cardLimit - cardUsed))}</h3>
-                                    <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Fôlego financeiro</p>
-                                </div>
-                                <div className="stat-icon-wrapper" style={{ color: '#10b981', backgroundColor: '#10b9811A' }}>
-                                    <CheckCircle size={24} />
-                                </div>
-                            </div>
-
-                            <div className="stat-card" style={{ borderLeftColor: '#f59e0b', position: 'relative' }}>
-                                <div className="flex-1">
-                                    <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Ciclo da Fatura</p>
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex flex-col">
-                                            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>Dia {String(dueDay).padStart(2, '0')}</span>
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>Vencimento</span>
-                                        </div>
-                                        <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
-                                        <div className="flex flex-col">
-                                            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>Dia {String(closeDay).padStart(2, '0')}</span>
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>Fechamento</span>
+                                <div className="stat-card overflow-hidden" style={{ borderLeftColor: '#f59e0b', background: 'rgba(245, 158, 11, 0.02)', position: 'relative' }}>
+                                    <div className="flex-1" style={{ position: 'relative', zIndex: 1 }}>
+                                        <p style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Ciclo da Fatura</p>
+                                        <div style={{ display: 'flex', gap: '12px' }}>
+                                            <div style={{ flex: 1, padding: '12px', background: 'var(--surface)', borderRadius: '14px', border: '1.5px solid var(--border)', textAlign: 'center', boxShadow: 'var(--shadow-sm)' }}>
+                                                <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Vence</span>
+                                                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: '#f59e0b' }}>Dia</span> {String(dueDay).padStart(2, '0')}
+                                                </div>
+                                            </div>
+                                            <div style={{ flex: 1, padding: '12px', background: 'var(--surface)', borderRadius: '14px', border: '1.5px solid rgba(245, 158, 11, 0.3)', textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.1)' }}>
+                                                <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginBottom: '4px' }}>Fecha</span>
+                                                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: '#f59e0b' }}>Dia</span> {String(closeDay).padStart(2, '0')}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 mt-4">
-                                        <button onClick={(e) => { e.stopPropagation(); openEditAccount(selectedCard); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all">
-                                            <Edit2 size={14} />
-                                        </button>
-                                        <button onClick={(e) => handleDeleteAccount(selectedCard.id, e)} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-600 transition-all">
-                                            <Trash2 size={14} />
-                                        </button>
+                                    <div className="stat-icon-wrapper" style={{ position: 'absolute', top: '10px', right: '10px', color: '#f59e0b', backgroundColor: '#f59e0b1A', width: '38px', height: '38px' }}>
+                                        <Calendar size={18} />
                                     </div>
                                 </div>
-                                <div className="stat-icon-wrapper" style={{ color: '#f59e0b', backgroundColor: '#f59e0b1A' }}>
-                                    <Calendar size={24} />
+
+                                <div className="stat-card" style={{ borderLeftColor: 'var(--primary)', background: 'rgba(99, 102, 241, 0.02)' }}>
+                                    <div className="flex-1">
+                                        <p style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '1rem' }}>Gerenciar Cartão</p>
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); openEditAccount(selectedCard); }} 
+                                                className="btn flex-1 hover:scale-105 transition-all" 
+                                                style={{ padding: '0 16px', height: '42px', background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: '12px', color: 'var(--text-main)', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: 'var(--shadow-sm)' }}
+                                            >
+                                                <Edit2 size={14} color="var(--primary)" /> Ajustar
+                                            </button>
+                                            <button 
+                                                onClick={(e) => handleDeleteAccount(selectedCard.id, e)} 
+                                                className="btn hover:scale-105 transition-all" 
+                                                style={{ padding: '0 12px', height: '42px', background: '#fef2f2', border: '1.5px solid #fee2e2', borderRadius: '12px', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </>
-                    );
-                })()}
-            </div>
+                            </>
+                        );
+                    })()}
+                </div>
 
 
 
