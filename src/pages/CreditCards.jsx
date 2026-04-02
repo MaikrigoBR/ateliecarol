@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CreditCard, Calendar, BarChart2, AlertCircle, ShoppingBag, CheckCircle, ChevronLeft, ChevronRight, Edit2, Plus, Trash2, X, ArrowRight } from 'lucide-react';
+import { CreditCard, Calendar, BarChart2, AlertCircle, ShoppingBag, CheckCircle, ChevronLeft, ChevronRight, Edit2, Plus, Trash2, X, ArrowRight, Check } from 'lucide-react';
 import db from '../services/database';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, PieChart, Pie
@@ -361,8 +361,36 @@ export function CreditCards() {
                 </div>
             </div>
 
+
+            {/* NOVO: Card Selection Row (Tags Style) */}
+            <div className="flex flex-wrap items-center gap-3 mb-8 mt-2 scrollbar-hide overflow-x-auto pb-2">
+                {accounts.map(card => {
+                    const isActive = selectedCardId === card.id;
+                    const cardBal = accBalances[card.id] || 0;
+                    const cardUsed = cardBal < 0 ? Math.abs(cardBal) : 0;
+                    
+                    return (
+                        <button 
+                            key={card.id}
+                            onClick={() => setSelectedCardId(card.id)}
+                            className={`flex items-center gap-3 px-5 py-2.5 rounded-[1.2rem] border transition-all duration-300 shadow-sm whitespace-nowrap 
+                                ${isActive ? 'bg-indigo-500 text-white border-indigo-600 shadow-indigo-200 ring-2 ring-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:bg-slate-50'}`}
+                        >
+                            <CreditCard size={16} className={isActive ? 'text-white' : 'text-indigo-400'} />
+                            <div className="flex flex-col items-start leading-none">
+                                <span className={`text-[0.8rem] font-black ${isActive ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>{card.name}</span>
+                                <span className={`text-[0.6rem] font-bold mt-1 ${isActive ? 'text-white/80' : 'text-slate-400'}`}>
+                                    {cardUsed > 0 ? `R$ ${formatCurrency(cardUsed)}` : 'S/ Dívida'}
+                                </span>
+                            </div>
+                            {isActive && <Check size={14} className="ml-1" />}
+                        </button>
+                    );
+                })}
+            </div>
+
             {!selectedCard ? (
-                <div style={{ padding: '3rem', textAlign: 'center', backgroundColor: 'var(--surface-hover)', borderRadius: '16px', border: '1px dashed var(--border)', marginTop: '2rem' }}>
+                <div style={{ padding: '3rem', textAlign: 'center', backgroundColor: 'var(--surface-hover)', borderRadius: '16px', border: '1px dashed var(--border)', marginTop: '1rem' }}>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.5rem' }}>Nenhum cartão cadastrado</h3>
                     <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Cadastre seu primeiro cartão de crédito para começar a ter inteligência nas suas faturas.</p>
                     <button onClick={openNewAccount} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 700 }}>
@@ -371,95 +399,80 @@ export function CreditCards() {
                 </div>
             ) : (
                 <>
-
-            {/* Cartões - Premium Intelligence Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8 mt-2">
-                {accounts.map(card => {
-                    const isActive = selectedCardId === card.id;
-                    const cardBal = accBalances[card.id] || 0;
+                
+            {/* NEW: Intelligent Data Tags Hud (Selected Card Focus) */}
+            <div className="flex flex-wrap gap-4 mb-2 animate-fade-in">
+                {(() => {
+                    const cardBal = accBalances[selectedCard.id] || 0;
                     const cardUsed = cardBal < 0 ? Math.abs(cardBal) : 0;
-                    const cardLimit = Number(card.limit || 0);
+                    const cardLimit = Number(selectedCard.limit || 0);
                     const percent = cardLimit > 0 ? (cardUsed / cardLimit) * 100 : 0;
-                    
-                    const groups = groupByInvoiceCycle(transactions, card);
-                    const now = new Date();
-                    const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-                    const currentGroup = groups.find(g => g.key === currentKey) || { transactions: [], total: 0 };
-
-                    const dueDay = card.dueDay || 10;
-                    const closeDay = card.closeDay || (dueDay - 7 <= 0 ? 30 + (dueDay - 7) : dueDay - 7);
+                    const dueDay = selectedCard.dueDay || 10;
+                    const closeDay = selectedCard.closeDay || (dueDay - 7 <= 0 ? 30 + (dueDay - 7) : dueDay - 7);
 
                     return (
-                        <div 
-                            key={card.id} 
-                            onClick={() => setSelectedCardId(card.id)}
-                            className={`group relative overflow-hidden rounded-[1.5rem] border transition-all duration-500 cursor-pointer flex flex-col p-6 gap-5 shadow-sm hover:shadow-xl ${isActive ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100 hover:bg-white dark:hover:bg-slate-900'}`}
-                        >
-                            {/* Decorative Background Glimmer for Active */}
-                            {isActive && <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl animate-pulse"></div>}
+                        <>
+                            <div className="group px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
+                                <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                                    <ShoppingBag size={14} />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">Gasto Total</span>
+                                    <span className="text-[0.85rem] font-black text-slate-800 dark:text-white">R$ {formatCurrency(cardUsed)}</span>
+                                </div>
+                            </div>
 
-                            <div className="flex justify-between items-start z-10 w-full">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-500 ${isActive ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg rotate-6' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
-                                        <CreditCard size={24} />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <h5 className={`text-[1.1rem] font-black leading-none ${isActive ? 'text-slate-800 dark:text-white' : 'text-slate-500'}`}>{card.name}</h5>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[8px] uppercase tracking-wider border border-emerald-200 dark:border-emerald-500/20">Fech: {String(closeDay).padStart(2, '0')}</span>
-                                            <span className="px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-[8px] uppercase tracking-wider border border-rose-200 dark:border-rose-500/20">Venc: {String(dueDay).padStart(2, '0')}</span>
+                            <div className="group px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
+                                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                                    <BarChart2 size={14} />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">Utilização</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-[0.85rem] font-black ${percent > 90 ? 'text-rose-600' : 'text-indigo-600'}`}>{percent.toFixed(1)}%</span>
+                                        <div className="w-12 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div className={`h-full rounded-full ${percent > 90 ? 'bg-rose-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(percent, 100)}%` }}></div>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                {isActive && (
-                                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => { e.stopPropagation(); openEditAccount(card); }} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-500/10 transition-all shadow-sm"><Edit2 size={14} /></button>
-                                        <button onClick={(e) => handleDeleteAccount(card.id, e)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 transition-all shadow-sm"><Trash2 size={14} /></button>
-                                    </div>
-                                )}
                             </div>
 
-                            {/* Center Limit Usage */}
-                            <div className="flex flex-col gap-2 z-10 w-full">
-                                <div className="flex justify-between items-end">
-                                    <span className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest leading-none">Status de Utilização</span>
-                                    <div className="text-right leading-none">
-                                        <span className="text-[0.85rem] font-black text-slate-600 dark:text-slate-300">R$ {formatCurrency(Math.max(0, cardLimit - cardUsed))} </span>
-                                        <span className="text-[0.6rem] font-bold text-slate-400 uppercase">Livre</span>
-                                    </div>
+                            <div className="group px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
+                                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                                    <CheckCircle size={14} />
                                 </div>
-                                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-200/50 dark:border-slate-700/50 shadow-inner">
-                                    <div 
-                                        className={`h-full rounded-full transition-all duration-1000 ${percent > 90 ? 'bg-gradient-to-r from-rose-500 to-red-600' : 'bg-gradient-to-r from-indigo-500 to-purple-600 shadow-[0_0_8px_rgba(99,102,241,0.4)]'}`}
-                                        style={{ width: `${Math.min(100, percent)}%` }}
-                                    ></div>
-                                </div>
-                                <div className="flex justify-between items-center text-[9px] font-black text-slate-400 uppercase">
-                                    <span>Gasto: R$ {formatCurrency(cardUsed)}</span>
-                                    <span>Uso: {percent.toFixed(1)}%</span>
-                                    <span>Límite: R$ {formatCurrency(cardLimit)}</span>
-                                </div>
-                            </div>
-
-                            {/* Bottom Current Invoice */}
-                            <div className="mt-2 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center z-10 w-full">
                                 <div className="flex flex-col">
-                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest block">Fatura {now.getUTCMonth()+1}/{now.getUTCFullYear()}</span>
-                                    <span className="text-[1.25rem] font-black text-purple-700 dark:text-purple-400 leading-tight">R$ {formatCurrency(currentGroup.total)}</span>
+                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">Disp. Atual</span>
+                                    <span className="text-[0.85rem] font-black text-emerald-600">R$ {formatCurrency(Math.max(0, cardLimit - cardUsed))}</span>
                                 </div>
-                                {isActive ? (
-                                    <div className="flex items-center gap-2 text-indigo-500 text-[10px] font-black uppercase group-hover:translate-x-1 transition-transform">
-                                        Detalhar <ArrowRight size={14} />
-                                    </div>
-                                ) : (
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase italic">Foco Selecionado: {selectedCard?.id === card.id ? 'Sim' : 'Não'}</span>
-                                )}
                             </div>
-                        </div>
+
+                            <div className="group px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
+                                <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
+                                    <Calendar size={14} />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">Ciclo Mensal</span>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-[0.7rem] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-500/10 text-rose-600">Venc: {String(dueDay).padStart(2, '0')}</span>
+                                        <span className="text-[0.7rem] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400">Fech: {String(closeDay).padStart(2, '0')}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="ml-auto flex items-center gap-2">
+                                <button onClick={(e) => { e.stopPropagation(); openEditAccount(selectedCard); }} className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm">
+                                    <Edit2 size={16} />
+                                </button>
+                                <button onClick={(e) => handleDeleteAccount(selectedCard.id, e)} className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:border-rose-200 transition-all shadow-sm">
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </>
                     );
-                })}
+                })()}
             </div>
+
 
             {/* Layout de Gráficos (Flex estilo Dashboard) */}
             <div className="charts-layout">
