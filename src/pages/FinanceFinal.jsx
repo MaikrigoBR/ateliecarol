@@ -54,15 +54,16 @@ const CATEGORY_COLORS = {
 
 // --- Components from Dashboard ---
 
-function SciFiStatCard({ title, value, icon: Icon, color, subtext, gradient }) {
+function SciFiStatCard({ title, value, icon: Icon, color, subtext, isActive, onClick }) {
     const getColorTheme = (c) => {
         const map = {
-            'green': { glow: 'rgba(16, 185, 129, 0.3)', text: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', grad: 'from-emerald-500/10 to-transparent' },
-            'orange': { glow: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', grad: 'from-amber-500/10 to-transparent' },
-            'purple': { glow: 'rgba(139, 92, 246, 0.3)', text: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', grad: 'from-violet-500/10 to-transparent' },
-            'blue': { glow: 'rgba(59, 130, 246, 0.3)', text: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', grad: 'from-blue-500/10 to-transparent' },
-            'red': { glow: 'rgba(239, 68, 68, 0.3)', text: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', grad: 'from-red-500/10 to-transparent' },
-            'emerald': { glow: 'rgba(52, 211, 153, 0.3)', text: '#34d399', bg: 'rgba(52, 211, 153, 0.1)', grad: 'from-emerald-400/10 to-transparent' }
+            'green': { glow: 'rgba(16, 185, 129, 0.3)', text: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+            'orange': { glow: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+            'purple': { glow: 'rgba(139, 92, 246, 0.3)', text: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
+            'blue': { glow: 'rgba(59, 130, 246, 0.3)', text: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+            'red': { glow: 'rgba(239, 68, 68, 0.3)', text: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+            'emerald': { glow: 'rgba(52, 211, 153, 0.3)', text: '#34d399', bg: 'rgba(52, 211, 153, 0.1)' },
+            'primary': { glow: 'rgba(99, 102, 241, 0.3)', text: 'var(--primary)', bg: 'rgba(99, 102, 241, 0.1)' }
         };
         return map[c] || map['blue'];
     };
@@ -71,45 +72,56 @@ function SciFiStatCard({ title, value, icon: Icon, color, subtext, gradient }) {
 
     return (
         <div 
+            className={`stat-card relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-xl ${isActive ? 'ring-2 ring-offset-2 ring-[var(--surface)]' : ''}`} 
             style={{ 
-                position: 'relative', overflow: 'hidden', borderRadius: '16px', 
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%)', 
-                backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.5)', 
-                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)',
-                transition: 'transform 0.3s ease, box-shadow 0.3s ease', cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', minHeight: '140px'
-            }} 
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.1)'; }} 
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.05)'; }}
+                borderLeft: `5px solid ${theme.text}`,
+                cursor: onClick ? 'pointer' : 'default',
+                transform: isActive ? 'translateY(-6px) scale(1.02)' : 'none',
+                boxShadow: isActive ? `0 20px 30px -10px ${theme.glow}, 0 10px 15px -5px ${theme.glow}` : 'var(--shadow-sm)',
+                border: isActive ? `1.5px solid ${theme.text}40` : '1px solid var(--border)',
+                background: isActive ? `linear-gradient(150deg, var(--surface) 0%, ${theme.text}0D 100%)` : 'var(--surface)',
+                padding: '1.4rem',
+                minHeight: '120px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                animation: isActive ? 'pulse-subtle 3s infinite' : 'none'
+            }}
+            onClick={onClick}
         >
-            {/* Top Right Accent */}
-            <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', borderRadius: '50%', background: theme.glow, filter: 'blur(30px)', opacity: 0.9, zIndex: 0 }}></div>
+            {/* Dynamic Glow Accent */}
+            <div style={{ 
+                position: 'absolute', top: '-25%', right: '-25%', width: '120px', height: '120px', 
+                background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
+                borderRadius: '50%', filter: 'blur(20px)', pointerEvents: 'none', opacity: isActive ? 0.8 : 0.4
+            }}></div>
             
-            <div style={{ position: 'relative', padding: '24px', display: 'flex', flexDirection: 'column', height: '100%', zIndex: 10, flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                    <div style={{ padding: '12px', borderRadius: '14px', backgroundColor: theme.bg, color: theme.text, display: 'inline-flex', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.04)' }}>
-                        <Icon size={26} style={{ filter: `drop-shadow(0 0 6px ${theme.glow})` }} />
+            <div className="flex-1" style={{ position: 'relative', zIndex: 1 }}>
+                <p style={{ 
+                    fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '0.5rem', opacity: 0.8
+                }}>{title}</p>
+                <h3 style={{ 
+                    fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em', margin: 0
+                }}>{value}</h3>
+                {subtext && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '0.8rem' }}>
+                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: theme.text }}></div>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, margin: 0, opacity: 0.9 }}>{subtext}</p>
                     </div>
-                </div>
-                
-                <div style={{ marginTop: 'auto' }}>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '4px' }}>
-                        {title}
-                    </p>
-                    <h3 style={{ fontSize: '1.65rem', fontWeight: 900, letterSpacing: '-0.025em', color: color === 'red' ? '#ef4444' : '#0f172a', margin: '0 0 8px 0' }}>
-                        {value}
-                    </h3>
-                    {subtext && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9 }}>
-                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: theme.text, boxShadow: `0 0 4px ${theme.text}` }}></div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{subtext}</span>
-                        </div>
-                    )}
-                </div>
+                )}
             </div>
             
-            {/* Sci-fi Bottom Border */}
-            <div style={{ position: 'absolute', bottom: 0, left: 0, height: '4px', width: '100%', background: `linear-gradient(90deg, ${theme.text} 0%, transparent 100%)`, opacity: 0.9 }}></div>
+            <div className="stat-icon-wrapper shrink-0" style={{ 
+                transform: isActive ? 'rotate(-8deg) scale(1.15)' : 'none',
+                color: theme.text, 
+                backgroundColor: theme.bg,
+                width: '46px', height: '46px', borderRadius: '14px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: isActive ? `0 8px 15px -4px ${theme.glow}` : 'none',
+                transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+            }}>
+                <Icon size={24} />
+            </div>
         </div>
     );
 }
@@ -887,221 +899,103 @@ export function FinanceFinal() {
             </div>
 
             
-            {/* NEW: Modern High-Intelligence Financial Terminal Row 2 - Bank Strips */}
-            <div className="mb-10 animate-slide-up">
-                <div className="flex items-center justify-between mb-5 px-1">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/20 flex items-center justify-center text-white">
-                            <Landmark size={20} />
-                        </div>
-                        <div>
-                            <h3 className="text-[1.2rem] font-black text-slate-800 dark:text-slate-100 m-0 leading-none tracking-tight">Banking Terminal</h3>
-                            <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1.5 opacity-60">Liquidez & Fluxo de Reservas</p>
-                        </div>
+            {/* BLOCO DAS CONTAS - Reconstruído no padrão Dashboard */}
+            <div className="mb-10 section-container">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                        <Landmark size={20} />
+                    </div>
+                    <div>
+                        <h3 className="text-[1.25rem] font-black text-slate-800 dark:text-slate-100 m-0">Gestão de Contas & Liquidez</h3>
+                        <p className="text-[0.7rem] font-bold text-slate-400 uppercase tracking-widest mt-1">Saldo e fluxo de reservas bancárias</p>
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-4">
+                <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
                     {accounts.filter(a => a.type !== 'credit').map((acc, idx) => {
                         const balance = Number(acc.balance || 0);
-                        // Mock sparkline data based on balance if no history
-                        const sparkData = [
-                            { v: balance * 0.95 }, { v: balance * 0.98 }, { v: balance * 0.96 }, 
-                            { v: balance * 1.02 }, { v: balance * 1.01 }, { v: balance }
-                        ];
-
                         return (
-                            <div 
-                                key={acc.id} 
-                                className="group relative overflow-hidden bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 rounded-[1.25rem] p-5 flex flex-col md:flex-row md:items-center justify-between transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:border-indigo-500/30"
-                                style={{ animationDelay: `${idx * 100}ms` }}
-                            >
-                                {/* Institution Column */}
-                                <div className="flex items-center gap-5 min-w-[240px] z-10">
-                                    <div className="relative">
-                                        <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 shadow-inner group-hover:scale-110 transition-transform duration-500">
-                                            <Landmark size={22} className="group-hover:text-indigo-500 transition-colors" />
-                                        </div>
-                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 shadow-sm"></div>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[1rem] font-black text-slate-800 dark:text-white leading-none tracking-tight">{acc.name}</span>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[8px] font-black text-slate-400 uppercase tracking-widest">Digital Terminal</span>
-                                            <span className="text-[10px] font-bold text-slate-400/60 font-mono tracking-tighter">ID: {acc.id.slice(0, 8)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Sparkline Component Integrated */}
-                                <div className="hidden xl:flex flex-1 h-12 max-w-[200px] items-center px-4 opacity-50 group-hover:opacity-100 transition-opacity">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={sparkData}>
-                                            <defs>
-                                                <linearGradient id={`grad-${acc.id}`} x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor={balance >= 0 ? "#10b981" : "#ef4444"} stopOpacity={0.3}/>
-                                                    <stop offset="95%" stopColor={balance >= 0 ? "#10b981" : "#ef4444"} stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <Area 
-                                                type="monotone" 
-                                                dataKey="v" 
-                                                stroke={balance >= 0 ? "#10b981" : "#ef4444"} 
-                                                strokeWidth={2.5}
-                                                fillOpacity={1} 
-                                                fill={`url(#grad-${acc.id})`}
-                                                isAnimationActive={true}
-                                            />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-
-                                {/* Status & Performance Indicator */}
-                                <div className="flex flex-col items-end md:items-center px-6 min-w-[150px] z-10">
-                                    <div className="flex items-center gap-2 text-emerald-500 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest">
-                                        <TrendingUp size={12} /> +1.2% Trend
-                                    </div>
-                                    <span className="text-[8px] font-medium text-slate-400 uppercase mt-1 tracking-wider">Health Monitor</span>
-                                </div>
-
-                                {/* Balance & Value Column */}
-                                <div className="text-right z-10 min-w-[180px] mt-4 md:mt-0">
-                                    <div className="flex flex-col">
-                                        <span className={`text-[1.6rem] font-black tracking-tighter leading-none ${balance < 0 ? 'text-rose-500' : 'text-slate-800 dark:text-white'}`}>
-                                            R$ {formatCurrency(Math.abs(balance))}
-                                        </span>
-                                        <div className="flex items-center justify-end gap-2 mt-1.5 font-bold uppercase">
-                                            <span className="text-[10px] text-slate-400 tracking-wider">Total Liquidity</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Action HUD Toggle */}
-                                <div className="flex items-center justify-center p-2 z-10 opacity-0 group-hover:opacity-100 transition-all ml-4">
-                                    <button 
-                                        onClick={() => openEditAccount(acc)}
-                                        className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 shadow-md border border-slate-200/50 dark:border-slate-700/50 text-slate-400 hover:text-indigo-500 hover:scale-110 transition-all flex items-center justify-center"
-                                    >
-                                        <Edit2 size={16} />
-                                    </button>
-                                </div>
-                            </div>
+                            <SciFiStatCard 
+                                key={acc.id}
+                                title={acc.name}
+                                value={`R$ ${formatCurrency(balance)}`}
+                                icon={Landmark}
+                                color={balance < 0 ? 'red' : 'blue'}
+                                subtext={`Tipo: ${acc.type === 'savings' ? 'Reserva' : 'Corrente'} • ID: ${acc.id.slice(0, 8)}`}
+                                onClick={() => openEditAccount(acc)}
+                                isActive={globalAccFilter === acc.id}
+                            />
                         );
                     })}
                 </div>
             </div>
 
-            {/* NEW: Modern High-Intelligence Row 3 - Credit Card Glass Hub */}
-            <div className="mb-12 animate-slide-up" style={{ animationDelay: '200ms' }}>
-                <div className="flex items-center justify-between mb-5 px-1">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 shadow-lg shadow-purple-500/20 flex items-center justify-center text-white">
-                            <CreditCard size={20} />
-                        </div>
-                        <div>
-                            <h3 className="text-[1.2rem] font-black text-slate-800 dark:text-slate-100 m-0 leading-none tracking-tight">Credit Hub</h3>
-                            <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1.5 opacity-60">Matriz de Crédito & Ciclos</p>
-                        </div>
+            {/* BLOCO DOS CARTÕES - Reconstruído no padrão Dashboard */}
+            <div className="mb-12 section-container">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500">
+                        <CreditCard size={20} />
+                    </div>
+                    <div>
+                        <h3 className="text-[1.25rem] font-black text-slate-800 dark:text-slate-100 m-0">Credit Hub & Ciclos</h3>
+                        <p className="text-[0.7rem] font-bold text-slate-400 uppercase tracking-widest mt-1">Gestão de faturas e exposição ao crédito</p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
                     {accounts.filter(a => a.type === 'credit').map((acc, idx) => {
                         const limit = Number(acc.limit || 0);
-                        const groups = groupByInvoiceCycle(transactions, acc);
-                        const now = new Date();
-                        const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-                        const currentGroup = groups.find(g => g.key === currentKey) || { transactions: [], total: 0 };
-                        
                         const debt = filteredTrans.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s + Number(t.amount || 0), 0) -
                                      filteredTrans.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s + Number(t.amount || 0), 0);
                         const percent = limit > 0 ? (debt / limit) * 100 : 0;
                         const dueDay = acc.dueDay || 10;
-                        const closeDay = acc.closeDay || (dueDay - 7 <= 0 ? 30 + (dueDay - 7) : dueDay - 7);
-
+                        
                         return (
                             <div 
-                                key={acc.id} 
+                                key={acc.id}
                                 onClick={() => setSelectedCreditCard(acc)}
-                                className="group relative rounded-[2.5rem] p-1 overflow-hidden transition-all duration-700 hover:-translate-y-2 cursor-pointer shadow-xl hover:shadow-purple-500/20"
-                                style={{ animationDelay: `${idx * 150}ms` }}
+                                className="stat-card relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-xl cursor-pointer"
+                                style={{ 
+                                    borderLeft: `5px solid ${percent > 90 ? '#ef4444' : '#8b5cf6'}`,
+                                    background: 'var(--surface)',
+                                    padding: '1.5rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px'
+                                }}
                             >
-                                {/* Animated Back Glow */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 border border-slate-200/50 dark:border-slate-700/50 -z-10"></div>
-                                <div className="absolute -top-12 -right-12 w-48 h-48 bg-purple-500/10 rounded-full blur-[60px] group-hover:bg-purple-500/20 transition-all duration-700"></div>
-
-                                <div className="flex flex-col p-8 gap-8">
-                                    {/* Header: Brand & Identity */}
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-16 h-16 rounded-[1.5rem] bg-slate-900 dark:bg-slate-800 shadow-2xl flex items-center justify-center text-white border border-slate-700 ring-4 ring-white/50 dark:ring-black/10 group-hover:scale-110 transition-transform duration-700">
-                                                <CreditCard size={32} className="text-purple-400 group-hover:text-purple-300" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <h4 className="text-[1.4rem] font-black text-slate-800 dark:text-white leading-none tracking-tight">{acc.name}</h4>
-                                                <div className="flex items-center gap-2 mt-2">
-                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Active Credit Matrix</span>
-                                                </div>
-                                            </div>
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500">
+                                            <CreditCard size={24} />
                                         </div>
-                                        <div className="text-right flex flex-col items-end">
-                                            <div className="px-3 py-1.5 rounded-xl bg-purple-500 text-white text-[10px] font-black uppercase shadow-lg shadow-purple-500/30">Tier: Elite</div>
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase mt-2 italic tracking-widest animate-pulse">Intelli-Cycle</span>
+                                        <div>
+                                            <h4 className="text-[1.1rem] font-black text-slate-800 dark:text-white leading-none">{acc.name}</h4>
+                                            <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-1">{percent.toFixed(1)}% de Utilização</p>
                                         </div>
                                     </div>
-
-                                    {/* Limit Usage: Circular Visual Paradigm */}
-                                    <div className="flex items-center justify-between bg-slate-50/50 dark:bg-black/20 rounded-[2rem] p-6 border border-white dark:border-slate-800/50">
-                                        <div className="flex flex-col gap-1 flex-1 pr-6 border-r border-slate-200 dark:border-slate-800">
-                                            <span className="text-[0.7rem] font-black text-slate-400 uppercase tracking-widest block opacity-70">Credit Availability</span>
-                                            <h5 className="text-[1.1rem] font-black text-slate-800 dark:text-slate-100 flex items-baseline gap-2">
-                                                 R$ {formatCurrency(Math.max(0, limit - debt))}
-                                                 <span className="text-[0.7rem] font-bold text-emerald-500">Free</span>
-                                            </h5>
-                                            <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 mt-3 rounded-full overflow-hidden shadow-inner p-0.5">
-                                                <div 
-                                                    className={`h-full rounded-full transition-all duration-1000 ${percent > 90 ? 'bg-gradient-to-r from-red-500 to-rose-600' : 'bg-gradient-to-r from-purple-500 to-indigo-600 shadow-[0_0_12px_rgba(139,92,246,0.4)]'}`}
-                                                    style={{ width: `${Math.min(100, percent)}%` }}
-                                                ></div>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase mt-2 tracking-tighter">
-                                                <span>Total Matrix: R$ {formatCurrency(limit)}</span>
-                                                <span className={percent > 90 ? 'text-rose-500' : 'text-purple-500'}>{percent.toFixed(1)}% Load</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col items-center justify-center pl-8 min-w-[120px]">
-                                            <div className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest mb-1">Invoice Center</div>
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-[1.8rem] font-black text-purple-700 dark:text-purple-400 leading-none">R$ {formatCurrency(currentGroup.total)}</span>
-                                                <div className="flex items-center gap-1.5 mt-2">
-                                                     <div className="px-2 py-0.5 rounded-md bg-rose-500 shadow-sm text-white text-[8px] font-black uppercase">Venc: {dueDay}</div>
-                                                     <div className="text-[10px] text-slate-500 font-black">/ {now.getMonth() + 1}</div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div className="text-right">
+                                        <span className="px-2 py-1 bg-purple-500 text-white text-[9px] font-black uppercase rounded-lg">Vence Dia {dueDay}</span>
                                     </div>
+                                </div>
 
-                                    {/* Action HUD */}
-                                    <div className="flex items-center justify-between pt-2">
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest block opacity-60">Cycle Status</span>
-                                                <div className="text-[0.75rem] font-bold text-slate-600 dark:text-slate-300 uppercase mt-1">Fechamento em {String(closeDay).padStart(2, '0')}</div>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); openEditAccount(acc); }}
-                                                className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-indigo-500 hover:scale-110 transition-all flex items-center justify-center"
-                                            >
-                                                <Edit2 size={18} />
-                                            </button>
-                                            <div className="w-12 h-12 rounded-2xl bg-indigo-500 shadow-lg shadow-indigo-500/20 text-white flex items-center justify-center hover:scale-110 transition-all">
-                                                <ArrowRight size={22} />
-                                            </div>
-                                        </div>
+                                <div className="mt-2">
+                                    <div className="flex justify-between text-[0.7rem] font-black text-slate-400 uppercase mb-2">
+                                        <span>Dívida: R$ {formatCurrency(debt)}</span>
+                                        <span>Livre: R$ {formatCurrency(Math.max(0, limit - debt))}</span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                        <div 
+                                            className={`h-full transition-all duration-1000 ${percent > 90 ? 'bg-red-500' : 'bg-purple-500'}`}
+                                            style={{ width: `${Math.min(100, percent)}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center mt-2 group">
+                                    <span className="text-[0.65rem] font-bold text-slate-400 italic">Clique para ver faturas</span>
+                                    <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-purple-500 group-hover:bg-purple-50 transition-all">
+                                        <ArrowRight size={16} />
                                     </div>
                                 </div>
                             </div>
