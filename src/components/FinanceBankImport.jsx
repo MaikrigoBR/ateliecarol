@@ -49,10 +49,11 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                 (et.date === nt.date && 
                  Math.abs(Number(et.amount)) === Math.abs(Number(nt.amount)) &&
                  String(et.accountId) === String(selectedAccountId) &&
-                 et.description.toLowerCase().trim() === nt.description.toLowerCase().trim())
+                 et.description.toLowerCase().trim() === nt.description.toLowerCase().trim()) ||
+                (et.installment === nt.installment && et.description === nt.description && String(et.accountId) === String(selectedAccountId))
             );
 
-            // 2. Check against this same batch (NuBank case: multiple identical lines in CSV)
+            // 2. Check against this same batch
             const isLocalDuplicate = localParsedSeen.has(fingerprint);
             localParsedSeen.add(fingerprint);
 
@@ -61,15 +62,13 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
             // Suggested Match (Pending transactions or Orders)
             let suggestedMatch = null;
             if (!isDuplicate) {
-                // Check pending transactions
                 const transMatch = existingTransactions.find(et => 
-                    et.status === 'pending' && 
-                    et.date === nt.date && 
-                    Math.abs(Number(et.amount)) === Math.abs(Number(nt.amount))
+                    et.description === nt.description &&
+                    Math.abs(Number(et.amount)) === Math.abs(Number(nt.amount)) &&
+                    (et.status === 'pending' || et.source === 'projection')
                 );
                 if (transMatch) suggestedMatch = { type: 'transaction', item: transMatch };
 
-                // Check pending orders (if it's an income)
                 if (!transMatch && nt.type === 'income') {
                     const orderMatch = orders.find(o => 
                         o.paymentStatus === 'pending' && 
@@ -82,32 +81,23 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
             // --- AUTO-VINCULO COM ATIVOS/INSUMOS (FUZZY) ---
             let suggestedLink = null;
             const desc = (nt.description || '').toLowerCase();
-            const descParts = desc.split(/[* \-\/]/).filter(p => p.length > 3); // Palavras significativas da descrição
+            const descParts = desc.split(/[* \-\/]/).filter(p => p.length > 3);
 
-            // 1. Procurar em Equipamentos
             const equipMatch = equipments.find(e => {
                 const name = e.name.toLowerCase();
                 const brand = (e.brand || '').toLowerCase();
-                // Match direto ou se alguma palavra significativa da descrição está no nome do equipamento
-                return desc.includes(name) || name.includes(desc) || 
-                       (brand && desc.includes(brand)) ||
-                       descParts.some(p => name.includes(p));
+                return desc.includes(name) || name.includes(desc) || (brand && desc.includes(brand)) || descParts.some(p => name.includes(p));
             });
 
             if (equipMatch) {
                 suggestedLink = { type: 'equipment', id: equipMatch.id, name: equipMatch.name };
             } else {
-                // 2. Procurar em Materiais / Insumos
                 const matMatch = materials.find(m => {
                     const name = m.name.toLowerCase();
                     const cat = (m.category || '').toLowerCase();
-                    return desc.includes(name) || name.includes(desc) ||
-                           (cat && desc.includes(cat)) ||
-                           descParts.some(p => name.includes(p));
+                    return desc.includes(name) || name.includes(desc) || (cat && desc.includes(cat)) || descParts.some(p => name.includes(p));
                 });
-                if (matMatch) {
-                    suggestedLink = { type: 'material', id: matMatch.id, name: matMatch.name };
-                }
+                if (matMatch) suggestedLink = { type: 'material', id: matMatch.id, name: matMatch.name };
             }
 
             // --- AUTO-CONCILIÇÃO DE TRANSFERÊNCIA/CARTÃO ---
@@ -116,19 +106,12 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
             let isAISuggested = !!nt.isAISuggested;
 
             if (nt.type === 'expense' && (nt.category === 'Pagamento de Fatura' || desc.includes('pagamento fatura') || desc.includes('pagamento nubank') || desc.includes('pagamento mercado pago') || desc.includes('pagamento cartao'))) {
-                const targetCard = accounts.find(a => 
-                    a.type === 'credit' && (
-                        desc.includes(a.name.toLowerCase()) ||
-                        (a.bank && desc.includes(a.bank.toLowerCase())) ||
-                        (selectedAcc?.bank && a.bank && selectedAcc.bank.toLowerCase() === a.bank.toLowerCase()) // Same bank card
-                    )
-                );
+                const targetCard = accounts.find(a => a.type === 'credit' && (desc.includes(a.name.toLowerCase()) || (a.bank && desc.includes(a.bank.toLowerCase())) || (selectedAcc?.bank && a.bank && selectedAcc.bank.toLowerCase() === a.bank.toLowerCase())));
                 if (targetCard) targetAccountId = targetCard.id;
                 finalCategory = 'Pagamento de Fatura';
                 isAISuggested = true;
             }
 
-            // --- SMART HISTORICAL CATEGORY ---
             if (!isAISuggested || finalCategory === 'Outros' || finalCategory === 'Geral') {
                 const historyCat = getHistoricalCategory(nt.description);
                 if (historyCat) {
@@ -139,14 +122,53 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
 
             return { ...nt, category: finalCategory, isAISuggested, isDuplicate, suggestedMatch, suggestedLink, targetAccountId };
         });
+
+        // --- EXPANSÃO PROATIVA DE PARCELAS ---
+        const expanded = [];
+        withMeta.forEach(main => {
+            expanded.push({ ...main, selected: !main.isDuplicate });
+            
+            // Se detectarmos parcelamento (ex: 3/10)
+            if (main.installmentNumber && main.installmentsTotal > 1 && !main.isDuplicate) {
+                for (let i = 1; i <= main.installmentsTotal; i++) {
+                    if (i === main.installmentNumber) continue; // Pular a atual
+
+                    const parcelKey = `${i}/${main.installmentsTotal}`;
+                    // Verificar se essa parcela específica já existe no DB
+                    const alreadyExists = existingTransactions.some(et => 
+                        et.description === main.description && 
+                        et.installment === parcelKey &&
+                        String(et.accountId) === String(selectedAccountId)
+                    );
+
+                    if (!alreadyExists) {
+                        const dateObj = new Date(main.date + 'T12:00:00');
+                        dateObj.setMonth(dateObj.getMonth() + (i - main.installmentNumber));
+                        
+                        expanded.push({
+                            ...main,
+                            id: `${main.id}-proj-${i}`,
+                            date: dateObj.toISOString().split('T')[0],
+                            installment: parcelKey,
+                            installmentNumber: i,
+                            isDuplicate: false,
+                            isProjected: true,
+                            source: 'projection',
+                            status: i < main.installmentNumber ? 'paid' : 'pending',
+                            selected: true // Por padrão, selecionamos para criar o histórico/futuro
+                        });
+                    }
+                }
+            }
+        });
         
         const stats = {
-            total: withMeta.length,
-            duplicates: withMeta.filter(t => t.isDuplicate).length,
-            totalAmount: withMeta.reduce((s, t) => s + Number(t.amount || 0), 0)
+            total: expanded.length,
+            duplicates: expanded.filter(t => t.isDuplicate).length,
+            totalAmount: expanded.reduce((s, t) => s + Number(t.amount || 0), 0)
         };
 
-        setStagedTransactions(withMeta.map(t => ({ ...t, selected: !t.isDuplicate })));
+        setStagedTransactions(expanded);
         setImportStats(stats);
         setIsParsing(false);
     };
@@ -236,12 +258,12 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                         accountId: selectedAccountId, amount: t.amount, type: t.type, category: t.category || 'Geral', description: t.description,
                         installment: t.installment || null,
                         date: t.date,
-                        status: 'paid',
+                        status: t.status || 'paid',
                         bankReferenceId: t.rawId,
                         linkedItemId: t.suggestedLink?.id || null,
                         linkedItemType: t.suggestedLink?.type || null,
                         createdAt: new Date().toISOString(),
-                        source: 'bank_import'
+                        source: t.source || 'bank_import'
                     });
                 }
 
@@ -555,20 +577,23 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                         <td style={{ padding: '16px', fontWeight: 600, fontSize: '0.8rem', color: '#64748b' }}>
                                             {new Date(t.date).toLocaleDateString('pt-BR')}
                                         </td>
-                                        <td style={{ padding: '16px' }}>
+                                        <td style={{ padding: '12px 16px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                <input 
-                                                    type="text"
-                                                    value={t.description}
-                                                    onChange={(e) => updateStagedRow(t.id, { description: e.target.value })}
-                                                    style={{ 
-                                                        width: '100%', border: 'none', background: 'transparent', 
-                                                        fontWeight: 900, color: '#0f172a', fontSize: '1rem',
-                                                        padding: '4px 8px', borderRadius: '4px',
-                                                        borderBottom: '1px dashed #e2e8f0'
-                                                    }}
-                                                    className="hover:bg-slate-50 focus:bg-white focus:ring-0 focus:border-primary"
-                                                />
+                                                <div className="flex items-center gap-2">
+                                                    {t.isProjected && <span style={{ padding: '2px 6px', backgroundColor: '#eef2ff', color: '#6366f1', borderRadius: '4px', fontSize: '9px', fontWeight: 900 }}>PROJEÇÃO</span>}
+                                                    <input 
+                                                        type="text"
+                                                        value={t.description}
+                                                        onChange={(e) => updateStagedRow(t.id, { description: e.target.value })}
+                                                        style={{ 
+                                                            width: '100%', border: 'none', background: 'transparent', 
+                                                            fontWeight: 900, color: t.isProjected ? '#6366f1' : '#0f172a', fontSize: '1rem',
+                                                            padding: '4px 8px', borderRadius: '4px',
+                                                            borderBottom: '1px dashed #e2e8f0'
+                                                        }}
+                                                        className="hover:bg-slate-50 focus:bg-white focus:ring-0 focus:border-primary"
+                                                    />
+                                                </div>
                                                 <div className="flex flex-wrap gap-2 items-center px-2">
                                                     {t.installment && (
                                                         <span style={{ 
