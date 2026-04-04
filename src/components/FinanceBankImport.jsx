@@ -609,7 +609,11 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                             />
                                         </td>
                                         <td style={{ padding: '12px 16px' }}>
-                                            {t.isDuplicate ? (
+                                            {t.isProjected ? (
+                                                <div className="flex items-center gap-1.5 text-indigo-600 font-bold text-[10px] uppercase">
+                                                    <Zap size={12} fill="#6366f1" /> Projeção Inteligente
+                                                </div>
+                                            ) : t.isDuplicate ? (
                                                 <div className="flex items-center gap-1.5 text-orange-600 font-bold text-[10px] uppercase">
                                                     <AlertTriangle size={12} /> Bloquear Duplicidade
                                                 </div>

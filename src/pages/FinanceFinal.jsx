@@ -1868,8 +1868,14 @@ export function FinanceFinal() {
                                         {t.orderId ? <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" title="Pedido Automático"></div> : (t.referenceId ? <Hammer size={12} color="#f59e0b" title="Módulo Derivado" /> : null)}
                                         {t.description}
                                         {(t.installmentsTotal > 1 || t.installment) && (
-                                            <span style={{ marginLeft: '6px', fontSize: '9px', color: '#4f46e5', backgroundColor: '#e0e7ff', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
-                                                {t.installment || `${t.installmentNumber}/${t.installmentsTotal}`}
+                                            <span style={{ 
+                                                marginLeft: '8px', fontSize: '10px', color: 'white', 
+                                                backgroundColor: '#4f46e5', padding: '2px 8px', 
+                                                borderRadius: '9999px', fontWeight: 900,
+                                                boxShadow: '0 2px 4px rgba(79, 70, 229, 0.2)',
+                                                display: 'inline-flex', alignItems: 'center', gap: '3px'
+                                            }}>
+                                                <CreditCard size={10} /> {t.installment || `${t.installmentNumber}/${t.installmentsTotal}`}
                                             </span>
                                         )}
                                         {isOverdue && <span style={{ marginLeft: '6px', fontSize: '9px', color: 'white', backgroundColor: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>⚠️ VENCIDO</span>}

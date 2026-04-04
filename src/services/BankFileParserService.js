@@ -243,12 +243,15 @@ export const BankFileParserService = {
             
             // --- DETECÇÃO UNIVERSAL DE PARCELAS ---
             // Suporta: (Parcela 02 de 10), - Parcela 3/10, (02/10), (Parc 1/5), (P: 01/12), 2/12, etc.
-            const instRegex = /(?:[(-]\s*)?(?:Parcela|Parc\.?|P:?)?\s*(\d{1,2})\s*(?:de|\/)\s*(\d{1,2})\)?/i;
+            // Regex melhorado para capturar padrões NuBank (ex: IFOOD - 01/10) e variações com hífens ou espaços
+            const instRegex = /(?:[(-]\s*|\s-\s)?(?:Parcela|Parc\.?|P:?)?\s*(\d{1,2})\s*(?:de|\/)\s*(\d{1,2})\)?/i;
             const instMatch = desc.match(instRegex);
             
+            let installment = null;
             if (instMatch) {
                 installmentNumber = parseInt(instMatch[1]);
                 installmentsTotal = parseInt(instMatch[2]);
+                installment = `${instMatch[1].padStart(2, '0')}/${instMatch[2].padStart(2, '0')}`;
                 isAISuggested = true;
             }
 
@@ -270,6 +273,7 @@ export const BankFileParserService = {
                 id: Math.random().toString(36).substring(7),
                 category,
                 isAISuggested,
+                installment,
                 installmentNumber,
                 installmentsTotal,
                 bankReferenceId,
