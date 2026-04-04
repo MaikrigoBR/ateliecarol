@@ -44,10 +44,23 @@ export function FinanceBankImport({ accounts = [], existingTransactions = [], or
         
         const withMeta = parsed.map(nt => {
             const fingerprint = nt.rawId || `${nt.date}-${nt.amount}-${nt.description.trim()}`;
-            const isInDB = existingTransactions.some(et => 
-                (et.bankReferenceId === nt.rawId && nt.rawId) || 
-                (et.date === nt.date && Math.abs(et.amount) === Math.abs(nt.amount) && String(et.accountId) === String(selectedAccountId) && et.description.trim() === nt.description.trim())
-            );
+            
+            // --- BLINDAGEM REFORÇADA ---
+            const isInDB = existingTransactions.some(et => {
+                // 1. Match por ID de Transação Real (OFX/CSV)
+                if (et.bankReferenceId === nt.rawId && nt.rawId) return true;
+                
+                // 2. Match por Parcela Específica (02/10, etc)
+                // Se temos a mesma descrição e o mesmo identificador de parcela na mesma conta, é duplicidade.
+                if (nt.installment && et.installment === nt.installment && et.description.trim() === nt.description.trim() && String(et.accountId) === String(selectedAccountId)) return true;
+
+                // 3. Match por Atributos (Caso não tenha ID ou Parcela)
+                return et.date === nt.date && 
+                       Math.abs(et.amount) === Math.abs(nt.amount) && 
+                       String(et.accountId) === String(selectedAccountId) && 
+                       et.description.trim() === nt.description.trim();
+            });
+
             const isLocalDuplicate = localSeen.has(fingerprint);
             localSeen.add(fingerprint);
             const isDuplicate = isInDB || isLocalDuplicate;
