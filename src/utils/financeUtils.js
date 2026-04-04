@@ -6,15 +6,21 @@
  * @returns {Date} - Primeiro dia do mês da fatura correspondente
  */
 export function getInvoiceMonth(dateStr, closeDay) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const transDate = new Date(y, m - 1, d);
+  if (!dateStr || typeof dateStr !== 'string') return new Date();
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return new Date();
+  
+  const [y, m, d] = parts.map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return new Date();
+  
+  const normalizedCloseDay = Number(closeDay) || 3;
   
   // Se o dia da compra for maior ou igual ao dia de fechamento, a conta vai para o próximo mês
-  if (d >= closeDay) {
-    return new Date(y, m, 1); // Mês subsequente à compra
+  if (d >= normalizedCloseDay) {
+    return new Date(y, m, 1);
   }
   
-  return new Date(y, m - 1, 1); // Mesmo mês da compra
+  return new Date(y, m - 1, 1);
 }
 
 /**
@@ -42,10 +48,22 @@ export function groupByInvoiceCycle(transactions, selectedCard) {
     const groups = {};
     
     transactions.forEach(t => {
-        if (t.accountId !== selectedCard.id) return;
+        if (String(t.accountId) !== String(selectedCard.id)) return;
         if (t.type !== 'expense' && t.type !== 'income') return;
 
-        const invoiceMonth = getInvoiceMonth(t.date, processedCloseDay);
+        let invoiceMonth = getInvoiceMonth(t.date, processedCloseDay);
+        
+        // Regra Especial de Pagamento de Fatura: Se for crédito (income) e for logo após o fechamento,
+        // vinculamos à fatura que acabara de fechar para o usuário ver o abatimento correto.
+        const isInvoicePayment = t.category === 'Pagamento de Fatura' || t.description.toLowerCase().includes('pagamento fatura');
+        if (t.type === 'income' && isInvoicePayment) {
+            const tDay = Number(t.date.split('-')[2]);
+            // Se o dia do pagamento for entre o fechamento e o dia 15, provavelmente é o pagamento da conta anterior
+            if (tDay >= processedCloseDay && tDay <= 15) {
+                invoiceMonth = new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth() - 1, 1);
+            }
+        }
+
         const key = `${invoiceMonth.getFullYear()}-${String(invoiceMonth.getMonth() + 1).padStart(2, '0')}`;
         
         if (!groups[key]) {

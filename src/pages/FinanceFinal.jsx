@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     CreditCard, Wallet, TrendingUp, TrendingDown, Plus, 
     Calendar, DollarSign, Filter, MoreHorizontal, CheckCircle, AlertCircle, Trash2, BarChart2, Edit2,
-    ShoppingBag, Truck, Briefcase, Tag, Zap, Coffee, ArrowUpRight, ArrowDownLeft, Landmark, LayoutGrid, ArrowRight, X, Settings, Search, FileText, Hammer, ListOrdered, ArrowDownRight, Check
+    ShoppingBag, Truck, Briefcase, Tag, Zap, Coffee, ArrowUpRight, ArrowDownLeft, Landmark, LayoutGrid, ArrowRight, X, Settings, Search, FileText, Hammer, ListOrdered, ArrowDownRight, Check, Upload, ShieldCheck, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import db from '../services/database';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,6 +16,10 @@ import { FinanceTransactionDetailsModal } from '../components/FinanceTransaction
 import { FinanceAIInsights, SimpleDRETable } from '../components/FinanceAIInsights';
 import { FinanceBatchEntryModal } from '../components/FinanceBatchEntryModal';
 import { formatCurrency, groupByInvoiceCycle } from '../utils/financeUtils';
+import FinanceAuditService from '../services/FinanceAuditService';
+import { AuditReportModal } from '../components/AuditReportModal';
+import { FinanceProjectionDashboard } from '../components/FinanceProjectionDashboard';
+import { FinanceBankImport } from '../components/FinanceBankImport';
 
 const EXPENSE_CATEGORIES = [
     'Administrativo / Fixos',
@@ -57,13 +60,13 @@ const CATEGORY_COLORS = {
 function SciFiStatCard({ title, value, icon: Icon, color, subtext, isActive, onClick }) {
     const getColorTheme = (c) => {
         const map = {
-            'green': { glow: 'rgba(16, 185, 129, 0.3)', text: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
-            'orange': { glow: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-            'purple': { glow: 'rgba(139, 92, 246, 0.3)', text: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
-            'blue': { glow: 'rgba(59, 130, 246, 0.3)', text: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
-            'red': { glow: 'rgba(239, 68, 68, 0.3)', text: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-            'emerald': { glow: 'rgba(52, 211, 153, 0.3)', text: '#34d399', bg: 'rgba(52, 211, 153, 0.1)' },
-            'primary': { glow: 'rgba(99, 102, 241, 0.3)', text: 'var(--primary)', bg: 'rgba(99, 102, 241, 0.1)' }
+            'green': { glow: 'rgba(16, 185, 129, 0.3)', text: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', grad: 'linear-gradient(135deg, #10b981, #059669)' },
+            'orange': { glow: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', grad: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+            'purple': { glow: 'rgba(139, 92, 246, 0.3)', text: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)', grad: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' },
+            'blue': { glow: 'rgba(59, 130, 246, 0.3)', text: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)', grad: 'linear-gradient(135deg, #3b82f6, #2563eb)' },
+            'red': { glow: 'rgba(239, 68, 68, 0.3)', text: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', grad: 'linear-gradient(135deg, #ef4444, #dc2626)' },
+            'emerald': { glow: 'rgba(52, 211, 153, 0.3)', text: '#34d399', bg: 'rgba(52, 211, 153, 0.15)', grad: 'linear-gradient(135deg, #10b981, #059669)' },
+            'primary': { glow: 'rgba(99, 102, 241, 0.3)', text: 'var(--primary)', bg: 'rgba(99, 102, 241, 0.15)', grad: 'linear-gradient(135deg, var(--primary), #4f46e5)' }
         };
         return map[c] || map['blue'];
     };
@@ -72,55 +75,61 @@ function SciFiStatCard({ title, value, icon: Icon, color, subtext, isActive, onC
 
     return (
         <div 
-            className={`stat-card relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-xl ${isActive ? 'ring-2 ring-offset-2 ring-[var(--surface)]' : ''}`} 
+            className={`stat-card relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-xl ${isActive ? 'active-stat' : ''}`} 
             style={{ 
-                borderLeft: `5px solid ${theme.text}`,
+                borderRadius: '24px',
                 cursor: onClick ? 'pointer' : 'default',
-                transform: isActive ? 'translateY(-6px) scale(1.02)' : 'none',
-                boxShadow: isActive ? `0 20px 30px -10px ${theme.glow}, 0 10px 15px -5px ${theme.glow}` : 'var(--shadow-sm)',
-                border: isActive ? `1.5px solid ${theme.text}40` : '1px solid var(--border)',
-                background: isActive ? `linear-gradient(150deg, var(--surface) 0%, ${theme.text}0D 100%)` : 'var(--surface)',
-                padding: '1.4rem',
-                minHeight: '120px',
+                transform: isActive ? 'translateY(-6px)' : 'none',
+                boxShadow: isActive ? `0 20px 40px -12px ${theme.glow}` : '0 4px 6px -1px rgba(0,0,0,0.05)',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                backdropFilter: 'blur(10px)',
+                padding: '24px',
+                minHeight: '130px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
-                animation: isActive ? 'pulse-subtle 3s infinite' : 'none'
+                gap: '20px',
+                animation: isActive ? 'pulse-subtle 4s infinite' : 'none'
             }}
             onClick={onClick}
         >
-            {/* Dynamic Glow Accent */}
-            <div style={{ 
-                position: 'absolute', top: '-25%', right: '-25%', width: '120px', height: '120px', 
-                background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
-                borderRadius: '50%', filter: 'blur(20px)', pointerEvents: 'none', opacity: isActive ? 0.8 : 0.4
-            }}></div>
-            
+            <div 
+                style={{ 
+                    position: 'absolute', 
+                    top: 0, 
+                    left: 0, 
+                    width: '6px', 
+                    height: '100%', 
+                    background: theme.grad,
+                    opacity: 0.8
+                }} 
+            />
+
             <div className="flex-1" style={{ position: 'relative', zIndex: 1 }}>
                 <p style={{ 
-                    fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '0.5rem', opacity: 0.8
+                    fontSize: '0.625rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--text-muted)', marginBottom: '8px', opacity: 0.7
                 }}>{title}</p>
                 <h3 style={{ 
-                    fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em', margin: 0
+                    fontSize: '1.75rem', fontWeight: 950, color: 'var(--text-main)', letterSpacing: '-0.04em', margin: 0, lineHeight: 1
                 }}>{value}</h3>
                 {subtext && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '0.8rem' }}>
-                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: theme.text }}></div>
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, margin: 0, opacity: 0.9 }}>{subtext}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.text, opacity: 0.6 }}></div>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, margin: 0 }}>{subtext}</p>
                     </div>
                 )}
             </div>
             
             <div className="stat-icon-wrapper shrink-0" style={{ 
-                transform: isActive ? 'rotate(-8deg) scale(1.15)' : 'none',
-                color: theme.text, 
-                backgroundColor: theme.bg,
-                width: '46px', height: '46px', borderRadius: '14px',
+                background: theme.grad,
+                color: 'white',
+                width: '54px', height: '54px', borderRadius: '18px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: isActive ? `0 8px 15px -4px ${theme.glow}` : 'none',
-                transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                boxShadow: `0 8px 16px -4px ${theme.glow}`,
+                transform: isActive ? 'rotate(-6deg) scale(1.1)' : 'none',
+                transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
             }}>
-                <Icon size={24} />
+                <Icon size={26} strokeWidth={2.5} />
             </div>
         </div>
     );
@@ -305,12 +314,15 @@ export function FinanceFinal() {
     const [selectedTransIds, setSelectedTransIds] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
-    const [orders, setOrders] = useState([]); // For projections
+    const [orders, setOrders] = useState([]); // Active for projections
+    const [totalOrders, setTotalOrders] = useState([]); // All for DRE
     const [equipments, setEquipments] = useState([]); // For linking
+    const [materials, setMaterials] = useState([]); // For linking
     const [loading, setLoading] = useState(true);
     const [chartData, setChartData] = useState([]);
     const [costCenterData, setCostCenterData] = useState([]);
     const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+    const [view, setView] = useState('overview'); // Added: 'overview', 'projection' or 'import'
     
     // Dynamic Categories State
     const [expenseCategories, setExpenseCategories] = useState(EXPENSE_CATEGORIES);
@@ -322,6 +334,8 @@ export function FinanceFinal() {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [newCategoryType, setNewCategoryType] = useState('expense');
     const [newCategoryColor, setNewCategoryColor] = useState('#6366f1');
+    const [newCategoryParent, setNewCategoryParent] = useState('');
+    const [editCategoryId, setEditCategoryId] = useState(null);
     const [rawCategories, setRawCategories] = useState([]);
     
     // Global Dash Filter
@@ -347,6 +361,11 @@ export function FinanceFinal() {
 
     // Modals & Forms State
     const [isAccModalOpen, setIsAccModalOpen] = useState(false);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [exportRange, setExportRange] = useState({
+        start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+    });
     const [isTransModalOpen, setIsTransModalOpen] = useState(false);
     const [editAccId, setEditAccId] = useState(null);
     const [editTransId, setEditTransId] = useState(null);
@@ -357,6 +376,10 @@ export function FinanceFinal() {
     const [transDateFilter, setTransDateFilter] = useState('');
     const [visibleTransactionsLimit, setVisibleTransactionsLimit] = useState(50);
 
+    // Audit System State
+    const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+    const [auditReport, setAuditReport] = useState([]);
+
 
     // Global Filtered Data
     const filteredAccounts = useMemo(() => {
@@ -366,6 +389,37 @@ export function FinanceFinal() {
     const filteredTrans = useMemo(() => {
         return globalAccFilter ? transactions.filter(t => t.accountId === globalAccFilter) : transactions;
     }, [transactions, globalAccFilter]);
+
+    // --- NOVA LÓGICA DE AUDITORIA CONTÁBIL (V5) ---
+    const allTransactions = useMemo(() => transactions || [], [transactions]);
+    
+    const auditStats = useMemo(() => {
+        const total = allTransactions.length;
+        if (total === 0) return { percent: 0, count: 0, total: 0 };
+        const reconciled = allTransactions.filter(t => 
+            t.linkedItemId || t.orderId || t.status === 'reconciled' || t.suggestedMatch || t.bankReferenceId
+        ).length;
+        return {
+            percent: Math.round((reconciled / total) * 100),
+            count: reconciled,
+            total
+        };
+    }, [allTransactions]);
+
+    const mlStats = useMemo(() => {
+        const mlTrans = allTransactions.filter(t => 
+            t.description?.toLowerCase().includes('mercado') || 
+            t.description?.toLowerCase().includes('mp*') ||
+            t.bankReferenceId
+        );
+        const total = mlTrans.length;
+        if (total === 0) return { percent: 100, count: 0 };
+        const withId = mlTrans.filter(t => t.bankReferenceId).length;
+        return {
+            percent: Math.round((withId / total) * 100),
+            count: withId
+        };
+    }, [allTransactions]);
 
     // Calculations
     useEffect(() => {
@@ -380,8 +434,16 @@ export function FinanceFinal() {
             // 2. KPI Stats
             const now = new Date();
             const todayStr = now.toISOString().split('T')[0];
-            const currentMonth = now.getMonth();
-            const currentYear = now.getFullYear();
+            
+            // Usar o filtro de data (Mês de Competência) se disponível
+            let currentMonth = now.getMonth();
+            let currentYear = now.getFullYear();
+            
+            if (transDateFilter) {
+                const [y, m] = transDateFilter.split('-');
+                currentYear = parseInt(y);
+                currentMonth = parseInt(m) - 1;
+            }
 
             const currentMonthTrans = filteredTrans.filter(t => {
                 const d = new Date(t.date);
@@ -389,7 +451,18 @@ export function FinanceFinal() {
                 return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear;
             });
 
-            const income = currentMonthTrans.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+            // --- CÁLCULO DE DRE POR COMPETÊNCIA (ACCRUAL) ---
+            // Pegamos o faturamento real (Pedidos criados no mês) + Outras receitas diretas
+            const monthOrderRevenue = totalOrders.filter(o => {
+                if (!o.createdAt) return false;
+                const d = new Date(o.createdAt);
+                return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear;
+            }).reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+            const directIncomes = currentMonthTrans.filter(t => t.type === 'income' && !t.orderId)
+                .reduce((sum, t) => sum + Number(t.amount), 0);
+
+            const accrualIncome = monthOrderRevenue + directIncomes;
             const expense = currentMonthTrans.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
             
             // Accounts Payable Calculation
@@ -451,24 +524,50 @@ export function FinanceFinal() {
                 };
             }).sort((a,b) => b.value - a.value);
 
-            // True Net Profit (subtract gateway taxes from income since incomes in Firebase are recorded as NetAmount already if from webhook.
-            // Wait, Webhook records income as NET AMOUNT exactly. So the True Result doesn't need to subtract the tax again if it's already net!
-            // However, visually showing the Gateway Tax helps the owner understand how much they lost in fees.
+             // 4. Provisões (Contas a Pagar e Receber - Próximos 30 dias)
+            const upcomingPayables = filteredTrans.filter(t => {
+                const d = new Date(t.date);
+                const next30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                return t.type === 'expense' && t.status === 'pending' && d >= now && d <= next30Days;
+            }).sort((a,b) => new Date(a.date) - new Date(b.date));
+
+            const upcomingReceivables = orders.filter(o => {
+                const targetDate = o.nextDueDate || o.deadline;
+                if (!targetDate) return false;
+                const d = new Date(targetDate);
+                const next30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                return d >= now && d <= next30Days;
+            }).sort((a,b) => new Date(a.nextDueDate || a.deadline) - new Date(b.nextDueDate || b.deadline));
+
+            // 5. Depreciação Automática (Estimada)
+            // Calculamos a depreciação mensal de todos os equipamentos cadastrados (Ativo Imobilizado)
+            // Assumindo vida útil média de 5 anos (60 meses) para equipamentos de ateliê
+            const totalAssetValue = equipments.reduce((sum, eq) => sum + Number(eq.value || 0), 0);
+            const monthlyDepreciation = totalAssetValue / 60;
 
             setStats({
                 totalBalance: totalBal,
-                monthIncome: income,
+                monthIncome: accrualIncome,
                 monthExpense: expense,
-                result: income - expense,
+                result: accrualIncome - expense,
                 creditDebt: creditUsed,
                 gatewayTaxes: totalGatewayTaxes,
                 expenseMap: expenseMap,
                 payableToday,
-                payableMonth
+                payableMonth,
+                upcomingPayables,
+                upcomingReceivables,
+                monthlyDepreciation,
+                totalAssetValue
             });
             setCostCenterData(costCenterFormat);
         }
-    }, [transactions, orders, accounts, loading, globalAccFilter, chartMode]);
+    }, [transactions, orders, accounts, loading, globalAccFilter, chartMode, transDateFilter]);
+
+    // Auto-clear selection when filters change (Safety First)
+    React.useEffect(() => {
+        setSelectedTransIds([]);
+    }, [transSearchTerm, transTypeFilter, transAccFilter, globalAccFilter, transDateFilter, transStatusFilter, transStartDate, transEndDate]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -476,17 +575,20 @@ export function FinanceFinal() {
         const trans = await db.getAll('transactions') || [];
         const allOrders = await db.getAll('orders') || [];
         const allEquips = await db.getAll('equipments') || [];
+        const allMaterials = await db.getAll('inventory') || [];
         
         // Fetch Categories
         let dbCategories = await db.getAll('categories') || [];
+        
+        // Seeding robust: Garantir que se o usuário deletar tudo ou estiver começando, os padrões entrem.
+        // Se já houver categorias, não forcamos a entrada para respeitar exclusões manuais feitas pelo usuário no passado.
         if (dbCategories.length === 0) {
-            // Seed defaults
             const promises = [];
             for (const cat of EXPENSE_CATEGORIES) {
-                promises.push(db.create('categories', { name: cat, type: 'expense', color: CATEGORY_COLORS[cat] || '#9ca3af' }));
+                promises.push(db.create('categories', { name: cat, type: 'expense', color: CATEGORY_COLORS[cat] || '#9ca3af', parentId: null }));
             }
             for (const cat of INCOME_CATEGORIES) {
-                promises.push(db.create('categories', { name: cat, type: 'income', color: CATEGORY_COLORS[cat] || '#10b981' }));
+                promises.push(db.create('categories', { name: cat, type: 'income', color: CATEGORY_COLORS[cat] || '#10b981', parentId: null }));
             }
             await Promise.all(promises);
             dbCategories = await db.getAll('categories') || [];
@@ -520,7 +622,9 @@ export function FinanceFinal() {
         setAccounts(recalculatedAccs);
         setTransactions(trans.sort((a,b) => new Date(b.date) - new Date(a.date)));
         setOrders(pendingOrders);
+        setTotalOrders(allOrders);
         setEquipments(allEquips);
+        setMaterials(allMaterials);
         setLoading(false);
     };
 
@@ -528,18 +632,36 @@ export function FinanceFinal() {
         fetchData();
     }, []);
 
-    const handleCreateCategory = async (e) => {
+    const handleSaveCategory = async (e) => {
         e.preventDefault();
         if (!newCategoryName.trim()) return;
         
-        await db.create('categories', { 
+        const payload = { 
             name: newCategoryName.trim(), 
             type: newCategoryType, 
-            color: newCategoryColor 
-        });
+            color: newCategoryColor,
+            parentId: newCategoryParent || null
+        };
+
+        if (editCategoryId) {
+            await db.update('categories', editCategoryId, payload);
+        } else {
+            await db.create('categories', payload);
+        }
         
         setNewCategoryName('');
+        setNewCategoryParent('');
+        setNewCategoryColor('#6366f1');
+        setEditCategoryId(null);
         fetchData();
+    };
+
+    const openEditCategory = (c) => {
+        setNewCategoryName(c.name);
+        setNewCategoryType(c.type);
+        setNewCategoryColor(c.color);
+        setNewCategoryParent(c.parentId || '');
+        setEditCategoryId(c.id);
     };
 
     const handleDeleteCategory = async (id, name) => {
@@ -597,6 +719,65 @@ export function FinanceFinal() {
         setEditAccId(null);
         setNewAccount({ name: '', type: 'checking', balance: 0, limit: 0, dueDay: 10, closeDay: 3, color: '#3b82f6' });
         fetchData();
+    };
+
+    const handleRunAudit = async () => {
+        const result = await FinanceAuditService.runFullAudit();
+        setAuditReport(result);
+        setIsAuditModalOpen(true);
+    };
+
+    const handleExportToAccountant = async () => {
+        setIsExportModalOpen(true);
+    };
+
+    const performExport = async () => {
+        try {
+            const data = await FinanceAuditService.generateAccountantReport(exportRange.start, exportRange.end);
+            
+            if (!data || data.length === 0) {
+                alert(`Nenhum dado auditado encontrado para o período ${exportRange.start.split('-').reverse().join('/')} até ${exportRange.end.split('-').reverse().join('/')}.`);
+                return;
+            }
+            
+            FinanceAuditService.exportToExcel(data, `AtelieCarol_Pacote_Contador_${exportRange.start}_a_${exportRange.end}`);
+            setIsExportModalOpen(false);
+            alert('Relatório gerado com sucesso!');
+        } catch (err) {
+            console.error('Export error:', err);
+            alert('Falha ao gerar relatório.');
+        }
+    };
+
+    const handleSetRangePreset = (type) => {
+        const now = new Date();
+        let start, end;
+
+        switch(type) {
+            case 'currentMonth':
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'lastMonth':
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+                break;
+            case 'last3Months':
+                start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'currentYear':
+                start = new Date(now.getFullYear(), 0, 1);
+                end = new Date(now.getFullYear(), 11, 31);
+                break;
+            default:
+                return;
+        }
+
+        setExportRange({
+            start: start.toISOString().split('T')[0],
+            end: end.toISOString().split('T')[0]
+        });
     };
 
     const openEditTrans = (t) => {
@@ -762,6 +943,55 @@ export function FinanceFinal() {
         }
     };
 
+    const handleBulkDelete = async () => {
+        if (selectedTransIds.length === 0) return;
+        
+        // 1. Fetch the actual records from the current filtered list to be absolutely sure what's being deleted
+        const toDelete = selectedTransIds.map(id => transactions.find(x => x.id === id)).filter(Boolean);
+        
+        if (toDelete.length === 0) {
+            setSelectedTransIds([]);
+            return;
+        }
+
+        // 2. Anti-erro para transações de pedidos (bloqueia o lote se houver alguma de pedido lá no meio)
+        const hasOrderTrans = toDelete.some(t => t.orderId && t.type === 'income');
+
+        if (hasOrderTrans) {
+            alert('AÇÃO CANCELADA (Proteção de Receita):\n\nNo lote selecionado existem transações vinculadas a Pedidos/Vendas (Seladas).\n\nEstas transações não podem ser apagadas em massa para evitar furos no fluxo de caixa fiscal. Desmarque-as ou estorne o pedido individualmente.');
+            return;
+        }
+
+        const confirmMsg = `Deseja EXCLUIR DEFINITIVAMENTE ${toDelete.length} lançamentos selecionados?\n\nIsso afetará os saldos das contas correspondentes.\n\nESTA AÇÃO NÃO PODE SER DESFEITA.`;
+        
+        if (window.confirm(confirmMsg)) {
+            try {
+                console.log(`Starting bulk delete for ${toDelete.length} items...`);
+                
+                // Perform deletion in chunks or parallel with tracking
+                const results = await Promise.all(toDelete.map(async (item) => {
+                    const success = await db.delete('transactions', item.id);
+                    return success;
+                }));
+
+                const successCount = results.filter(r => r === true).length;
+                console.log(`Bulk delete finished. Success: ${successCount}/${toDelete.length}`);
+
+                setSelectedTransIds([]);
+                await fetchData();
+                
+                if (successCount === toDelete.length) {
+                    alert(`Sucesso! ${successCount} lançamentos foram removidos.`);
+                } else {
+                    alert(`Aviso: ${successCount} de ${toDelete.length} foram removidos. Alguns itens podem não ter sido excluídos.`);
+                }
+            } catch (error) {
+                console.error("Critical error during bulk delete:", error);
+                alert("Ocorreu um erro ao processar a exclusão em lote. Verifique o console para detalhes.");
+            }
+        }
+    };
+
 
     const accBalances = React.useMemo(() => {
         const balances = {};
@@ -809,29 +1039,164 @@ export function FinanceFinal() {
         return result.sort((a, b) => new Date(b.date) - new Date(a.date));
     }, [transactions, accounts]);
 
+    const finalFilteredTrans = React.useMemo(() => {
+        return transactionsWithBalance.filter(t => {
+            const acc = accounts.find(a => a.id === t.accountId);
+            const search = transSearchTerm.toLowerCase();
+            const matchesSearch = t.description?.toLowerCase().includes(search) || t.category?.toLowerCase().includes(search);
+            const matchesType = transTypeFilter === '' || t.type === transTypeFilter;
+            const matchesAcc = (transAccFilter === '' || t.accountId === transAccFilter) && (globalAccFilter === '' || t.accountId === globalAccFilter);
+            
+            let matchesDate = true;
+            if (transDateFilter) {
+                const tMonth = t.date.substring(0, 7); // YYYY-MM
+                matchesDate = tMonth === transDateFilter;
+            }
+            if (transStartDate && t.date < transStartDate) matchesDate = false;
+            if (transEndDate && t.date > transEndDate) matchesDate = false;
+
+            let matchesStatus = true;
+            if (transStatusFilter) {
+                if (transStatusFilter === 'paid') matchesStatus = t.status === 'paid';
+                if (transStatusFilter === 'pending') {
+                    const isOverdue = t.status === 'pending' && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
+                    matchesStatus = t.status === 'pending' && !isOverdue;
+                }
+                if (transStatusFilter === 'overdue') {
+                    matchesStatus = t.status === 'pending' && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
+                }
+                if (transStatusFilter === 'imported') {
+                    matchesStatus = !!t.bankReferenceId;
+                }
+            }
+            
+            return matchesSearch && matchesType && matchesAcc && matchesDate && matchesStatus;
+        });
+    }, [transactionsWithBalance, accounts, transSearchTerm, transTypeFilter, transAccFilter, globalAccFilter, transDateFilter, transStartDate, transEndDate, transStatusFilter]);
+
     if (loading) return <div className="p-xl text-center">Carregando financeiro...</div>;
 
     return (
         <div className="animate-fade-in page-content">
-            <div className="dashboard-header">
+            <div className="dashboard-header" style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '24px' }}>
                 <div>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+                    <h2 style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.04em' }}>
                         Inteligência Financeira
                     </h2>
-                    <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                        Controle de fluxo de caixa e projeções.
+                    <p style={{ color: 'var(--text-muted)', marginTop: '4px', fontWeight: 700, fontSize: '0.85rem' }}>
+                        Controle de fluxo de caixa, auditoria e projeções futuristas.
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <select 
-                        className="form-input" 
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem', backgroundColor: 'var(--surface-hover)', border: 'none', fontWeight: 600, color: 'var(--text-main)' }}
-                        value={globalAccFilter} 
-                        onChange={e => setGlobalAccFilter(e.target.value)}
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Seletor de Conta Premium */}
+                    <div style={{ position: 'relative', width: '220px' }}>
+                        <div style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)', zIndex: 2, display: 'flex' }}>
+                             <Landmark size={18} strokeWidth={2.5} />
+                        </div>
+                        <select 
+                            className="form-input" 
+                            style={{ 
+                                padding: '0.8rem 1rem 0.8rem 48px', 
+                                fontSize: '0.8rem', 
+                                backgroundColor: 'var(--surface)', 
+                                border: '1px solid var(--border)', 
+                                borderRadius: '20px',
+                                fontWeight: 900, 
+                                color: 'var(--text-main)',
+                                width: '100%',
+                                cursor: 'pointer',
+                                appearance: 'none',
+                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                            }}
+                            value={globalAccFilter} 
+                            onChange={e => setGlobalAccFilter(e.target.value)}
+                        >
+                            <option value="">Consolidado Global</option>
+                            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                        <div style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
+                             <ChevronDown size={16} />
+                        </div>
+                    </div>
+
+                    <div style={{ height: '32px', width: '1px', background: 'var(--border)', margin: '0 4px' }}></div>
+
+                    {/* Botões de Ação Secundária */}
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={handleRunAudit}
+                            className="group"
+                            style={{ width: '48px', height: '48px', borderRadius: '18px', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', transition: 'all 0.3s', cursor: 'pointer' }}
+                            title="Diagnóstico de Saúde"
+                        >
+                             <ShieldCheck size={22} className="group-hover:scale-110 transition-transform" />
+                        </button>
+                        <button 
+                            onClick={() => setIsCategoryModalOpen(true)}
+                            className="group"
+                            style={{ width: '48px', height: '48px', borderRadius: '18px', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6366f1', transition: 'all 0.3s', cursor: 'pointer' }}
+                            title="Centros de Custo"
+                        >
+                             <Settings size={22} className="group-hover:rotate-45 transition-transform" />
+                        </button>
+                        <button 
+                            onClick={() => setIsBatchModalOpen(true)}
+                            className="group"
+                            style={{ width: '48px', height: '48px', borderRadius: '18px', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ec4899', transition: 'all 0.3s', cursor: 'pointer' }}
+                            title="Lote Retroativo"
+                        >
+                             <ListOrdered size={22} className="group-hover:translate-x-0.5 transition-transform" />
+                        </button>
+                        <button 
+                            onClick={() => {
+                                setEditAccId(null);
+                                setNewAccount({ name: '', type: 'checking', balance: 0, limit: 0, dueDay: 10, closeDay: 3, color: '#3b82f6' });
+                                setIsAccModalOpen(true);
+                            }}
+                            className="group"
+                            style={{ width: '48px', height: '48px', borderRadius: '18px', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0ea5e9', transition: 'all 0.3s', cursor: 'pointer' }}
+                            title="Nova Conta"
+                        >
+                             <Wallet size={22} className="group-hover:scale-110 transition-transform" />
+                        </button>
+                        <button 
+                            onClick={() => setTransStatusFilter('overdue')}
+                            className="group"
+                            style={{ width: '48px', height: '48px', borderRadius: '18px', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', transition: 'all 0.3s', cursor: 'pointer' }}
+                            title="Ver Vencidos"
+                        >
+                             <AlertCircle size={22} className="group-hover:scale-110 transition-transform" />
+                        </button>
+                    </div>
+
+                    <div style={{ height: '32px', width: '1px', background: 'var(--border)', margin: '0 4px' }}></div>
+
+                    {/* Ações Principais */}
+                    <button 
+                        type="button"
+                        onClick={handleExportToAccountant}
+                        style={{ 
+                            padding: '0.8rem 1.5rem', 
+                            borderRadius: '20px', 
+                            fontSize: '0.8rem', 
+                            fontWeight: 950, 
+                            background: '#1e293b', 
+                            color: 'white', 
+                            border: 'none', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '10px',
+                            boxShadow: '0 10px 20px -5px rgba(30, 41, 59, 0.3)',
+                            transition: 'all 0.3s',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            zIndex: 100
+                        }}
                     >
-                        <option value="">Consolidado Global (Todas)</option>
-                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
+                         <FileText size={16} strokeWidth={2.5} />
+                         PACOTE DO CONTADOR
+                    </button>
 
                     <button 
                         onClick={() => {
@@ -839,197 +1204,312 @@ export function FinanceFinal() {
                             setNewTrans({ description: '', amount: '', type: 'expense', category: 'Outros', accountId: '', date: new Date().toISOString().split('T')[0], status: 'paid', installments: 1, isRecurring: false, recurrenceMonths: 12 });
                             setIsTransModalOpen(true);
                         }}
-                        className="btn btn-primary btn-sm flex items-center gap-2"
-                        style={{ padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem' }}
-                    >
-                        <Plus size={16} /> Novo Lançamento
-                    </button>
-                    <button 
-                        onClick={() => setIsBatchModalOpen(true)}
-                        className="btn bg-purple-100 text-purple-700 btn-sm flex items-center gap-2 hover:bg-purple-200 transition-colors"
-                        style={{ padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem' }}
-                    >
-                        <ListOrdered size={16} /> Lote Retroativo
-                    </button>
-                    <button 
-                        onClick={() => setTransStatusFilter('overdue')}
-                        className="btn bg-red-50 text-red-600 btn-sm flex items-center gap-2 hover:bg-red-100 transition-colors border border-red-100"
-                        style={{ padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem' }}
-                    >
-                         <AlertCircle size={16} /> Vencidos
-                    </button>
-                    <button 
-                        onClick={() => {
-                            setEditAccId(null);
-                            setNewAccount({ name: '', type: 'checking', balance: 0, limit: 0, dueDay: 10, closeDay: 3, color: '#3b82f6' });
-                            setIsAccModalOpen(true);
+                        style={{ 
+                            padding: '0.8rem 1.5rem', 
+                            borderRadius: '20px', 
+                            fontSize: '0.8rem', 
+                            fontWeight: 950, 
+                            background: 'var(--primary)', 
+                            color: 'white', 
+                            border: 'none', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '10px',
+                            boxShadow: '0 10px 25px -5px var(--glow)',
+                            transition: 'all 0.3s',
+                            cursor: 'pointer'
                         }}
-                        className="btn bg-white border border-gray-200 text-gray-700 btn-sm flex items-center gap-2 hover:bg-gray-50 transition-colors"
-                         style={{ padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem' }}
                     >
-                         <Wallet size={16} /> Nova Conta
+                         <Plus size={20} strokeWidth={3} />
+                         NOVO LANÇAMENTO
                     </button>
                 </div>
             </div>
 
-            {/* KPI Grid Sci-Fi */}
-            <FinanceAIInsights transactions={transactions} accounts={accounts} openEditTrans={openEditTrans} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-                <SciFiStatCard 
-                    title={globalAccFilter ? "Saldo da Conta" : "Saldo Consolidado"} 
-                    value={`${stats.totalBalance < 0 ? '-' : ''}R$ ${formatCurrency(Math.abs(stats.totalBalance))}`} 
-                    icon={Landmark} 
-                    color={stats.totalBalance < 0 ? 'red' : 'blue'}
-                    subtext={globalAccFilter ? "Atualizado para esta conta" : "Balanço líquido total em caixa"}
-                />
-                <SciFiStatCard 
-                    title="Contas a Pagar (Hoje)" 
-                    value={`R$ ${formatCurrency(stats.payableToday)}`} 
-                    icon={ArrowDownRight} 
-                    color={stats.payableToday > 0 ? 'red' : 'emerald'}
-                    subtext="Vencendo na data de hoje"
-                />
-                <SciFiStatCard 
-                    title="Compromissos do Mês" 
-                    value={`R$ ${formatCurrency(stats.payableMonth)}`} 
-                    icon={Calendar} 
-                    color="orange"
-                    subtext="Total pendente no período"
-                />
+            {/* Navegação por Segmented Control Premium */}
+            <div style={{ 
+                display: 'inline-flex', 
+                background: 'var(--surface)', 
+                padding: '6px', 
+                borderRadius: '24px', 
+                border: '1px solid var(--border)', 
+                marginBottom: '40px',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+            }}>
+                <button 
+                    onClick={() => setView('overview')}
+                    style={{ 
+                        border: 'none', 
+                        background: view === 'overview' ? 'var(--primary)' : 'transparent', 
+                        color: view === 'overview' ? 'white' : 'var(--text-muted)',
+                        padding: '10px 24px',
+                        borderRadius: '20px',
+                        fontWeight: 900,
+                        fontSize: '0.8rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        cursor: 'pointer',
+                        transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}
+                >
+                    <LayoutGrid size={16} strokeWidth={2.5} /> Visão Geral
+                </button>
+                <button 
+                    onClick={() => setView('projection')}
+                    style={{ 
+                        border: 'none', 
+                        background: view === 'projection' ? 'var(--primary)' : 'transparent', 
+                        color: view === 'projection' ? 'white' : 'var(--text-muted)',
+                        padding: '10px 24px',
+                        borderRadius: '20px',
+                        fontWeight: 900,
+                        fontSize: '0.8rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        cursor: 'pointer',
+                        transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}
+                >
+                    <Zap size={16} strokeWidth={2.5} /> Inteligência & Projeção
+                </button>
+                <button 
+                    onClick={() => setView('import')}
+                    style={{ 
+                        border: 'none', 
+                        background: view === 'import' ? 'var(--primary)' : 'transparent', 
+                        color: view === 'import' ? 'white' : 'var(--text-muted)',
+                        padding: '10px 24px',
+                        borderRadius: '20px',
+                        fontWeight: 900,
+                        fontSize: '0.8rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        cursor: 'pointer',
+                        transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}
+                >
+                    <Upload size={16} strokeWidth={2.5} /> Importação Inteligente
+                </button>
             </div>
 
-            
-            {/* BLOCO DAS CONTAS - Reconstruído no padrão Dashboard */}
-            <div className="mb-10 section-container">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-                        <Landmark size={20} />
-                    </div>
-                    <div>
-                        <h3 className="text-[1.25rem] font-black text-slate-800 dark:text-slate-100 m-0">Gestão de Contas & Liquidez</h3>
-                        <p className="text-[0.7rem] font-bold text-slate-400 uppercase tracking-widest mt-1">Saldo e fluxo de reservas bancárias</p>
-                    </div>
-                </div>
-
-                <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-                    {accounts.filter(a => a.type !== 'credit').map((acc, idx) => {
-                        const balance = Number(acc.balance || 0);
-                        return (
-                            <SciFiStatCard 
-                                key={acc.id}
-                                title={acc.name}
-                                value={`R$ ${formatCurrency(balance)}`}
-                                icon={Landmark}
-                                color={balance < 0 ? 'red' : 'blue'}
-                                subtext={`Tipo: ${acc.type === 'savings' ? 'Reserva' : 'Corrente'} • ID: ${acc.id.slice(0, 8)}`}
-                                onClick={() => openEditAccount(acc)}
-                                isActive={globalAccFilter === acc.id}
-                            />
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* BLOCO DOS CARTÕES - Reconstruído no padrão Dashboard */}
-            <div className="mb-12 section-container">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-                        <CreditCard size={20} />
-                    </div>
-                    <div>
-                        <h3 className="text-[1.25rem] font-black text-slate-800 dark:text-slate-100 m-0">Credit Hub & Ciclos</h3>
-                        <p className="text-[0.7rem] font-bold text-slate-400 uppercase tracking-widest mt-1">Gestão de faturas e exposição ao crédito</p>
-                    </div>
-                </div>
-
-                <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                    {accounts.filter(a => a.type === 'credit').map((acc, idx) => {
-                        const limit = Number(acc.limit || 0);
-                        const debt = filteredTrans.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s + Number(t.amount || 0), 0) -
-                                     filteredTrans.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s + Number(t.amount || 0), 0);
-                        const percent = limit > 0 ? (debt / limit) * 100 : 0;
-                        const dueDay = acc.dueDay || 10;
-                        
-                        return (
-                            <div 
-                                key={acc.id}
-                                onClick={() => setSelectedCreditCard(acc)}
-                                className="stat-card relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-xl cursor-pointer"
-                                style={{ 
-                                    borderLeft: `5px solid ${percent > 90 ? '#ef4444' : '#8b5cf6'}`,
-                                    background: 'var(--surface)',
-                                    padding: '1.5rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '12px'
-                                }}
-                            >
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500">
-                                            <CreditCard size={24} />
-                                        </div>
-                                        <div>
-                                            <h4 className="text-[1.1rem] font-black text-slate-800 dark:text-white leading-none">{acc.name}</h4>
-                                            <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-1">{percent.toFixed(1)}% de Utilização</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="px-2 py-1 bg-purple-500 text-white text-[9px] font-black uppercase rounded-lg">Vence Dia {dueDay}</span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-2">
-                                    <div className="flex justify-between text-[0.7rem] font-black text-slate-400 uppercase mb-2">
-                                        <span>Dívida: R$ {formatCurrency(debt)}</span>
-                                        <span>Livre: R$ {formatCurrency(Math.max(0, limit - debt))}</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full transition-all duration-1000 ${percent > 90 ? 'bg-red-500' : 'bg-purple-500'}`}
-                                            style={{ width: `${Math.min(100, percent)}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-between items-center mt-2 group">
-                                    <span className="text-[0.65rem] font-bold text-slate-400 italic">Clique para ver faturas</span>
-                                    <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-purple-500 group-hover:bg-purple-50 transition-all">
-                                        <ArrowRight size={16} />
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-
-             {/* Warning Pending Income (Point 7 of Flow) */}
-            {(() => {
-                const pendings = transactionsWithBalance.filter(t => t.type === 'income' && t.status !== 'paid');
-                const totalPending = pendings.reduce((sum, t) => sum + Number(t.amount), 0);
-                if (totalPending > 0) {
-                    return (
-                        <div className="mb-6 p-4 rounded-xl flex items-center justify-between shadow-sm" style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa' }}>
-                            <div className="flex items-center gap-4">
-                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#ffedd5', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <AlertCircle size={20} />
-                                </div>
-                                <div>
-                                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#9a3412', margin: 0 }}>Atenção: Recebimentos Pendentes</h3>
-                                    <p style={{ color: '#c2410c', fontSize: '0.85rem', margin: 0 }}>Você possui {pendings.length} pedido(s) concluído(s) aguardando o recebimento.</p>
-                                </div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '0.8rem', color: '#c2410c', textTransform: 'uppercase', fontWeight: 700 }}>Valor Bloqueado</div>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ea580c' }}>R$ {formatCurrency(totalPending)}</div>
-                            </div>
+            {view === 'overview' ? (
+                <>
+                
+                {/* AUDIT SCORE (CONCILIÔMETRO) - NOVO KPI DE ELITE */}
+                <div className="mb-12 section-container">
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                            <ShieldCheck size={24} strokeWidth={2.5} />
                         </div>
-                    );
-                }
-                return null;
-            })()}
+                        <div>
+                            <h3 className="text-[1.5rem] font-black text-slate-800 dark:text-slate-100 m-0 leading-none">Saúde da Auditoria Financeira</h3>
+                            <p className="text-[0.75rem] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Confiabilidade e conciliação de dados bancários</p>
+                        </div>
+                    </div>
+
+                    <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                        <SciFiStatCard 
+                            title="Conciliômetro de Lançamentos"
+                            value={`${auditStats.percent}%`}
+                            icon={ShieldCheck}
+                            color={auditStats.percent > 90 ? 'emerald' : (auditStats.percent > 50 ? 'orange' : 'red')}
+                            subtext={`${auditStats.count} de ${auditStats.total} lançamentos auditados`}
+                            isActive={true}
+                        />
+                        <SciFiStatCard 
+                            title="Rastreabilidade Digital (ML/MP)"
+                            value={mlStats.percent + '%'}
+                            icon={Zap}
+                            color="blue"
+                            subtext={`${mlStats.count} transações ML integradas via ID`}
+                        />
+                        <SciFiStatCard 
+                            title="Status do Patrimônio"
+                            value={allTransactions.filter(t => t.linkedItemId).length}
+                            icon={Hammer}
+                            color="purple"
+                            subtext="Lançamentos vinculados a Ativos"
+                        />
+                    </div>
+                </div>
+
+                <div className="mb-10">
+                    <FinanceAIInsights transactions={transactions} accounts={accounts} openEditTrans={openEditTrans} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2.5rem' }}>
+                    <SciFiStatCard 
+                        title={globalAccFilter ? "Saldo da Conta" : "Saldo Consolidado"} 
+                        value={`${stats.totalBalance < 0 ? '-' : ''}R$ ${formatCurrency(Math.abs(stats.totalBalance))}`} 
+                        icon={Landmark} 
+                        color={stats.totalBalance < 0 ? 'red' : 'blue'}
+                        subtext={globalAccFilter ? "Atualizado para esta conta" : "Balanço líquido total em caixa"}
+                    />
+                    <SciFiStatCard 
+                        title="Liquidez Imediata" 
+                        value={(stats.payableMonth > 0 ? (stats.totalBalance / stats.payableMonth).toFixed(1) : '∞') + 'x'} 
+                        icon={Zap} 
+                        color={(stats.payableMonth > 0 ? (stats.totalBalance / stats.payableMonth) : 2) > 1.2 ? 'emerald' : 'orange'}
+                        subtext="Capacidade de cobrir saídas (mês)"
+                    />
+                    <SciFiStatCard 
+                        title="Contas a Pagar (Hoje)" 
+                        value={`R$ ${formatCurrency(stats.payableToday)}`} 
+                        icon={ArrowDownRight} 
+                        color={stats.payableToday > 0 ? 'red' : 'emerald'}
+                        subtext="Vencendo na data de hoje"
+                    />
+                    <SciFiStatCard 
+                        title="Compromissos do Mês" 
+                        value={`R$ ${formatCurrency(stats.payableMonth)}`} 
+                        icon={Calendar} 
+                        color="orange"
+                        subtext="Total pendente no período"
+                    />
+                </div>
+
+                {/* BLOCO DAS CONTAS - Reconstruído no padrão Dashboard */}
+                <div className="mb-12 section-container">
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                            <Landmark size={24} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                            <h3 className="text-[1.5rem] font-black text-slate-800 dark:text-slate-100 m-0 leading-none">Gestão de Liquidez e Contas</h3>
+                            <p className="text-[0.75rem] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Faturamento real e disponibilidade de caixa</p>
+                        </div>
+                    </div>
+
+                    <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                        {accounts.filter(a => a.type !== 'credit').map((acc, idx) => {
+                            const balance = Number(acc.balance || 0);
+                            return (
+                                <SciFiStatCard 
+                                    key={acc.id}
+                                    title={acc.name}
+                                    value={`R$ ${formatCurrency(balance)}`}
+                                    icon={Landmark}
+                                    color={balance < 0 ? 'red' : 'blue'}
+                                    subtext={`Tipo: ${acc.type === 'savings' ? 'Reserva' : 'Corrente'} • ID: ${acc.id.slice(0, 8)}`}
+                                    onClick={() => openEditAccount(acc)}
+                                    isActive={globalAccFilter === acc.id}
+                                />
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* BLOCO DOS CARTÕES - Reconstruído no padrão Dashboard */}
+                <div className="mb-12 section-container">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500">
+                            <CreditCard size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-[1.25rem] font-black text-slate-800 dark:text-slate-100 m-0">Credit Hub & Ciclos</h3>
+                            <p className="text-[0.7rem] font-bold text-slate-400 uppercase tracking-widest mt-1">Gestão de faturas e exposição ao crédito</p>
+                        </div>
+                    </div>
+
+                    <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                        {accounts.filter(a => a.type === 'credit').map((acc, idx) => {
+                            const limit = Number(acc.limit || 0);
+                            const debt = filteredTrans.filter(t => t.accountId === acc.id && t.type === 'expense').reduce((s,t) => s + Number(t.amount || 0), 0) -
+                                         filteredTrans.filter(t => t.accountId === acc.id && t.type === 'income').reduce((s,t) => s + Number(t.amount || 0), 0);
+                            const percent = limit > 0 ? (debt / limit) * 100 : 0;
+                            const dueDay = acc.dueDay || 10;
+                            
+                            return (
+                                <div 
+                                    key={acc.id}
+                                    onClick={() => setSelectedCreditCard(acc)}
+                                    className="stat-card relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-xl cursor-pointer"
+                                    style={{ 
+                                        borderLeft: `5px solid ${percent > 90 ? '#ef4444' : '#8b5cf6'}`,
+                                        background: 'var(--surface)',
+                                        padding: '1.5rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '12px'
+                                    }}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500">
+                                                <CreditCard size={24} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[1.1rem] font-black text-slate-800 dark:text-white leading-none">{acc.name}</h4>
+                                                <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-1">{percent.toFixed(1)}% de Utilização</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="px-2 py-1 bg-purple-500 text-white text-[9px] font-black uppercase rounded-lg">Vence Dia {dueDay}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-2">
+                                        <div className="flex justify-between text-[0.7rem] font-black text-slate-400 uppercase mb-2">
+                                            <span>Dívida: R$ {formatCurrency(debt)}</span>
+                                            <span>Livre: R$ {formatCurrency(Math.max(0, limit - debt))}</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                            <div 
+                                                className={`h-full transition-all duration-1000 ${percent > 90 ? 'bg-red-500' : 'bg-purple-500'}`}
+                                                style={{ width: `${Math.min(100, percent)}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-between items-center mt-2 group">
+                                        <span className="text-[0.65rem] font-bold text-slate-400 italic">Clique para ver faturas</span>
+                                        <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-purple-500 group-hover:bg-purple-50 transition-all">
+                                            <ArrowRight size={16} />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+
+                 {/* Warning Pending Income (Point 7 of Flow) */}
+                {(() => {
+                    const pendings = transactionsWithBalance.filter(t => t.type === 'income' && t.status !== 'paid');
+                    const totalPending = pendings.reduce((sum, t) => sum + Number(t.amount), 0);
+                    if (totalPending > 0) {
+                        return (
+                            <div className="mb-6 p-4 rounded-xl flex items-center justify-between shadow-sm" style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa' }}>
+                                <div className="flex items-center gap-4">
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#ffedd5', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <AlertCircle size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#9a3412', margin: 0 }}>Atenção: Recebimentos Pendentes</h3>
+                                        <p style={{ color: '#c2410c', fontSize: '0.85rem', margin: 0 }}>Você possui {pendings.length} pedido(s) concluído(s) aguardando o recebimento.</p>
+                                    </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontSize: '0.8rem', color: '#c2410c', textTransform: 'uppercase', fontWeight: 700 }}>Valor Bloqueado</div>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ea580c' }}>R$ {formatCurrency(totalPending)}</div>
+                                </div>
+                            </div>
+                        );
+                    }
+                    return null;
+                })()}
+
+                {/* Transição Suave para Gráficos e Tabelas */}
 
             {/* Charts Grid */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
@@ -1109,6 +1589,67 @@ export function FinanceFinal() {
                     </div>
                 </div>
 
+                {/* Próximas Obrigações e Recebíveis (Provisão) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '32px', marginBottom: '40px' }}>
+                    <div style={{ padding: '32px', borderRadius: '32px', background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 4px 20px -4px rgba(0,0,0,0.05)' }}>
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500">
+                                <TrendingDown size={22} strokeWidth={2.5} />
+                            </div>
+                            <div>
+                                <h4 className="text-[1.1rem] font-black text-slate-800 m-0 uppercase tracking-tight">Próximas Obrigações</h4>
+                                <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-1">Contas a pagar - Próximos 30 dias</p>
+                            </div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxH: '320px', overflowY: 'auto', paddingRight: '8px' }} className="custom-scrollbar">
+                            {stats.upcomingPayables?.length > 0 ? stats.upcomingPayables.map((p, i) => (
+                                <div key={i} className="flex justify-between items-center p-4 rounded-2xl border border-slate-100 hover:border-red-200 hover:bg-red-50/30 transition-all group">
+                                    <div className="flex items-center gap-4">
+                                        <div style={{ background: '#fef2f2', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Calendar size={18} color="#ef4444" strokeWidth={2.5} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[0.85rem] font-black text-slate-800 m-0 group-hover:text-red-700 transition-colors">{p.description}</p>
+                                            <p className="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider m-0 mt-1">{new Date(p.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[0.95rem] font-black text-red-600">R$ {formatCurrency(p.amount)}</span>
+                                </div>
+                            )) : <p className="text-xs text-muted italic text-center py-10 bg-slate-50 rounded-3xl border border-dashed">Nenhuma obrigação para os próximos 30 dias.</p>}
+                        </div>
+                    </div>
+                    
+                    <div style={{ padding: '32px', borderRadius: '32px', background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 4px 20px -4px rgba(0,0,0,0.05)' }}>
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                <TrendingUp size={22} strokeWidth={2.5} />
+                            </div>
+                            <div>
+                                <h4 className="text-[1.1rem] font-black text-slate-800 m-0 uppercase tracking-tight">Previsão de Recebíveis</h4>
+                                <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-1">Entradas previstas - Próximos 30 dias</p>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxH: '320px', overflowY: 'auto', paddingRight: '8px' }} className="custom-scrollbar">
+                            {stats.upcomingReceivables?.length > 0 ? stats.upcomingReceivables.map((r, i) => (
+                                <div key={i} className="flex justify-between items-center p-4 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all group">
+                                    <div className="flex items-center gap-4">
+                                        <div style={{ background: '#f0fdf4', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <ShoppingBag size={18} color="#10b981" strokeWidth={2.5} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[0.85rem] font-black text-slate-800 m-0 group-hover:text-emerald-700 transition-colors">Pedido #{r.id.substring(0,6).toUpperCase()}</p>
+                                            <p className="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider m-0 mt-1">Vencimento: {new Date(r.nextDueDate || r.deadline || r.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[0.95rem] font-black text-emerald-600">R$ {formatCurrency(r.balanceDue || r.total)}</span>
+                                </div>
+                            )) : <p className="text-xs text-muted italic text-center py-10 bg-slate-50 rounded-3xl border border-dashed">Nenhuma previsão de recebimento próxima.</p>}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Bottom Row: Full Width DRE */}
                 <div style={{ display: 'flex', width: '100%', minHeight: '400px' }}>
                     <div style={{ width: '100%' }}>
@@ -1156,6 +1697,7 @@ export function FinanceFinal() {
                         <option value="paid">✅ Conciliado (Pago)</option>
                         <option value="pending">⏳ Estimado (Pendente)</option>
                         <option value="overdue">⚠️ Vencido (Atrasado)</option>
+                        <option value="imported">🏦 Ver Apenas Importados</option>
                      </select>
 
                      <select 
@@ -1251,6 +1793,16 @@ export function FinanceFinal() {
                             <CheckCircle size={16} /> Marcar como Pago
                         </button>
                         <button 
+                            onClick={handleBulkDelete}
+                            style={{ 
+                                background: 'transparent', color: '#ff4444', border: '1px solid rgba(255,68,68,0.3)', 
+                                padding: '6px 16px', borderRadius: '8px', fontWeight: 700, 
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                            }}
+                        >
+                            <Trash2 size={16} /> Apagar Selecionados
+                        </button>
+                        <button 
                             onClick={() => setSelectedTransIds([])}
                             style={{ 
                                 background: 'transparent', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.2)', 
@@ -1269,9 +1821,9 @@ export function FinanceFinal() {
                         <th style={{ padding: '1rem 1.5rem', textAlign: 'center', width: '50px' }}>
                             <input 
                                 type="checkbox" 
-                                checked={selectedTransIds.length > 0 && selectedTransIds.length === transactionsWithBalance.length}
+                                checked={selectedTransIds.length > 0 && selectedTransIds.length === finalFilteredTrans.length}
                                 onChange={(e) => {
-                                    if (e.target.checked) setSelectedTransIds(transactionsWithBalance.map(t => t.id));
+                                    if (e.target.checked) setSelectedTransIds(finalFilteredTrans.map(t => t.id));
                                     else setSelectedTransIds([]);
                                 }}
                             />
@@ -1285,44 +1837,7 @@ export function FinanceFinal() {
                     </tr>
                 </thead>
                 <tbody>
-                    {transactionsWithBalance
-                        .filter(t => {
-                            const acc = accounts.find(a => a.id === t.accountId);
-                            // Esconde lançamentos de cartão da visão geral
-                            // if (acc?.type === 'credit' && transAccFilter === '' && globalAccFilter === '') {
-                            //     return false;
-                            // }
-
-                            const search = transSearchTerm.toLowerCase();
-                            const matchesSearch = t.description?.toLowerCase().includes(search) || t.category?.toLowerCase().includes(search);
-                            const matchesType = transTypeFilter === '' || t.type === transTypeFilter;
-                            const matchesAcc = transAccFilter === '' || t.accountId === transAccFilter;
-                            
-                            // Date filter (Year-Month or Range)
-                            let matchesDate = true;
-                            if (transDateFilter) {
-                                const tMonth = t.date.substring(0, 7); // YYYY-MM
-                                matchesDate = tMonth === transDateFilter;
-                            }
-                            if (transStartDate && t.date < transStartDate) matchesDate = false;
-                            if (transEndDate && t.date > transEndDate) matchesDate = false;
-
-                            // Status Filter
-                            let matchesStatus = true;
-                            if (transStatusFilter) {
-                                if (transStatusFilter === 'paid') matchesStatus = t.status === 'paid';
-                                if (transStatusFilter === 'pending') {
-                                     // Pending but not overdue
-                                     const isOverdue = t.status === 'pending' && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
-                                     matchesStatus = t.status === 'pending' && !isOverdue;
-                                }
-                                if (transStatusFilter === 'overdue') {
-                                    matchesStatus = t.status === 'pending' && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
-                                }
-                            }
-                            
-                            return matchesSearch && matchesType && matchesAcc && matchesDate && matchesStatus;
-                        })
+                    {finalFilteredTrans
                         .slice(0, visibleTransactionsLimit)
                         .map(t => {
                             const acc = accounts.find(a => a.id === t.accountId);
@@ -1352,7 +1867,11 @@ export function FinanceFinal() {
                                     <div className="flex items-center gap-2">
                                         {t.orderId ? <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" title="Pedido Automático"></div> : (t.referenceId ? <Hammer size={12} color="#f59e0b" title="Módulo Derivado" /> : null)}
                                         {t.description}
-                                        {t.installmentsTotal > 1 && <span style={{ marginLeft: '6px', fontSize: '9px', color: '#4f46e5', backgroundColor: '#e0e7ff', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{t.installmentNumber}/{t.installmentsTotal}</span>}
+                                        {(t.installmentsTotal > 1 || t.installment) && (
+                                            <span style={{ marginLeft: '6px', fontSize: '9px', color: '#4f46e5', backgroundColor: '#e0e7ff', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                                {t.installment || `${t.installmentNumber}/${t.installmentsTotal}`}
+                                            </span>
+                                        )}
                                         {isOverdue && <span style={{ marginLeft: '6px', fontSize: '9px', color: 'white', backgroundColor: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>⚠️ VENCIDO</span>}
                                         {isToday && <span style={{ marginLeft: '6px', fontSize: '9px', color: 'white', backgroundColor: '#f59e0b', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>🔔 VENCE HOJE</span>}
                                         {t.status === 'pending' && !isOverdue && !isToday && <span style={{ marginLeft: '6px', fontSize: '9px', color: '#b45309', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>⏳ ESTIMADO</span>}
@@ -1423,6 +1942,36 @@ export function FinanceFinal() {
             )}
             </div>
         </div>
+                </>
+            ) : view === 'projection' ? (
+                <FinanceProjectionDashboard 
+                    transactions={transactions} 
+                    accounts={accounts} 
+                    orders={orders} 
+                />
+            ) : (
+                <FinanceBankImport 
+                    accounts={accounts} 
+                    existingTransactions={transactions}
+                    orders={orders}
+                    categories={rawCategories}
+                    equipments={equipments}
+                    materials={materials}
+                    onImportSuccess={(count) => {
+                        alert(`Sucesso! ${count} novos lançamentos importados e auditados.`);
+                        fetchData();
+                        setView('overview');
+                    }}
+                />
+            )}
+
+        <AuditReportModal
+            isOpen={isAuditModalOpen}
+            report={auditReport}
+            accounts={accounts}
+            onClose={() => setIsAuditModalOpen(false)}
+            onRefresh={fetchData}
+        />
 
         {/* Modals */}
         <FinanceBatchEntryModal
@@ -1671,72 +2220,212 @@ export function FinanceFinal() {
                     </div>
                 </div>
             )}
-
+            
             {isCategoryModalOpen && (
                 <div className="modal-overlay" style={{ zIndex: 1100 }}>
-                    <div className="modal-content" style={{ maxWidth: '500px', width: '100%' }} onClick={e => e.stopPropagation()}>
+                    <div className="modal-content" style={{ maxWidth: '600px', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">Gerenciar Centros de Custo</h2>
-                            <button type="button" className="btn btn-icon" onClick={() => setIsCategoryModalOpen(false)}>
+                            <h2 className="modal-title">
+                                {editCategoryId ? 'Editar Centro de Custo' : 'Gerenciar Centros de Custo'}
+                            </h2>
+                            <button type="button" className="btn btn-icon" onClick={() => {
+                                setIsCategoryModalOpen(false);
+                                setEditCategoryId(null);
+                                setNewCategoryName('');
+                                setNewCategoryParent('');
+                            }}>
                                 <X size={20} />
                             </button>
                         </div>
                         <div className="modal-body">
-                            <form onSubmit={handleCreateCategory} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '24px' }}>
-                                <div style={{ flex: 1 }}>
-                                    <label className="form-label text-xs mb-1">Nome da Categoria</label>
-                                    <input type="text" required className="form-input" style={{ width: '100%' }} value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Ex: Material Gráfico..." />
+                            <form onSubmit={handleSaveCategory} className="space-y-4 mb-8 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <div className="grid grid-cols-12 gap-3">
+                                    <div className="col-span-8">
+                                        <label className="form-label text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Nome da Categoria/Sub</label>
+                                        <input type="text" required className="form-input w-full" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Ex: Materiais, Salários..." />
+                                    </div>
+                                    <div className="col-span-4">
+                                        <label className="form-label text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Tipo</label>
+                                        <select className="form-input w-full" value={newCategoryType} onChange={e => setNewCategoryType(e.target.value)}>
+                                            <option value="expense">Despesa (-)</option>
+                                            <option value="income">Receita (+)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div className="col-span-8">
+                                        <label className="form-label text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Vincular a Categoria Principal (Opcional)</label>
+                                        <select className="form-input w-full" value={newCategoryParent} onChange={e => setNewCategoryParent(e.target.value)}>
+                                            <option value="">Nenhuma (Categoria Principal)</option>
+                                            {rawCategories
+                                                .filter(c => c.type === newCategoryType && c.id !== editCategoryId && !c.parentId)
+                                                .map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                                            }
+                                        </select>
+                                    </div>
+
+                                    <div className="col-span-2">
+                                        <label className="form-label text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Cor</label>
+                                        <input type="color" className="w-full h-10 p-0 border-none rounded-lg cursor-pointer" value={newCategoryColor} onChange={e => setNewCategoryColor(e.target.value)} />
+                                    </div>
+
+                                    <div className="col-span-2 flex items-end">
+                                        <button type="submit" className="btn btn-primary w-full h-10 flex items-center justify-center gap-2">
+                                            {editCategoryId ? <Check size={18} /> : <Plus size={18} />}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div style={{ width: '112px' }}>
-                                    <label className="form-label text-xs mb-1">Tipo</label>
-                                    <select className="form-input" style={{ width: '100%' }} value={newCategoryType} onChange={e => setNewCategoryType(e.target.value)}>
-                                        <option value="expense">Despesa</option>
-                                        <option value="income">Receita</option>
-                                    </select>
-                                </div>
-                                <div style={{ width: '48px' }}>
-                                    <label className="form-label text-xs mb-1">Cor</label>
-                                    <input type="color" style={{ width: '100%', height: '38px', padding: 0, border: 'none', borderRadius: '4px', cursor: 'pointer' }} value={newCategoryColor} onChange={e => setNewCategoryColor(e.target.value)} />
-                                </div>
-                                <button type="submit" className="btn btn-primary" style={{ height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }} title="Adicionar Categoria">
-                                    <Plus size={16} />
-                                </button>
+                                {editCategoryId && (
+                                    <div className="pt-2 flex justify-start">
+                                        <button type="button" onClick={() => { setEditCategoryId(null); setNewCategoryName(''); setNewCategoryParent(''); }} className="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase">Cancelar Edição</button>
+                                    </div>
+                                )}
                             </form>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '350px', overflowY: 'auto', paddingRight: '8px' }} className="custom-scrollbar">
-                                <div>
-                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Despesas (-)</h4>
-                                    <div className="flex flex-col gap-2">
-                                        {rawCategories.filter(c => c.type === 'expense').map(c => (
-                                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #f3f4f6' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: c.color }}></div>
-                                                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>{c.name}</span>
-                                                </div>
-                                                <button onClick={() => handleDeleteCategory(c.id, c.name)} style={{ color: '#9ca3af', padding: '4px', border: 'none', background: 'none', cursor: 'pointer' }} title={`Excluir ${c.name}`}>
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
+                            <div style={{ maxHeight: '400px', overflowY: 'auto' }} className="custom-scrollbar pr-2">
+                                {['income', 'expense'].map(type => (
+                                    <div key={type} className="mb-6">
+                                        <h4 className={`text-[11px] font-black uppercase tracking-widest mb-3 pb-1 border-b ${type === 'income' ? 'text-emerald-500 border-emerald-100' : 'text-red-500 border-red-100'}`}>
+                                            {type === 'income' ? 'Receitas (+)' : 'Despesas (-)'}
+                                        </h4>
+                                        <div className="space-y-1">
+                                            {rawCategories
+                                                .filter(c => c.type === type && !c.parentId)
+                                                .map(parent => (
+                                                    <div key={parent.id} className="space-y-1">
+                                                        <div className="group flex items-center justify-between p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 hover:border-primary/30 transition-all">
+                                                            <div className="flex items-center gap-3">
+                                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: parent.color }}></div>
+                                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{parent.name}</span>
+                                                            </div>
+                                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => openEditCategory(parent)} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors">
+                                                                    <Edit2 size={14} />
+                                                                </button>
+                                                                <button onClick={() => handleDeleteCategory(parent.id, parent.name)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {/* Subcategories */}
+                                                        {rawCategories.filter(sub => sub.parentId === parent.id).map(sub => (
+                                                            <div key={sub.id} className="group flex items-center justify-between p-2 ml-6 bg-slate-50/50 dark:bg-slate-900/20 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/20 transition-all">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: sub.color }}></div>
+                                                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{sub.name}</span>
+                                                                </div>
+                                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <button onClick={() => openEditCategory(sub)} className="p-1 text-slate-300 hover:text-blue-400">
+                                                                        <Edit2 size={12} />
+                                                                    </button>
+                                                                    <button onClick={() => handleDeleteCategory(sub.id, sub.name)} className="p-1 text-slate-300 hover:text-red-400">
+                                                                        <Trash2 size={12} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
                                     </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isExportModalOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1200, backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)' }}>
+                    <div className="modal-content animate-in fade-in zoom-in duration-300" style={{ maxWidth: '500px', width: '95%', background: 'linear-gradient(135deg, var(--surface) 0%, #1e293b 100%)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+                        <div className="modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '1.5rem' }}>
+                            <div className="flex items-center gap-3">
+                                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(30, 41, 59, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                                    <FileText size={20} />
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Receitas (+)</h4>
-                                    <div className="flex flex-col gap-2">
-                                        {rawCategories.filter(c => c.type === 'income').map(c => (
-                                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #f3f4f6' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: c.color }}></div>
-                                                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>{c.name}</span>
-                                                </div>
-                                                <button onClick={() => handleDeleteCategory(c.id, c.name)} style={{ color: '#9ca3af', padding: '4px', border: 'none', background: 'none', cursor: 'pointer' }} title={`Excluir ${c.name}`}>
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <h2 className="modal-title" style={{ fontSize: '1.1rem', color: 'white' }}>Pacote do Contador</h2>
+                                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>Exporte os dados financeiros para auditoria</p>
                                 </div>
                             </div>
+                            <button type="button" className="btn btn-icon" onClick={() => setIsExportModalOpen(false)} style={{ color: 'rgba(255,255,255,0.4)', hover: { color: 'white' } }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="modal-body" style={{ padding: '1.5rem' }}>
+                            {/* Atalhos de Período */}
+                            <div className="mb-6">
+                                <label className="form-label" style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', display: 'block' }}>Opções Pré-definidas</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { id: 'currentMonth', label: 'Mês Atual', icon: <Calendar size={14} /> },
+                                        { id: 'lastMonth', label: 'Mês Passado', icon: <Calendar size={14} /> },
+                                        { id: 'last3Months', label: 'Últimos 3 Meses', icon: <Calendar size={14} /> },
+                                        { id: 'currentYear', label: 'Ano de ' + new Date().getFullYear(), icon: <Calendar size={14} /> }
+                                    ].map(preset => (
+                                        <button 
+                                            key={preset.id}
+                                            onClick={() => handleSetRangePreset(preset.id)}
+                                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                            style={{ 
+                                                background: 'rgba(255,255,255,0.03)', 
+                                                border: '1px solid rgba(255,255,255,0.05)',
+                                                color: 'rgba(255,255,255,0.8)',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 600,
+                                                textAlign: 'left'
+                                            }}
+                                        >
+                                            <span style={{ color: '#38bdf8' }}>{preset.icon}</span>
+                                            {preset.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}></div>
+
+                            {/* Seleção Customizada */}
+                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                <div className="input-group">
+                                    <label className="form-label" style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', display: 'block' }}>Início do Período</label>
+                                    <input 
+                                        type="date" 
+                                        className="form-input w-full" 
+                                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '12px' }}
+                                        value={exportRange.start} 
+                                        onChange={e => setExportRange({...exportRange, start: e.target.value})} 
+                                    />
+                                </div>
+                                <div className="input-group">
+                                    <label className="form-label" style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', display: 'block' }}>Final do Período</label>
+                                    <input 
+                                        type="date" 
+                                        className="form-input w-full" 
+                                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '12px' }}
+                                        value={exportRange.end} 
+                                        onChange={e => setExportRange({...exportRange, end: e.target.value})} 
+                                    />
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={performExport}
+                                className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all hover:brightness-110 active:scale-[0.98] group"
+                                style={{ 
+                                    background: 'linear-gradient(to right, #0ea5e9, #38bdf8)', 
+                                    color: 'white', 
+                                    fontWeight: 900, 
+                                    fontSize: '0.9rem',
+                                    border: 'none',
+                                    boxShadow: '0 10px 25px -5px rgba(14, 165, 233, 0.4)'
+                                }}
+                            >
+                                <Upload size={18} className="group-hover:-translate-y-1 transition-transform" />
+                                GERAR ARQUIVO PARA O CONTADOR
+                            </button>
                         </div>
                     </div>
                 </div>

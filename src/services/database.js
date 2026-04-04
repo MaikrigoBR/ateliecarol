@@ -26,10 +26,10 @@ export const database = {
             // Prevent accidental double-imports from bloating the entire application
             const seen = new Set();
             const uniqueArray = rawArray.filter(item => {
-                if (item.deleted === true) return false; // SOFT DELETE GLOBAL FILTER
-
-                // Strip ID for comparison so exact same content counts as duplicate
-                const { id, ...contentProps } = item;
+                if (item.deleted === true) return false;
+                
+                // Exclude system fields from comparison
+                const { id, createdAt, updatedAt, ...contentProps } = item;
                 const key = JSON.stringify(contentProps);
                 if (seen.has(key)) return false;
                 seen.add(key);
