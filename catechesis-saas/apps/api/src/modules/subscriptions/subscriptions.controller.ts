@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Post, Query, UseGuards } from '@nestjs/common';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import type { AuthenticatedUser } from '@catechesis-saas/types';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
@@ -27,15 +27,14 @@ export class SubscriptionsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('STUDENT', 'ADMINISTRATOR')
+  @Roles('STUDENT', 'ADMINISTRATOR', 'DEVELOPER')
   async create(
     @CurrentUser() user: AuthenticatedUser | undefined,
     @TenantContext() tenantContext: TenantContextValue | undefined,
     @Body() body: CreateSubscriptionDto
   ) {
     const slug = tenantContext?.tenant.slug ?? 'emmaus';
-    const studentIdentityId =
-      user?.roles.includes('STUDENT') ? user.identityId : body.studentIdentityId;
+    const studentIdentityId = body.studentIdentityId ?? user?.identityId;
 
     if (!studentIdentityId) {
       throw new BadRequestException('studentIdentityId e obrigatorio para administradores');
@@ -45,5 +44,25 @@ export class SubscriptionsController {
       ...body,
       studentIdentityId
     });
+  }
+
+  @Get('mine')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STUDENT', 'ADMINISTRATOR', 'DEVELOPER')
+  async mine(
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @TenantContext() tenantContext: TenantContextValue | undefined,
+    @Query('studentIdentityId') studentIdentityId?: string
+  ) {
+    const slug = tenantContext?.tenant.slug ?? 'emmaus';
+    const targetStudentIdentityId = studentIdentityId ?? user?.identityId;
+
+    if (!targetStudentIdentityId) {
+      throw new BadRequestException('studentIdentityId e obrigatorio');
+    }
+
+    return {
+      items: await this.subscriptionsService.listSubscriptionsForStudent(slug, targetStudentIdentityId)
+    };
   }
 }

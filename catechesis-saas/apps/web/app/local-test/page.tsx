@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { SectionShell } from '../../components/section-shell';
+import { listDemoCredentials } from '../../lib/demo-users';
 
 const localLinks = [
   {
@@ -23,6 +24,10 @@ const localLinks = [
     href: 'http://localhost:3000/tenant/emmaus/admin'
   },
   {
+    label: 'Login - tenant Emaus',
+    href: 'http://localhost:3000/tenant/emmaus/sign-in'
+  },
+  {
     label: 'Health da API',
     href: 'http://localhost:4000/api/health'
   },
@@ -40,33 +45,6 @@ const localLinks = [
   }
 ];
 
-const demoCredentials = [
-  {
-    profile: 'Desenvolvedor global',
-    tenant: 'emmaus',
-    email: 'dev@platform.local',
-    password: 'Dev@123'
-  },
-  {
-    profile: 'Administrador',
-    tenant: 'emmaus',
-    email: 'admin@emmaus.local',
-    password: 'Admin@123'
-  },
-  {
-    profile: 'Professor',
-    tenant: 'emmaus',
-    email: 'teacher@emmaus.local',
-    password: 'Teacher@123'
-  },
-  {
-    profile: 'Aluno',
-    tenant: 'emmaus',
-    email: 'student@emmaus.local',
-    password: 'Student@123'
-  }
-];
-
 const loginExample = `POST http://localhost:4000/api/auth/login
 Content-Type: application/json
 
@@ -77,6 +55,8 @@ Content-Type: application/json
 }`;
 
 export default function LocalTestPage() {
+  const demoCredentials = listDemoCredentials('emmaus');
+
   return (
     <main className="page-shell">
       <section className="hero compact-hero">
@@ -120,10 +100,10 @@ export default function LocalTestPage() {
         <SectionShell eyebrow="Credenciais" title="Perfis demo">
           <div className="link-list">
             {demoCredentials.map((item) => (
-              <div key={item.email}>
+              <div key={`${item.email}-${item.tenantSlug}`}>
                 <strong>{item.profile}</strong>
                 <p>
-                  Tenant: <code>{item.tenant}</code>
+                  Tenant: <code>{item.tenantSlug}</code>
                 </p>
                 <p>
                   Email: <code>{item.email}</code>
@@ -131,6 +111,7 @@ export default function LocalTestPage() {
                 <p>
                   Senha: <code>{item.password}</code>
                 </p>
+                <p>{item.description}</p>
               </div>
             ))}
           </div>

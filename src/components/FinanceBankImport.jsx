@@ -78,27 +78,35 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                 }
             }
 
-            // --- AUTO-VINCULO COM ATIVOS/INSUMOS (FUZZY) ---
-            let suggestedLink = null;
+            // --- AUTO-VINCULO COM ATIVOS/INSUMOS (FUZZY MULTI-MATCH) ---
+            let detectedItems = [];
             const desc = (nt.description || '').toLowerCase();
             const descParts = desc.split(/[* \-\/]/).filter(p => p.length > 3);
 
-            const equipMatch = equipments.find(e => {
+            // Scan Equipments
+            equipments.forEach(e => {
                 const name = e.name.toLowerCase();
                 const brand = (e.brand || '').toLowerCase();
-                return desc.includes(name) || name.includes(desc) || (brand && desc.includes(brand)) || descParts.some(p => name.includes(p));
+                if (desc.includes(name) || name.includes(desc) || (brand && desc.includes(brand)) || descParts.some(p => name.includes(p))) {
+                    if (!detectedItems.find(di => di.id === e.id)) {
+                        detectedItems.push({ type: 'equipment', id: e.id, name: e.name, cost: parseFloat(e.cost || e.purchasePrice || 0) });
+                    }
+                }
             });
 
-            if (equipMatch) {
-                suggestedLink = { type: 'equipment', id: equipMatch.id, name: equipMatch.name };
-            } else {
-                const matMatch = materials.find(m => {
-                    const name = m.name.toLowerCase();
-                    const cat = (m.category || '').toLowerCase();
-                    return desc.includes(name) || name.includes(desc) || (cat && desc.includes(cat)) || descParts.some(p => name.includes(p));
-                });
-                if (matMatch) suggestedLink = { type: 'material', id: matMatch.id, name: matMatch.name };
-            }
+            // Scan Materials
+            materials.forEach(m => {
+                const name = m.name.toLowerCase();
+                const cat = (m.category || '').toLowerCase();
+                if (desc.includes(name) || name.includes(desc) || (cat && desc.includes(cat)) || descParts.some(p => name.includes(p))) {
+                    if (!detectedItems.find(di => di.id === m.id)) {
+                        detectedItems.push({ type: 'material', id: m.id, name: m.name, cost: parseFloat(m.cost || m.price || 0) });
+                    }
+                }
+            });
+
+            let suggestedLink = detectedItems.length === 1 ? detectedItems[0] : null;
+            let isCompound = detectedItems.length > 1;
 
             // --- AUTO-CONCILIÇÃO DE TRANSFERÊNCIA/CARTÃO ---
             let targetAccountId = null;
@@ -120,14 +128,50 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                 }
             }
 
-            return { ...nt, category: finalCategory, isAISuggested, isDuplicate, suggestedMatch, suggestedLink, targetAccountId };
+            return { ...nt, category: finalCategory, isAISuggested, isDuplicate, suggestedMatch, suggestedLink, detectedItems, isCompound, targetAccountId };
         });
 
-        // --- EXPANSÃO PROATIVA DE PARCELAS ---
+        // --- EXPANSÃO PROATIVA DE PARCELAS E COMPOSIÇÕES ---
         const expanded = [];
         withMeta.forEach(main => {
-            expanded.push({ ...main, selected: !main.isDuplicate });
+            if (main.isCompound && !main.isDuplicate) {
+                // Sugerir desmembramento automático por itens detectados
+                let totalCostDetected = main.detectedItems.reduce((s, it) => s + it.cost, 0);
+                let residual = main.amount - totalCostDetected;
+
+                main.detectedItems.forEach((it, idx) => {
+                    expanded.push({
+                        ...main,
+                        id: `${main.id}-comp-${idx}`,
+                        amount: it.cost || (main.amount / (main.detectedItems.length + (residual > 0 ? 1 : 0))).toFixed(2),
+                        description: `${main.description} / ${it.name}`,
+                        suggestedLink: { type: it.type, id: it.id, name: it.name },
+                        category: it.type === 'equipment' ? 'Equipamentos & Ativos' : 'Materiais & Insumos',
+                        isSplit: true,
+                        splitGroup: main.id,
+                        parentAmount: main.amount,
+                        selected: true
+                    });
+                });
+
+                if (residual > 0.01) {
+                    expanded.push({
+                        ...main,
+                        id: `${main.id}-residual`,
+                        amount: parseFloat(residual.toFixed(2)),
+                        description: `${main.description} (Resíduo/Taxas)`,
+                        category: 'Impostos & Taxas',
+                        isSplit: true,
+                        splitGroup: main.id,
+                        parentAmount: main.amount,
+                        selected: true
+                    });
+                }
+            } else {
+                expanded.push({ ...main, selected: !main.isDuplicate });
+            }
             
+            // ... (rest of the installment expansion logic)
             // Se detectarmos parcelamento (ex: 3/10)
             if (main.installmentNumber && main.installmentsTotal > 1 && !main.isDuplicate) {
                 for (let i = 1; i <= main.installmentsTotal; i++) {
@@ -332,36 +376,41 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
 
     const splitTransaction = (id) => {
         setStagedTransactions(prev => {
-            const index = prev.findIndex(t => t.id === id);
-            if (index === -1) return prev;
+            const original = prev.find(t => t.id === id);
+            if (!original) return prev;
             
-            const original = prev[index];
-            const originalTotal = original.parentAmount || original.amount;
-            const halfAmount = Number((original.amount / 2).toFixed(2));
+            const halfAmount = (parseFloat(original.amount) / 2).toFixed(2);
+            const parentId = original.splitGroup || original.id;
             
             const sub1 = { 
                 ...original, 
                 id: `${id}-1`, 
-                amount: halfAmount, 
+                amount: parseFloat(halfAmount), 
                 isSplit: true, 
-                splitGroup: id,
-                parentAmount: originalTotal,
-                description: `${original.description} (Dividido 1/2)`
+                splitGroup: parentId, 
+                parentAmount: original.parentAmount || original.amount,
+                selected: true 
             };
             const sub2 = { 
                 ...original, 
                 id: `${id}-2`, 
-                amount: Number((original.amount - halfAmount).toFixed(2)), 
+                amount: parseFloat(halfAmount), 
                 isSplit: true, 
-                splitGroup: id,
-                parentAmount: originalTotal,
-                description: `${original.description} (Dividido 2/2)`
+                splitGroup: parentId, 
+                parentAmount: original.parentAmount || original.amount,
+                selected: true 
             };
             
-            const newList = [...prev];
-            newList.splice(index, 1, sub1, sub2);
-            return newList;
+            return prev.filter(t => t.id !== id).concat([sub1, sub2]);
         });
+    };
+
+    const getSplitBalance = (splitGroupId) => {
+        const group = stagedTransactions.filter(t => t.splitGroup === splitGroupId && t.selected);
+        if (group.length === 0) return 0;
+        const parentAmount = group[0].parentAmount;
+        const currentTotal = group.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+        return (parentAmount - currentTotal).toFixed(2);
     };
 
     const updateStagedRow = (id, updates) => {
@@ -581,13 +630,14 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                 <div className="flex items-center gap-2">
                                                     {t.isProjected && <span style={{ padding: '2px 6px', backgroundColor: '#eef2ff', color: '#6366f1', borderRadius: '4px', fontSize: '9px', fontWeight: 900 }}>PROJEÇÃO</span>}
+                                                    {t.isCompound && <span style={{ padding: '2px 6px', backgroundColor: '#fdf2f2', color: '#ef4444', borderRadius: '4px', fontSize: '9px', fontWeight: 900 }}>COMPOSIÇÃO</span>}
                                                     <input 
                                                         type="text"
                                                         value={t.description}
                                                         onChange={(e) => updateStagedRow(t.id, { description: e.target.value })}
                                                         style={{ 
                                                             width: '100%', border: 'none', background: 'transparent', 
-                                                            fontWeight: 900, color: t.isProjected ? '#6366f1' : '#0f172a', fontSize: '1rem',
+                                                            fontWeight: 900, color: t.isProjected ? '#6366f1' : (t.isCompound ? '#ef4444' : '#0f172a'), fontSize: '1rem',
                                                             padding: '4px 8px', borderRadius: '4px',
                                                             borderBottom: '1px dashed #e2e8f0'
                                                         }}
@@ -595,6 +645,23 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                                     />
                                                 </div>
                                                 <div className="flex flex-wrap gap-2 items-center px-2">
+                                                    {t.splitGroup && (
+                                                        <div style={{ 
+                                                            padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 900,
+                                                            backgroundColor: parseFloat(getSplitBalance(t.splitGroup)) === 0 ? '#ecfdf5' : '#fff7ed',
+                                                            color: parseFloat(getSplitBalance(t.splitGroup)) === 0 ? '#059669' : '#d97706',
+                                                            border: `1px solid ${parseFloat(getSplitBalance(t.splitGroup)) === 0 ? '#10b981' : '#f59e0b'}`
+                                                        }}>
+                                                            {parseFloat(getSplitBalance(t.splitGroup)) === 0 
+                                                                ? '✓ DIVISÃO BALANCEADA' 
+                                                                : `⚠️ FALTAM R$ ${getSplitBalance(t.splitGroup)}`}
+                                                        </div>
+                                                    )}
+                                                    {t.isCompound && (
+                                                        <div style={{ fontSize: '10px', color: '#ef4444', fontWeight: 900, marginTop: '4px' }}>
+                                                             Múltiplos itens detectados: {t.detectedItems.map(it => it.name).join(', ')}
+                                                        </div>
+                                                    )}
                                                     {t.installment && (
                                                         <span style={{ 
                                                             fontSize: '10px', fontWeight: 900, color: 'white', 
@@ -640,50 +707,72 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                             />
                                         </td>
                                         <td style={{ padding: '12px 16px' }}>
-                                            <select 
-                                                value={t.suggestedMatch ? (t.suggestedMatch.type === 'order' ? 'Vendas de Produtos' : t.suggestedMatch.item.category) : t.category}
-                                                onChange={(e) => {
-                                                    const newCat = e.target.value;
-                                                    const updates = { category: newCat, suggestedMatch: null, isAISuggested: false };
-                                                    updateStagedRow(t.id, updates);
-                                                }}
-                                                style={{ 
-                                                    backgroundColor: t.isAISuggested ? '#ecfdf5' : '#f8fafc',
-                                                    color: t.isAISuggested ? '#065f46' : '#334155',
-                                                    padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, 
-                                                    border: t.isAISuggested ? '1px solid #10b981' : '1px solid #e2e8f0',
-                                                    cursor: 'pointer', outline: 'none', width: '100%',
-                                                    boxShadow: t.isAISuggested ? '0 0 0 2px rgba(16, 185, 129, 0.1)' : 'none'
-                                                }}
-                                            >
-                                                <option value="Outros">Escolher Categoria...</option>
-                                                
-                                                <optgroup label="Minhas Categorias">
-                                                    {categories.map(cat => (
-                                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
-                                                    ))}
-                                                    {!categories.length && <option disabled>Nenhuma categoria personalizada</option>}
-                                                </optgroup>
-
-                                                <optgroup label="Despesas Padrão">
-                                                    <option value="Administrativo / Fixos">Administrativo / Fixos</option>
-                                                    <option value="Materiais & Insumos">Materiais & Insumos</option>
-                                                    <option value="Marketing & Vendas">Marketing & Vendas</option>
-                                                    <option value="Impostos & Taxas">Impostos & Taxas</option>
-                                                    <option value="Logística & Frete">Logística & Frete</option>
-                                                    <option value="Pessoal & RH">Pessoal & RH</option>
-                                                    <option value="Equipamentos & Ativos">Equipamentos & Ativos</option>
-                                                    <option value="Pagamento de Fatura">Pagamento de Fatura</option>
-                                                    <option value="Outros">Outros</option>
-                                                </optgroup>
-
-                                                <optgroup label="Receitas Padrão">
-                                                    <option value="Vendas de Produtos">Vendas de Produtos</option>
-                                                    <option value="Serviços Prestados">Serviços Prestados</option>
-                                                    <option value="Aporte / Investimento">Aporte / Investimento</option>
-                                                    <option value="Estorno / Ajuste">Estorno / Ajuste</option>
-                                                </optgroup>
-                                            </select>
+                                            <div className="flex flex-col gap-2">
+                                                <select 
+                                                    value={t.category}
+                                                    onChange={(e) => updateStagedRow(t.id, { category: e.target.value, isAISuggested: false })}
+                                                    style={{ 
+                                                        backgroundColor: t.isAISuggested ? '#ecfdf5' : '#f8fafc',
+                                                        color: t.isAISuggested ? '#065f46' : '#334155',
+                                                        padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, 
+                                                        border: t.isAISuggested ? '1px solid #10b981' : '1px solid #e2e8f0',
+                                                        cursor: 'pointer', outline: 'none', width: '100%',
+                                                        boxShadow: t.isAISuggested ? '0 0 0 2px rgba(16, 185, 129, 0.1)' : 'none'
+                                                    }}
+                                                >
+                                                    <option value="Outros">Escolher Categoria...</option>
+                                                    <optgroup label="Minhas Categorias">
+                                                        {categories.map(cat => (
+                                                            <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                                        ))}
+                                                        {!categories.length && <option disabled>Nenhuma categoria personalizada</option>}
+                                                    </optgroup>
+                                                    <optgroup label="Despesas Padrão">
+                                                        <option value="Administrativo / Fixos">Administrativo / Fixos</option>
+                                                        <option value="Materiais & Insumos">Materiais & Insumos</option>
+                                                        <option value="Marketing & Vendas">Marketing & Vendas</option>
+                                                        <option value="Impostos & Taxas">Impostos & Taxas</option>
+                                                        <option value="Logística & Frete">Logística & Frete</option>
+                                                        <option value="Pessoal & RH">Pessoal & RH</option>
+                                                        <option value="Equipamentos & Ativos">Equipamentos & Ativos</option>
+                                                        <option value="Pagamento de Fatura">Pagamento de Fatura</option>
+                                                        <option value="Outros">Outros</option>
+                                                    </optgroup>
+                                                    <optgroup label="Receitas Padrão">
+                                                        <option value="Vendas de Produtos">Vendas de Produtos</option>
+                                                        <option value="Serviços Prestados">Serviços Prestados</option>
+                                                        <option value="Aporte / Investimento">Aporte / Investimento</option>
+                                                        <option value="Estorno / Ajuste">Estorno / Ajuste</option>
+                                                    </optgroup>
+                                                </select>
+                                                <button 
+                                                    onClick={() => {
+                                                        const term = prompt('Buscar item no catálogo (Equipamento ou Material):');
+                                                        if (term) {
+                                                            const eq = equipments.find(e => e.name.toLowerCase().includes(term.toLowerCase()));
+                                                            const mt = materials.find(m => m.name.toLowerCase().includes(term.toLowerCase()));
+                                                            const found = eq || mt;
+                                                            if (found) {
+                                                                const itemPrice = parseFloat(found.cost || found.price || found.purchasePrice || 0);
+                                                                updateStagedRow(t.id, { 
+                                                                    description: `${t.description.split(' / ')[0]} / ${found.name}`,
+                                                                    suggestedLink: { type: eq ? 'equipment' : 'material', id: found.id, name: found.name },
+                                                                    category: eq ? 'Equipamentos & Ativos' : 'Materiais & Insumos',
+                                                                    amount: itemPrice > 0 ? itemPrice : t.amount
+                                                                });
+                                                            } else {
+                                                                alert('Item não encontrado no catálogo.');
+                                                            }
+                                                        }
+                                                    }}
+                                                    style={{ 
+                                                        fontSize: '10px', background: '#f1f5f9', color: '#475569', padding: '2px 8px', 
+                                                        borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 900, cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    + VINCULAR ITEM
+                                                </button>
+                                            </div>
                                         </td>
                                         <td style={{ padding: '12px 16px' }}>
                                             <select 
@@ -715,7 +804,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                                             updateStagedRow(t.id, { suggestedLink: null });
                                                             return;
                                                         }
-                                                        
                                                         const equip = equipments.find(eq => eq.id === id);
                                                         if (equip) {
                                                             const itemPrice = parseFloat(equip.cost || equip.purchasePrice || 0);
@@ -723,7 +811,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                                                 suggestedLink: { type: 'equipment', id, name: equip.name }, 
                                                                 category: 'Equipamentos & Ativos' 
                                                             };
-                                                            // Automação de valor para desmembramentos
                                                             if (t.isSplit && itemPrice > 0) {
                                                                 predictiveUpdates.amount = itemPrice;
                                                                 predictiveUpdates.isAISuggested = true;
@@ -737,7 +824,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                                                     suggestedLink: { type: 'material', id, name: mat.name }, 
                                                                     category: 'Materiais & Insumos' 
                                                                 };
-                                                                // Automação de valor para desmembramentos
                                                                 if (t.isSplit && itemPrice > 0) {
                                                                     predictiveUpdates.amount = itemPrice;
                                                                     predictiveUpdates.isAISuggested = true;

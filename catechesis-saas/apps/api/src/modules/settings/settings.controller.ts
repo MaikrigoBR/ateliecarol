@@ -57,4 +57,23 @@ export class SettingsController {
           : undefined
     });
   }
+
+  @Patch('tenant')
+  @Roles('ADMINISTRATOR', 'DEVELOPER')
+  async saveTenantPatch(
+    @TenantContext() tenantContext: TenantContextValue | undefined,
+    @Body() body: TenantSettingsPatchDto
+  ) {
+    const slug = tenantContext?.tenant.slug ?? 'emmaus';
+    return this.settingsService.saveTenantSettings(slug, {
+      branding: body.displayName ? { displayName: body.displayName } : undefined,
+      audience:
+        body.ageRangeLabel || body.youthFirst !== undefined
+          ? {
+              ageRangeLabel: body.ageRangeLabel,
+              youthFirst: body.youthFirst
+            }
+          : undefined
+    });
+  }
 }

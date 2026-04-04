@@ -2,6 +2,7 @@ import { mergeTenantSettings, platformDefaults } from '@catechesis-saas/config';
 import type {
   CourseSummary,
   DeepPartial,
+  PlanSummary,
   Role,
   TenantSettings,
   TenantSummary,
@@ -185,4 +186,22 @@ export function getFallbackCoursesForTenant(slug: string) {
 
 export function getFallbackPlan(tenantSlug: string, planId: string) {
   return fallbackPlans[tenantSlug]?.[planId];
+}
+
+export function listFallbackPlansForTenant(tenantSlug: string): PlanSummary[] {
+  const tenant = getFallbackTenant(tenantSlug);
+  const settings = getFallbackTenantSettings(tenantSlug);
+  const coursesById = new Map(getFallbackCoursesForTenant(tenantSlug).map((course) => [course.id, course.title]));
+
+  return Object.values(fallbackPlans[tenantSlug] ?? {}).map((plan) => ({
+    id: plan.id,
+    title: plan.title,
+    courseId: plan.courseId,
+    courseTitle: coursesById.get(plan.courseId),
+    priceCents: plan.priceCents,
+    currency: 'BRL',
+    interval: settings.billing.interval,
+    intervalUnit: settings.billing.intervalUnit,
+    paymentOwnershipMode: tenant?.paymentMode ?? settings.billing.paymentOwnershipMode
+  }));
 }

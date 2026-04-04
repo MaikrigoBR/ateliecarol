@@ -101,6 +101,10 @@ export function CreditCards() {
     const [editAccId, setEditAccId] = useState(null);
     const [newAccount, setNewAccount] = useState({ name: '', type: 'credit', balance: 0, limit: 0, dueDay: 10, closeDay: '', color: '#8b5cf6' });
     const [selectedDetailTrans, setSelectedDetailTrans] = useState(null);
+    const [paymentAmount, setPaymentAmount] = useState(0);
+    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isSuccess, setIsSuccess] = useState(false);
+    const [isPaying, setIsPaying] = useState(false);
 
     const fetchData = async () => {
         const accs = await db.getAll('accounts');
@@ -233,6 +237,14 @@ export function CreditCards() {
     const currentInvoiceTrans = currentInvoiceData.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
     const invoiceTotal = currentInvoiceData.total;
 
+    useEffect(() => {
+        if (invoiceTotal > 0) {
+            setPaymentAmount(invoiceTotal);
+        } else {
+            setPaymentAmount(0);
+        }
+    }, [invoiceTotal, selectedMonthOffset, selectedCardId]);
+
     // Pagamento da fatura parcial (se houver pagamentos avulsos que ainda não foram agrupados ou para controle visual)
     // Nota:groupByInvoiceCycle já desconta incomes (pagamentos) do total.
     const invoiceBalance = Math.max(0, invoiceTotal);
@@ -244,54 +256,72 @@ export function CreditCards() {
 
     const handlePayInvoice = async (e) => {
         e.preventDefault();
-        if (!paymentAccId) return;
+        if (!paymentAccId || !paymentAmount) return;
 
-        // Calcula a chave do mês com base na variável global ou de targetDate
-        const base = new Date();
-        const targetDate = new Date(base.getFullYear(), base.getMonth() + selectedMonthOffset, 1);
-        const monthKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+        setIsPaying(true);
+        try {
+            const base = new Date();
+            const targetDate = new Date(base.getFullYear(), base.getMonth() + selectedMonthOffset, 1);
+            const monthKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+            const amountToPay = Number(paymentAmount);
 
-        // Saída de dinheiro da conta corrente
-        const expensePayload = {
-            description: `Pagamento Fatura ${selectedCard.name} (${monthKey})`,
-            amount: invoiceBalance,
-            type: 'expense',
-            category: 'Cartão de Crédito',
-            accountId: paymentAccId,
-            date: new Date().toISOString().split('T')[0],
-            status: 'paid',
-            installments: 1,
-            createdAt: new Date().toISOString()
-        };
+            // Saída de dinheiro da conta corrente
+            const expensePayload = {
+                description: `Pagamento Fatura ${selectedCard.name} (${monthKey})`,
+                amount: amountToPay,
+                type: 'expense',
+                category: 'Cartão de Crédito',
+                accountId: paymentAccId,
+                date: paymentDate,
+                status: 'paid',
+                installments: 1,
+                createdAt: new Date().toISOString()
+            };
 
-        // Entrada de dinheiro no cartão (restaurando balance negativo / liberando limite)
-        const incomePayload = {
-            description: `Pagamento Fatura ${selectedCard.name} (${monthKey})`,
-            amount: invoiceTotal,
-            type: 'income',
-            category: 'Cartão de Crédito',
-            accountId: selectedCard.id,
-            date: new Date().toISOString().split('T')[0],
-            status: 'paid',
-            installments: 1,
-            createdAt: new Date().toISOString()
-        };
+            // Entrada de dinheiro no cartão (liberando limite)
+            const incomePayload = {
+                description: `Pagamento Fatura ${selectedCard.name} (${monthKey})`,
+                amount: amountToPay,
+                type: 'income',
+                category: 'Cartão de Crédito',
+                accountId: selectedCard.id,
+                date: paymentDate,
+                status: 'paid',
+                installments: 1,
+                createdAt: new Date().toISOString()
+            };
 
-        const currentPaid = selectedCard.paidInvoices || [];
-        const accountUpdatePromise = currentPaid.includes(monthKey) ? null : db.update('accounts', selectedCard.id, {
-            ...selectedCard,
-            paidInvoices: [...currentPaid, monthKey]
-        });
+            // Se o pagamento for total (ou superior), marca como paga
+            let accountUpdatePromise = null;
+            if (amountToPay >= invoiceTotal) {
+                const currentPaid = selectedCard.paidInvoices || [];
+                if (!currentPaid.includes(monthKey)) {
+                    accountUpdatePromise = db.update('accounts', selectedCard.id, {
+                        ...selectedCard,
+                        paidInvoices: [...currentPaid, monthKey]
+                    });
+                }
+            }
 
-        await Promise.all([
-            db.create('transactions', expensePayload),
-            db.create('transactions', incomePayload),
-            ...(accountUpdatePromise ? [accountUpdatePromise] : [])
-        ]);
+            await Promise.all([
+                db.create('transactions', expensePayload),
+                db.create('transactions', incomePayload),
+                ...(accountUpdatePromise ? [accountUpdatePromise] : [])
+            ]);
 
-        setIsPaymentModalOpen(false);
-        fetchData();
-        alert('Fatura paga e limite restaurado com sucesso!');
+            setIsSuccess(true);
+            setTimeout(() => {
+                setIsSuccess(false);
+                setIsPaymentModalOpen(false);
+                fetchData();
+            }, 2000);
+            
+        } catch (error) {
+            console.error("Erro ao pagar fatura:", error);
+            alert("Ocorreu um erro ao processar o pagamento.");
+        } finally {
+            setIsPaying(false);
+        }
     };
 
     // Gerar dados do Gráfico futuro
@@ -724,14 +754,23 @@ export function CreditCards() {
                                     key={trans.id} 
                                     onClick={() => setSelectedDetailTrans(trans)}
                                     style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }} 
-                                    className="hover:bg-blue-50 transition-colors"
-                                    title="Editar Lançamento"
+                                    className="hover:bg-indigo-50/50 transition-colors"
                                 >
                                     <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
                                         {new Date(trans.date).toLocaleDateString()}
                                     </td>
-                                    <td style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                                        {trans.description}
+                                    <td style={{ padding: '1rem 1.5rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div style={{ 
+                                                width: '32px', height: '32px', borderRadius: '8px', 
+                                                backgroundColor: trans.type === 'income' ? '#ecfdf5' : 'var(--surface-hover)',
+                                                color: trans.type === 'income' ? '#10b981' : 'var(--text-muted)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                            }}>
+                                                {trans.type === 'income' ? <CheckCircle size={16} /> : <ShoppingBag size={16} />}
+                                            </div>
+                                            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{trans.description}</span>
+                                        </div>
                                     </td>
                                     <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
                                         {trans.installmentsTotal > 1 ? (
@@ -747,8 +786,8 @@ export function CreditCards() {
                                             </span>
                                         ) : '-'}
                                     </td>
-                                     <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>
-                                         R$ {formatCurrency(trans.amount)}
+                                     <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 800, color: trans.type === 'income' ? '#10b981' : 'var(--text-main)' }}>
+                                         {trans.type === 'income' ? '+ ' : ''}R$ {formatCurrency(trans.amount)}
                                      </td>
                                 </tr>
                             ))}
@@ -808,42 +847,80 @@ export function CreditCards() {
                 </div>
             )}
 
-            {/* Modal for paying invoice */}
             {isPaymentModalOpen && (
                 <div className="modal-overlay" style={{ zIndex: 1000 }}>
-                    <div className="modal-content animate-slide-up" style={{ maxWidth: '400px', width: '100%', padding: '24px', backgroundColor: 'var(--surface)', borderRadius: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
-                                Pagar Fatura
-                            </h2>
-                            <button onClick={() => setIsPaymentModalOpen(false)} style={{ background: 'var(--surface-hover)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                    <div className="modal-content animate-slide-up" style={{ maxWidth: '450px', width: '100%', padding: 0, overflow: 'hidden', backgroundColor: 'var(--surface)', borderRadius: '24px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        
+                        {/* Header Moderno */}
+                        <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, #4338ca 100%)', padding: '32px', color: 'white', position: 'relative' }}>
+                            <button onClick={() => setIsPaymentModalOpen(false)} style={{ position: 'absolute', right: '16px', top: '16px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
                                 <X size={18} />
                             </button>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>Pagar Fatura</h2>
+                            <p style={{ opacity: 0.8, fontSize: '0.875rem', marginTop: '4px' }}>Confirmar liquidação do cartão {selectedCard?.name}</p>
                         </div>
-                        <form onSubmit={handlePayInvoice} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{ textAlign: 'center', background: 'var(--surface-hover)', padding: '16px', borderRadius: '12px' }}>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Valor a pagar</span>
-                                 <h3 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', margin: '4px 0 0 0' }}>
-                                     R$ {formatCurrency(invoiceBalance)}
-                                 </h3>
+
+                        {/* Success Overlay */}
+                        {isSuccess && (
+                            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(255,255,255,0.95)', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', animation: 'fade-in 0.3s ease' }}>
+                                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px', boxShadow: '0 0 40px rgba(16, 185, 129, 0.2)' }}>
+                                    <CheckCircle size={48} strokeWidth={3} className="animate-bounce" />
+                                </div>
+                                <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#065f46', margin: '0 0 8px 0' }}>Pagamento Realizado!</h3>
+                                <p style={{ color: '#059669', fontWeight: 600, fontSize: '0.875rem' }}>O limite será restaurado em instantes.</p>
                             </div>
+                        )}
+
+                        <form onSubmit={handlePayInvoice} style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Valor do Pagamento</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)' }}>R$</span>
+                                        <input 
+                                            required 
+                                            type="number" 
+                                            step="0.01" 
+                                            style={{ width: '100%', padding: '14px 16px 14px 44px', borderRadius: '14px', border: '2px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 800, outline: 'none' }} 
+                                            value={paymentAmount} 
+                                            onChange={e => setPaymentAmount(e.target.value)} 
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Data</label>
+                                    <input 
+                                        required 
+                                        type="date" 
+                                        style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '2px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 600, height: '56px', outline: 'none' }} 
+                                        value={paymentDate} 
+                                        onChange={e => setPaymentDate(e.target.value)} 
+                                    />
+                                </div>
+                            </div>
+
                             <div>
-                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>De onde o dinheiro vai sair? <span style={{color: '#ef4444'}}>*</span></label>
-                                <select required style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.875rem' }} value={paymentAccId} onChange={e => setPaymentAccId(e.target.value)}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Origem do Dinheiro</label>
+                                <select required style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '2px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 600, height: '56px', outline: 'none' }} value={paymentAccId} onChange={e => setPaymentAccId(e.target.value)}>
                                     <option value="">Selecione uma conta...</option>
                                      {allAccounts.filter(a => a.type !== 'credit').map(a => (
                                          <option key={a.id} value={a.id}>{a.name} (Saldo: R$ {formatCurrency(accBalances[a.id] || 0)})</option>
                                      ))}
                                 </select>
                             </div>
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                                <button type="button" onClick={() => setIsPaymentModalOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface-hover)', color: 'var(--text-main)', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-                                    Cancelar
-                                </button>
-                                <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--primary)', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-                                    Confirmar Pagamento
-                                </button>
-                            </div>
+
+                            <button 
+                                type="submit" 
+                                disabled={isPaying || !paymentAmount || !paymentAccId}
+                                className="btn btn-primary" 
+                                style={{ width: '100%', height: '56px', borderRadius: '14px', fontSize: '1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 10px 20px -5px rgba(99, 102, 241, 0.4)' }}
+                            >
+                                {isPaying ? 'Processando...' : (
+                                    <>
+                                        <CheckCircle size={20} /> Confirmar Pagamento
+                                    </>
+                                )}
+                            </button>
                         </form>
                     </div>
                 </div>

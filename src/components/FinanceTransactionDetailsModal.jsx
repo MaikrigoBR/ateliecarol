@@ -42,21 +42,25 @@ export function FinanceTransactionDetailsModal({ transaction, isOpen, onClose, o
         }
         try {
             // Se for parte de um parcelamento/mensalidade agrupado
-            if (transaction.parentId && transaction.installmentsTotal > 1) {
-                if (window.confirm(`Esta transação faz parte de um parcelamento em ${transaction.installmentsTotal}x.\n\nDeseja replicar as modificações (Valor, Categoria, Conta base e Descrição) para TODAS as parcelas futuras e passadas deste grupo?`)) {
+            if (transaction.parentId) {
+                const choice = window.confirm(`Esta transação faz parte de um grupo recorrente/parcelado.\n\nClique OK para replicar o novo valor (R$ ${formData.amount}) para as parcelas futuras.\nClique CANCELAR para editar apenas esta parcela individual.`);
+                
+                if (choice) {
                     const allTrans = await db.getAll('transactions');
-                    const group = allTrans.filter(t => t.parentId === transaction.parentId);
+                    // Filtra apenas as parcelas deste grupo que vencem HOJE ou no FUTURO em relação a esta edição
+                    const groupToUpdate = allTrans.filter(t => t.parentId === transaction.parentId && t.date >= transaction.date);
                     
-                    // Remove sufixos existentes tipo " (1/12)" se o usuário não tiver removido manualmente na form
                     const cleanBaseDesc = formData.description.replace(/\s?\(\d+[/]\d+\)$/, '').trim();
                     
-                    for (const t of group) {
+                    for (const t of groupToUpdate) {
                         await db.update('transactions', t.id, {
-                            description: `${cleanBaseDesc} (${t.installmentNumber}/${t.installmentsTotal})`,
+                            ...t,
+                            description: t.installmentNumber ? `${cleanBaseDesc} (${t.installmentNumber}/${t.installmentsTotal})` : formData.description,
                             amount: Number(formData.amount),
                             accountId: formData.accountId,
                             category: formData.category,
-                            status: t.id === transaction.id ? formData.status : t.status // Só altera status se for a parcela editada central
+                            // Status só muda se for a parcela atual ou se o usuário estiver marcando como paga no futuro (raro)
+                            status: t.id === transaction.id ? formData.status : t.status
                         });
                     }
                     onUpdate();

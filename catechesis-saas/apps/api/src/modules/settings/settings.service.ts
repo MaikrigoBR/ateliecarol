@@ -15,6 +15,10 @@ export class SettingsService {
     return mergeTenantSettings(await this.getEffectiveSettings(slug), overrides);
   }
 
+  async saveTenantSettings(slug: string, overrides: DeepPartial<TenantSettings>) {
+    return this.tenantService.saveTenantSettingsPatch(slug, overrides);
+  }
+
   async getConfigLayers(slug: string) {
     return {
       platformDefaults,

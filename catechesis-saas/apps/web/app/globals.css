@@ -114,7 +114,8 @@ p {
 
 .primary-link,
 .secondary-link,
-.link-list a {
+.link-list a,
+.button-reset {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -130,8 +131,15 @@ p {
   box-shadow: 0 12px 32px rgba(172, 81, 38, 0.26);
 }
 
+.button-reset {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
 .secondary-link,
-.link-list a {
+.link-list a,
+.secondary-link.button-reset {
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.8);
 }
@@ -147,6 +155,11 @@ p {
   margin-top: 24px;
 }
 
+.single-up {
+  grid-template-columns: 1fr;
+  margin-top: 24px;
+}
+
 .three-up {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 24px;
@@ -154,7 +167,8 @@ p {
 
 .panel,
 .metric-card,
-.course-card {
+.course-card,
+.credential-card {
   padding: 22px;
   border: 1px solid var(--border);
   border-radius: 24px;
@@ -190,6 +204,90 @@ p {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.plan-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--panel);
+}
+
+.plan-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.inline-form {
+  display: flex;
+}
+
+.credential-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.credential-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+  width: min(420px, 100%);
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field span {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.auth-form input {
+  min-height: 48px;
+  width: 100%;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.8);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.select-field {
+  min-height: 48px;
+  width: 100%;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.8);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.form-error {
+  color: #8f231f;
+  font-weight: 700;
+}
+
+.muted-copy {
+  color: var(--muted);
 }
 
 .pill {

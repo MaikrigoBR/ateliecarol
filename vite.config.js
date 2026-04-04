@@ -12,6 +12,6 @@ export default defineConfig({
     open: false,
   },
   build: {
-    chunkSizeWarningLimit: 2500 // Oculta o aviso sem forçar divisões destrutivas
+    chunkSizeWarningLimit: 2500
   }
 })

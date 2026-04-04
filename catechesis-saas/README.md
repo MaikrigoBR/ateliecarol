@@ -1,25 +1,25 @@
 # Catechesis SaaS
 
-Base inicial para uma plataforma multi-instituição de formação e catequese por assinatura, criada dentro deste repositório sem alterar a aplicação já existente.
+Base inicial para uma plataforma multi-instituicao de formacao e catequese por assinatura, criada dentro deste repositorio sem alterar a aplicacao ja existente.
 
-## O que já foi implementado
+## O que ja foi implementado
 
 - monorepo com `apps/web`, `apps/api`, `apps/worker` e `packages/*`;
 - modelagem Prisma separando plano de controle global e schema por tenant;
-- API NestJS com resolução de tenant, autenticação contextual, catálogo, settings e assinatura com snapshot;
-- frontend Next.js com landing page, vitrine por tenant e painéis iniciais de aluno, professor e administrador;
-- worker BullMQ com filas base para recorrência e repasse;
-- documentação de arquitetura e setup.
+- API NestJS com resolucao de tenant, autenticacao contextual, catalogo, settings e assinatura com snapshot;
+- frontend Next.js com landing page, vitrine por tenant, login web integrado e paineis por papel;
+- worker BullMQ com filas base para recorrencia e repasse;
+- documentacao de arquitetura e setup.
 
 ## Estrutura
 
-- `apps/web`: experiência visual multi-tenant.
-- `apps/api`: núcleo do backend.
-- `apps/worker`: jobs assíncronos.
-- `packages/types`: tipos de domínio.
-- `packages/config`: defaults e merge de parâmetros.
+- `apps/web`: experiencia visual multi-tenant.
+- `apps/api`: nucleo do backend.
+- `apps/worker`: jobs assincronos.
+- `packages/types`: tipos de dominio.
+- `packages/config`: defaults e merge de parametros.
 - `packages/ui`: tokens leves compartilhados.
-- `prisma/`: schemas e estratégia de dados.
+- `prisma/`: schemas e estrategia de dados.
 - `scripts/`: provisionamento e seed local do banco demo.
 
 ## Setup local
@@ -32,7 +32,7 @@ Base inicial para uma plataforma multi-instituição de formação e catequese p
 docker compose up -d
 ```
 
-4. Instale dependências:
+4. Instale dependencias:
 
 ```bash
 npm install
@@ -44,7 +44,7 @@ npm install
 npm run prisma:generate
 ```
 
-6. Se quiser a API usando persistência real em Postgres, provisione o ambiente demo:
+6. Se quiser a API usando persistencia real em Postgres, provisione o ambiente demo:
 
 ```bash
 npm run db:provision:demo
@@ -82,6 +82,7 @@ Depois abra:
 
 - `http://localhost:3000/local-test`
 - `http://localhost:3000/tenant/emmaus`
+- `http://localhost:3000/tenant/emmaus/sign-in`
 - `http://localhost:4000/api/health`
 
 ## Testes automatizados
@@ -95,13 +96,14 @@ npm run test
 ## Rotas demonstrativas
 
 - `/`: vitrine principal da plataforma.
-- `/tenant/emmaus`: visão do aluno.
-- `/tenant/emmaus/teacher`: visão do professor.
-- `/tenant/emmaus/admin`: visão do administrador.
+- `/tenant/emmaus`: visao do aluno.
+- `/tenant/emmaus/sign-in`: login web integrado com a API.
+- `/tenant/emmaus/teacher`: visao do professor.
+- `/tenant/emmaus/admin`: visao do administrador.
 
-## Próximos passos naturais
+## Proximos passos naturais
 
-- ligar autenticação e RBAC reais ao controle global persistido;
-- adicionar MFA e guards por papel/tenant;
+- expandir o login web para fluxos persistidos e administracao de sessao com dados reais do controle global;
+- adicionar MFA e guards por papel/tenant em mais fluxos;
 - conectar Mercado Pago e webhooks idempotentes;
-- incluir testes automatizados e seeds.
+- incluir mais testes automatizados e seeds.

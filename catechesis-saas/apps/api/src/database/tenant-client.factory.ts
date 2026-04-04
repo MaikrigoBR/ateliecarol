@@ -6,12 +6,40 @@ type TenantClient = {
   $disconnect(): Promise<void>;
   tenantSetting: {
     findMany(): Promise<Array<{ key: string; value: unknown }>>;
+    upsert(args: unknown): Promise<{ key: string; value: unknown }>;
   };
   course: {
     findMany(args: unknown): Promise<Array<{ id: string; slug: string; title: string; isPublished: boolean; modules: unknown[] }>>;
   };
   enrollment: {
     create(args: unknown): Promise<{ id: string }>;
+    findMany(args: unknown): Promise<
+      Array<{
+        id: string;
+        studentIdentityId: string;
+        courseId: string;
+        planId: string;
+        status: string;
+        startedAt: Date;
+        pricingSnapshot: { priceCents?: number; currency?: string };
+        course: { title: string };
+        plan: { title: string };
+        subscription?: { status: string } | null;
+      }>
+    >;
+  };
+  coursePlan: {
+    findMany(args: unknown): Promise<
+      Array<{
+        id: string;
+        courseId: string;
+        title: string;
+        priceCents: number;
+        billingInterval: number;
+        billingIntervalUnit: string;
+        course: { title: string };
+      }>
+    >;
   };
   subscription: {
     create(args: unknown): Promise<{ id: string }>;

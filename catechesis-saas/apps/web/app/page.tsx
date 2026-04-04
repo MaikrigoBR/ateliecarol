@@ -26,6 +26,9 @@ export default function HomePage() {
             <Link className="secondary-link" href="/local-test">
               Teste local
             </Link>
+            <Link className="secondary-link" href="/tenant/emmaus/sign-in">
+              Login demo
+            </Link>
           </div>
         </div>
         <div className="hero-stack">
@@ -66,6 +69,7 @@ export default function HomePage() {
               <Link href={`/tenant/${tenant.tenant.slug}`}>Area do aluno</Link>
               <Link href={`/tenant/${tenant.tenant.slug}/teacher`}>Painel do professor</Link>
               <Link href={`/tenant/${tenant.tenant.slug}/admin`}>Painel administrativo</Link>
+              <Link href={`/tenant/${tenant.tenant.slug}/sign-in`}>Entrar no tenant</Link>
             </div>
           </SectionShell>
         ))}

@@ -7,6 +7,9 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { TenantContextMiddleware } from './common/tenant/tenant-context.middleware.js';
 import { AuthService } from './modules/auth/auth.service.js';
+import { CatalogService } from './modules/catalog/catalog.service.js';
+import { SubscriptionsService } from './modules/subscriptions/subscriptions.service.js';
+import { TenantService } from './modules/tenant/tenant.service.js';
 import { getFallbackTenantSettings } from './demo/fallback-data.js';
 
 const adminUser: AuthenticatedUser = {
@@ -159,4 +162,69 @@ await runCase('AuthService rejects invalid fallback demo credentials', async () 
     async () => service.login('admin@emmaus.local', 'senha-incorreta', 'emmaus'),
     UnauthorizedException
   );
+});
+
+await runCase('CatalogService returns fallback plans when the tenant database is unavailable', async () => {
+  const service = new CatalogService({
+    getClient: async () => {
+      throw new Error('database unavailable in smoke tests');
+    }
+  } as never);
+
+  const plans = await service.getPlansForTenant('emmaus');
+
+  assert.equal(plans.length > 0, true);
+  assert.equal(plans[0]?.id, 'plano-jovem');
+  assert.equal(plans[0]?.currency, 'BRL');
+});
+
+await runCase('TenantService keeps runtime settings overrides available in demo mode', async () => {
+  const service = new TenantService(createControlPlaneStub() as never, {
+    getClient: async () => {
+      throw new Error('database unavailable in smoke tests');
+    }
+  } as never);
+  const slug = 'smoke-settings';
+
+  const firstUpdate = await service.saveTenantSettingsPatch(slug, {
+    branding: { displayName: 'Comunidade Smoke' },
+    audience: { ageRangeLabel: '16 a 20 anos', youthFirst: false }
+  });
+
+  assert.equal(firstUpdate.branding.displayName, 'Comunidade Smoke');
+  assert.equal(firstUpdate.audience.ageRangeLabel, '16 a 20 anos');
+  assert.equal(firstUpdate.audience.youthFirst, false);
+
+  const secondUpdate = await service.saveTenantSettingsPatch(slug, {
+    audience: { youthFirst: true }
+  });
+
+  assert.equal(secondUpdate.branding.displayName, 'Comunidade Smoke');
+  assert.equal(secondUpdate.audience.ageRangeLabel, '16 a 20 anos');
+  assert.equal(secondUpdate.audience.youthFirst, true);
+});
+
+await runCase('SubscriptionsService stores demo enrollment history when the tenant database is unavailable', async () => {
+  const service = new SubscriptionsService(
+    {
+      getEffectiveSettings: async () => getFallbackTenantSettings('emmaus') as TenantSettings
+    } as never,
+    {
+      getClient: async () => {
+        throw new Error('database unavailable in smoke tests');
+      }
+    } as never
+  );
+
+  const created = await service.createSubscription('emmaus', {
+    studentIdentityId: 'demo-student-smoke',
+    planId: 'plano-jovem'
+  });
+  const items = await service.listSubscriptionsForStudent('emmaus', 'demo-student-smoke');
+
+  assert.equal(created.subscription.status, 'PENDING');
+  assert.equal(items.length > 0, true);
+  assert.equal(items[0]?.planId, 'plano-jovem');
+  assert.equal(items[0]?.studentIdentityId, 'demo-student-smoke');
+  assert.equal(items[0]?.subscriptionStatus, 'PENDING');
 });

@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { mergeTenantSettings, platformDefaults } from '@catechesis-saas/config';
-import type { TenantSettings } from '@catechesis-saas/types';
+import type { DeepPartial, TenantSettings } from '@catechesis-saas/types';
 import { ControlPlanePrismaService } from '../../database/control-plane-prisma.service.js';
 import { TenantClientFactory } from '../../database/tenant-client.factory.js';
 import {
@@ -9,6 +9,23 @@ import {
   getFallbackTenant,
   getFallbackTenantSettings
 } from '../../demo/fallback-data.js';
+
+const runtimeTenantOverrides = new Map<string, DeepPartial<TenantSettings>>();
+
+function mergePartialSettings(
+  base: DeepPartial<TenantSettings>,
+  overrides: DeepPartial<TenantSettings>
+): DeepPartial<TenantSettings> {
+  return {
+    ...base,
+    ...overrides,
+    branding: { ...base.branding, ...overrides.branding },
+    audience: { ...base.audience, ...overrides.audience },
+    billing: { ...base.billing, ...overrides.billing },
+    pedagogy: { ...base.pedagogy, ...overrides.pedagogy },
+    notifications: { ...base.notifications, ...overrides.notifications }
+  };
+}
 
 @Injectable()
 export class TenantService {
@@ -64,9 +81,10 @@ export class TenantService {
   async getEffectiveSettings(slug: string) {
     const tenant = getFallbackTenant(slug);
     const baseSettings = mergeTenantSettings(platformDefaults, fallbackTenantSettings[slug] ?? {});
+    const runtimeOverridesForTenant = runtimeTenantOverrides.get(slug) ?? {};
 
     if (!tenant) {
-      return baseSettings;
+      return mergeTenantSettings(baseSettings, runtimeOverridesForTenant);
     }
 
     try {
@@ -77,10 +95,53 @@ export class TenantService {
         return acc;
       }, {});
 
-      return mergeTenantSettings(baseSettings, overrides as Partial<TenantSettings>);
+      return mergeTenantSettings(
+        mergeTenantSettings(baseSettings, overrides as Partial<TenantSettings>),
+        runtimeOverridesForTenant
+      );
     } catch {
-      return baseSettings;
+      return mergeTenantSettings(baseSettings, runtimeOverridesForTenant);
     }
+  }
+
+  async saveTenantSettingsPatch(slug: string, overrides: DeepPartial<TenantSettings>) {
+    const tenant = getFallbackTenant(slug);
+    const currentRuntimeOverrides = runtimeTenantOverrides.get(slug) ?? {};
+    const mergedRuntimeOverrides = mergePartialSettings(currentRuntimeOverrides, overrides);
+
+    runtimeTenantOverrides.set(slug, mergedRuntimeOverrides);
+
+    if (tenant) {
+      try {
+        const client = await this.tenantClientFactory.getClient(tenant.schemaName);
+
+        if (mergedRuntimeOverrides.branding) {
+          await client.tenantSetting.upsert({
+            where: { key: 'branding' },
+            update: { value: mergedRuntimeOverrides.branding },
+            create: {
+              key: 'branding',
+              value: mergedRuntimeOverrides.branding
+            }
+          });
+        }
+
+        if (mergedRuntimeOverrides.audience) {
+          await client.tenantSetting.upsert({
+            where: { key: 'audience' },
+            update: { value: mergedRuntimeOverrides.audience },
+            create: {
+              key: 'audience',
+              value: mergedRuntimeOverrides.audience
+            }
+          });
+        }
+      } catch {
+        // Keep runtime overrides available even when persistence is unavailable.
+      }
+    }
+
+    return this.getEffectiveSettings(slug);
   }
 
   getDemoSettings(slug: string) {

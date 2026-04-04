@@ -88,6 +88,33 @@ export interface CourseSummary {
   progressLabel?: string;
 }
 
+export interface PlanSummary {
+  id: string;
+  title: string;
+  courseId: string;
+  courseTitle?: string;
+  priceCents: number;
+  currency: string;
+  interval: number;
+  intervalUnit: BillingPolicy['intervalUnit'];
+  paymentOwnershipMode: PaymentOwnershipMode;
+}
+
+export interface EnrollmentSummary {
+  id: string;
+  studentIdentityId: string;
+  courseId: string;
+  courseTitle: string;
+  planId: string;
+  planTitle: string;
+  enrollmentStatus: string;
+  subscriptionStatus: string;
+  startedAt: string;
+  priceCents: number;
+  currency: string;
+  paymentOwnershipMode: PaymentOwnershipMode;
+}
+
 export interface DashboardMetric {
   id: string;
   label: string;

@@ -1,314 +1,185 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Edit2, Check, Trash2, Plus, DollarSign } from 'lucide-react';
-import db from '../services/database';
-import { useAuth } from '../contexts/AuthContext';
-import AuditService from '../services/AuditService';
+import { 
+    X, DollarSign, Calendar, Filter, 
+    ArrowRight, TrendingDown, TrendingUp,
+    ShieldAlert, AlertCircle, Clock, Trash2,
+    CalendarDays, BarChart2, CheckCircle, Activity,
+    History, Search, Layers, RefreshCw
+} from 'lucide-react';
+import db from '../services/database.js';
+import AuditService from '../services/AuditService.js';
+import FinanceAuditService from '../services/FinanceAuditService.js';
+import { formatCurrency } from '../utils/financeUtils.js';
 
-export function LinkedTransactionsModal({ isOpen, onClose, entityId, entityType, entityName }) {
-    const { currentUser } = useAuth();
+export function LinkedTransactionsModal({ isOpen, item, targetTable, onClose, onUpdate }) {
     const [transactions, setTransactions] = useState([]);
-    const [accounts, setAccounts] = useState([]);
-    const [editingTrans, setEditingTrans] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    const [newTrans, setNewTrans] = useState({
-        isAdding: false,
-        description: '',
-        amount: '',
-        date: new Date().toISOString().split('T')[0],
-        status: 'pending',
-        accountId: '',
-        paymentMethod: 'pix',
-        installments: 1
-    });
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterStatus, setFilterStatus] = useState('all');
 
     useEffect(() => {
-        if (isOpen && entityId) {
-            loadData();
-        } else {
-            setTransactions([]);
+        if (isOpen && item?.id) {
+            fetchTransactions();
         }
-    }, [isOpen, entityId]);
+    }, [isOpen, item?.id, targetTable]);
 
-    const loadData = async () => {
-        setLoading(true);
+    const fetchTransactions = async () => {
+        setIsLoading(true);
         try {
-            const allAccounts = await db.getAll('accounts');
-            setAccounts(allAccounts || []);
-
-            const allTrans = await db.getAll('transactions');
-            if (allTrans) {
-                // Filtra as transações relacionadas à entidade resolvendo conflito de tipos ocultos
-                const linked = allTrans.filter(t => String(t.referenceId) === String(entityId));
-                // Ordena por data
-                linked.sort((a, b) => new Date(b.date) - new Date(a.date));
-                setTransactions(linked);
-            }
-        } catch (error) {
-            console.error('Erro ao carregar transações:', error);
+            const allTransactions = await db.getAll('transactions');
+            const linked = allTransactions.filter(t => 
+                String(t.originId) === String(item.id) && 
+                String(t.originTable) === String(targetTable)
+            );
+            setTransactions(linked.sort((a, b) => new Date(b.date) - new Date(a.date)));
+        } catch (e) {
+            console.error(e);
         } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSaveEdit = async (id, updatedFields) => {
-        try {
-            // Checa a diferença de valor p/ saldo
-            const original = transactions.find(t => t.id === id);
-            await db.update('transactions', id, updatedFields);
-            
-            // Re-calcular saldo se mudou valor/conta ou status (MUITO complexo em edições rápidas sem reverter o original)
-            // Aqui simplificamos: o Financeiro refaz o saldo no banco de dados completo. (Ideal é não mexer nos saldos na tela rápida se já estiver pago, ou mexer restrito).
-            AuditService.log(currentUser, 'UPDATE', 'Transactions', id, `Editou transação via modal rápido vinculado`);
-            setEditingTrans(null);
-            loadData();
-        } catch(error) {
-            alert('Erro ao salvar transação');
+            setIsLoading(false);
         }
     };
 
     const handleDelete = async (id) => {
-        if(window.confirm('Excluir este lançamento financeiro?')) {
+        if (!confirm('Deseja realmente deletar este lançamento financeiro? Esta ação pode impactar os relatórios de auditoria.')) return;
+        try {
             await db.delete('transactions', id);
-            AuditService.log(currentUser, 'DELETE', 'Transactions', id, `Excluiu transação vinculada`);
-            loadData();
+            AuditService.log('Operador', 'DELETE', 'transactions', id, `Removeu lançamento vinculado ao ativo: ${item.name}`);
+            fetchTransactions();
+            if (onUpdate) onUpdate();
+        } catch (e) {
+            alert('Erro ao deletar transação.');
         }
     };
 
-    const handleAddNew = async () => {
-        if(!newTrans.description || !newTrans.amount || !newTrans.accountId) return;
-        
-        const category = entityType === 'Equipment' ? 'Investimento / Equipamentos' 
-                       : entityType === 'Maintenance' ? 'Manutenção de Equipamentos' 
-                       : 'Materiais & Insumos';
-                       
-        const installments = parseInt(newTrans.installments) || 1;
-        const totalAmount = parseFloat(newTrans.amount);
-        const isCredit = newTrans.paymentMethod === 'credit';
-        
-        if (installments > 1 && isCredit) {
-            const instAmt = totalAmount / installments;
-            for (let i = 0; i < installments; i++) {
-                const nd = new Date(newTrans.date);
-                nd.setMonth(nd.getMonth() + i);
-                
-                const payload = {
-                    description: `${newTrans.description} (${i+1}/${installments})`,
-                    amount: instAmt,
-                    type: 'expense',
-                    category: category,
-                    date: nd.toISOString().split('T')[0],
-                    status: 'paid', // Credit cards consume limit instantly
-                    paymentMethod: newTrans.paymentMethod,
-                    accountId: newTrans.accountId,
-                    referenceId: entityId,
-                    referenceType: entityType,
-                    installmentNumber: i + 1,
-                    installmentsTotal: installments,
-                    isRecurring: false,
-                    createdAt: new Date().toISOString()
-                };
-                const created = await db.create('transactions', payload);
-                AuditService.log(currentUser, 'CREATE', 'Transactions', created.id, `Criou despesa vinculada manualmente: ${payload.description}`);
-            }
-        } else {
-            const payload = {
-                description: newTrans.description,
-                amount: totalAmount,
-                type: 'expense',
-                category: category,
-                date: newTrans.date,
-                status: isCredit ? 'paid' : newTrans.status,
-                paymentMethod: newTrans.paymentMethod,
-                accountId: newTrans.accountId,
-                referenceId: entityId,
-                referenceType: entityType,
-                installments: 1,
-                isRecurring: false,
-                createdAt: new Date().toISOString()
-            };
-
-            const created = await db.create('transactions', payload);
-            AuditService.log(currentUser, 'CREATE', 'Transactions', created.id, `Criou despesa vinculada manualmente: ${payload.description}`);
-            
-            // Update account balance se for pago já
-            if (payload.status === 'paid' && payload.paymentMethod !== 'credit') {
-                const acc = accounts.find(a => a.id === payload.accountId);
-                if(acc) {
-                    await db.update('accounts', acc.id, { balance: parseFloat(acc.balance) - payload.amount });
-                }
-            }
+    const handleToggleStatus = async (transaction) => {
+        const newStatus = transaction.status === 'paid' ? 'pending' : 'paid';
+        try {
+            await db.update('transactions', transaction.id, { ...transaction, status: newStatus });
+            fetchTransactions();
+            if (onUpdate) onUpdate();
+        } catch (e) {
+            console.error(e);
         }
-
-        setNewTrans({
-            isAdding: false,
-            description: '',
-            amount: '',
-            date: new Date().toISOString().split('T')[0],
-            status: 'pending',
-            accountId: '',
-            paymentMethod: 'pix',
-            installments: 1
-        });
-        loadData();
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !item) return null;
+
+    const filteredTransactions = transactions.filter(t => 
+        t.description?.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        (filterStatus === 'all' || t.status === filterStatus)
+    );
+
+    const totalSpent = transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
 
     return (
-        <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
-            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', padding: '0', backgroundColor: 'var(--background)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh', border: '1px solid var(--border)' }}>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content modal-lg" onClick={e => e.stopPropagation()} style={{ borderRadius: '24px', overflow: 'hidden' }}>
                 
-                <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <DollarSign style={{ color: 'var(--success)' }} size={24} />
-                            Financeiro Vinculado
-                        </h2>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{entityName}</p>
+                {/* Header */}
+                <div className="modal-header" style={{ padding: '24px 32px' }}>
+                    <div className="flex items-center gap-md">
+                        <div style={{ padding: '12px', background: 'var(--primary)', color: 'white', borderRadius: '14px' }}>
+                            <History size={24} />
+                        </div>
+                        <div>
+                            <h2 className="modal-title" style={{ fontSize: '1.25rem', margin: 0 }}>Rastreabilidade Financeira</h2>
+                            <p className="text-xs text-muted" style={{ margin: '4px 0 0 0', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Auditoria de Gastos: {item.name}
+                            </p>
+                        </div>
                     </div>
-                    <button className="btn btn-icon" onClick={onClose} style={{ color: 'var(--text-muted)' }}>
-                        <X size={20} />
+                    <button onClick={onClose} className="btn-icon">
+                        <X size={24} />
                     </button>
                 </div>
 
-                <div style={{ padding: '20px', overflowY: 'auto', flex: 1, backgroundColor: 'var(--background)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>Lançamentos Associados</h3>
-                        <button className="btn btn-primary" onClick={() => setNewTrans({...newTrans, isAdding: !newTrans.isAdding, description: `Ref: ${entityName}`})} style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
-                            <Plus size={14} /> Novo Lançamento
-                        </button>
+                <div className="modal-body" style={{ padding: '32px' }}>
+                    
+                    {/* KPI Briefing */}
+                    <div className="stats-grid" style={{ marginBottom: '32px' }}>
+                        <div style={{ background: 'var(--background)', padding: '24px', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                            <p className="text-xs text-muted uppercase font-bold tracking-widest mb-1">Total Comprometido</p>
+                            <h3 className="text-2xl font-black text-slate-800">R$ {Math.abs(totalSpent).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h3>
+                            <p className="text-[10px] text-muted font-bold mt-2">CAPEX E OPEX INTEGRADOS</p>
+                        </div>
+                        <div style={{ background: 'var(--background)', padding: '24px', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                            <p className="text-xs text-muted uppercase font-bold tracking-widest mb-1">Volume de Lançamentos</p>
+                            <h3 className="text-2xl font-black text-slate-800">{transactions.length} registros</h3>
+                            <p className="text-[10px] text-muted font-bold mt-2">HISTÓRICO COMPLETO</p>
+                        </div>
                     </div>
 
-                    {newTrans.isAdding && (
-                        <div style={{ backgroundColor: 'var(--surface-hover)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '20px' }}>
-                            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '12px' }}>Adicionar Despesa Referente a {entityName}</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                <div className="form-group mb-0 col-span-2">
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Descrição</label>
-                                    <input type="text" className="form-input text-sm" value={newTrans.description} onChange={e => setNewTrans({...newTrans, description: e.target.value})} />
-                                </div>
-                                <div className="form-group mb-0">
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Valor (R$)</label>
-                                    <input type="number" step="0.01" className="form-input text-sm" value={newTrans.amount} onChange={e => setNewTrans({...newTrans, amount: e.target.value})} />
-                                </div>
-                                <div className="form-group mb-0">
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Data (Venc./Pag.)</label>
-                                    <input type="date" className="form-input text-sm" value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})} />
-                                </div>
-                                <div className="form-group mb-0 md:col-span-2">
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Conta/Caixa</label>
-                                    <select className="form-input text-sm" value={newTrans.accountId} onChange={e => setNewTrans({...newTrans, accountId: e.target.value})}>
-                                        <option value="">Selecione...</option>
-                                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                    </select>
-                                </div>
-                                <div className="form-group mb-0">
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Situação</label>
-                                    <select className="form-input text-sm" value={newTrans.status} onChange={e => setNewTrans({...newTrans, status: e.target.value})}>
-                                        <option value="pending">A Pagar</option>
-                                        <option value="paid">Já Pago</option>
-                                    </select>
-                                </div>
-                                <div className="form-group mb-0">
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Meio</label>
-                                    <select className="form-input text-sm" value={newTrans.paymentMethod} onChange={e => setNewTrans({...newTrans, paymentMethod: e.target.value})}>
-                                        <option value="pix">PIX</option>
-                                        <option value="credit">Cartão Crédito</option>
-                                        <option value="debit">Cartão Débito</option>
-                                        <option value="boleto">Boleto</option>
-                                        <option value="cash">Dinheiro</option>
-                                    </select>
-                                </div>
-                                {newTrans.paymentMethod === 'credit' && (
-                                    <div className="form-group mb-0">
-                                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Parcelas</label>
-                                        <input type="number" min="1" max="48" className="form-input text-sm" value={newTrans.installments} onChange={e => setNewTrans({...newTrans, installments: e.target.value})} />
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex gap-2 justify-end mt-2">
-                                <button className="btn btn-secondary text-sm px-3 py-1" onClick={() => setNewTrans({...newTrans, isAdding: false})}>Cancelar</button>
-                                <button className="btn btn-primary text-sm px-3 py-1" onClick={handleAddNew} disabled={!newTrans.description || !newTrans.amount || !newTrans.accountId}>Salvar Lançamento</button>
-                            </div>
+                    {/* Filter Tape */}
+                    <div className="flex gap-md mb-md">
+                        <div style={{ position: 'relative', flex: 1 }}>
+                            <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                            <input 
+                                type="text" 
+                                placeholder="Filtrar por descrição..." 
+                                className="form-input" 
+                                style={{ paddingLeft: '36px' }} 
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
                         </div>
-                    )}
+                        <select className="form-input" style={{ width: '180px' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <option value="all">Todos os Status</option>
+                            <option value="paid">✅ Liquidados</option>
+                            <option value="pending">⏳ Pendentes</option>
+                        </select>
+                    </div>
 
-                    {loading ? (
-                        <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>Carregando financeiro vinculado...</div>
-                    ) : transactions.length === 0 ? (
-                        <div className="text-center py-12" style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
-                            <DollarSign className="mx-auto mb-2" style={{ color: 'var(--text-muted)', opacity: 0.5 }} size={32} />
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nenhum lançamento financeiro atrelado encontrado.</p>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', opacity: 0.7 }}>Lançamentos gerados a partir de agora aparecerão aqui.</p>
-                        </div>
-                    ) : (
-                        <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                    {/* Transactions List */}
+                    <div className="chart-card" style={{ padding: 0, borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                        <div className="table-container">
                             <table className="table">
-                                <thead style={{ backgroundColor: 'var(--surface-hover)', borderBottom: '1px solid var(--border)' }}>
-                                    <tr>
-                                        <th style={{ width: '100px', padding: '12px' }}>Data</th>
-                                        <th style={{ padding: '12px' }}>Descrição</th>
-                                        <th style={{ width: '120px', padding: '12px' }}>Conta</th>
-                                        <th style={{ width: '100px', padding: '12px' }}>Situação</th>
-                                        <th style={{ width: '120px', textAlign: 'right', padding: '12px' }}>Valor</th>
-                                        <th style={{ width: '80px', textAlign: 'center', padding: '12px' }}>Ação</th>
+                                <thead>
+                                    <tr style={{ background: 'var(--surface-hover)' }}>
+                                        <th style={{ textAlign: 'left', padding: '1rem 1.5rem' }}>Data/Histórico</th>
+                                        <th style={{ textAlign: 'left', padding: '1rem 1.5rem' }}>Status</th>
+                                        <th style={{ textAlign: 'left', padding: '1rem 1.5rem' }}>Valor</th>
+                                        <th style={{ textAlign: 'right', padding: '1rem 1.5rem' }}>Gestão</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {transactions.map(t => (
+                                    {isLoading ? (
+                                        <tr><td colSpan="4" style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>Mapeando fluxos...</td></tr>
+                                    ) : filteredTransactions.length === 0 ? (
+                                        <tr><td colSpan="4" style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum fluxo financeiro localizado.</td></tr>
+                                    ) : filteredTransactions.map(t => (
                                         <tr key={t.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                            {editingTrans?.id === t.id ? (
-                                                <>
-                                                    <td style={{ padding: '8px' }}><input type="date" className="form-input text-xs p-1 h-7" value={editingTrans.date} onChange={e => setEditingTrans({...editingTrans, date: e.target.value})} /></td>
-                                                    <td style={{ padding: '8px' }}>
-                                                        <input type="text" className="form-input text-xs p-1 h-7 w-full" value={editingTrans.description} onChange={e => setEditingTrans({...editingTrans, description: e.target.value})} />
-                                                    </td>
-                                                    <td style={{ padding: '8px' }}>
-                                                        <select className="form-input text-xs p-1 h-7 w-full" value={editingTrans.accountId} onChange={e => setEditingTrans({...editingTrans, accountId: e.target.value})}>
-                                                            <option value="">Conta...</option>
-                                                            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                                        </select>
-                                                    </td>
-                                                    <td style={{ padding: '8px' }}>
-                                                        <select className="form-input text-xs p-1 h-7 w-full" value={editingTrans.status} onChange={e => setEditingTrans({...editingTrans, status: e.target.value})}>
-                                                            <option value="pending">A Pagar</option>
-                                                            <option value="paid">Pago</option>
-                                                        </select>
-                                                    </td>
-                                                    <td style={{ padding: '8px' }}><input type="number" step="0.01" className="form-input text-xs p-1 h-7 w-full text-right" value={editingTrans.amount} onChange={e => setEditingTrans({...editingTrans, amount: e.target.value})} /></td>
-                                                    <td className="text-center" style={{ padding: '8px' }}>
-                                                        <div className="flex gap-1 justify-center">
-                                                            <button title="Salvar" onClick={() => handleSaveEdit(t.id, editingTrans)} style={{ color: 'var(--success)', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}><Check size={14} /></button>
-                                                            <button title="Cancelar" onClick={() => setEditingTrans(null)} style={{ color: 'var(--text-muted)', backgroundColor: 'var(--surface-hover)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}><X size={14} /></button>
-                                                        </div>
-                                                    </td>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '12px' }}>{new Date(t.date).toLocaleDateString('pt-BR')}</td>
-                                                    <td style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', padding: '12px' }}>{t.description}</td>
-                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '12px' }}>{accounts.find(a => a.id === t.accountId)?.name || 'N/A'}</td>
-                                                    <td style={{ padding: '12px' }}>
-                                                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 700, backgroundColor: t.status === 'paid' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: t.status === 'paid' ? 'var(--success)' : 'var(--danger)' }}>
-                                                            {t.status === 'paid' ? (t.paymentMethod === 'credit' ? '💳 CARTÃO' : 'PAGO') : 'A PAGAR'}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--danger)', textAlign: 'right', padding: '12px' }}>R$ {parseFloat(t.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                                                    <td className="text-center" style={{ padding: '12px' }}>
-                                                        <div className="flex gap-1 justify-center">
-                                                            <button onClick={() => setEditingTrans(t)} style={{ color: 'var(--info)', backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }} title="Editar"><Edit2 size={14} /></button>
-                                                            <button onClick={() => handleDelete(t.id)} style={{ color: 'var(--danger)', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer' }} title="Excluir"><Trash2 size={14} /></button>
-                                                        </div>
-                                                    </td>
-                                                </>
-                                            )}
+                                            <td style={{ padding: '1rem 1.5rem' }}>
+                                                <div className="font-bold text-slate-800">{new Date(t.date).toLocaleDateString('pt-BR')}</div>
+                                                <div className="text-[10px] text-muted font-bold uppercase tracking-widest">{t.description}</div>
+                                            </td>
+                                            <td style={{ padding: '1rem 1.5rem' }}>
+                                                <button 
+                                                    onClick={() => handleToggleStatus(t)}
+                                                    className={`badge ${t.status === 'paid' ? 'badge-success' : 'badge-warning'} border-none cursor-pointer hover:opacity-80`}
+                                                >
+                                                    {t.status === 'paid' ? 'Liquidado' : 'Aguardando'}
+                                                </button>
+                                            </td>
+                                            <td style={{ padding: '1rem 1.5rem' }}>
+                                                <div className={`font-black text-sm ${t.amount < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                    R$ {Math.abs(t.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                                                <button onClick={() => handleDelete(t.id)} className="btn-icon" style={{ color: 'var(--danger)' }}>
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    )}
+                    </div>
+                </div>
+
+                <div className="modal-footer" style={{ padding: '24px 32px' }}>
+                    <button onClick={onClose} className="btn btn-secondary" style={{ padding: '0 32px' }}>Sair da Auditoria</button>
                 </div>
             </div>
         </div>

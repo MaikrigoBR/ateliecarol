@@ -1,901 +1,469 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, Hammer, Package, Trash2, Copy, DollarSign } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+    X, Package, Hammer, Ruler, DollarSign, 
+    Calendar, Save, Trash2, Plus, ArrowRight,
+    TrendingUp, Calculator, ShieldCheck, Activity,
+    Box, Truck, AlertCircle, RefreshCw, Layers,
+    History, Info
+} from 'lucide-react';
 import db from '../services/database.js';
 import AuditService from '../services/AuditService.js';
-import { useAuth } from '../contexts/AuthContext';
-import { LinkedTransactionsModal } from './LinkedTransactionsModal.jsx';
+import { formatCurrency } from '../utils/financeUtils.js';
 
-export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, onItemCloned, defaultType = 'equipment', itemToEdit }) {
-  const { currentUser } = useAuth();
-  const [formData, setFormData] = useState({
-    name: '',
-    type: defaultType,
-    cost: '',
-    purchaseDate: new Date().toISOString().split('T')[0],
-    serial: '',
-    value: '', // estimated current value
-    quantity: '',
-    unit: 'un', // un, kg, m, l, cx
-    minStock: '',
-    description: '',
-    model: '',
-    color: '',
-    manufacturer: '',
-    image: '',
-    category: ''
-  });
+export function NewInventoryItemModal({ isOpen, onClose, onItemSaved, defaultType = 'equipment', itemToEdit, targetTable = 'inventory' }) {
+    const [activeTab, setActiveTab] = useState('geral');
+    const [isSaving, setIsSaving] = useState(false);
+    const [accounts, setAccounts] = useState([]);
+    const [isReplenishMode, setIsReplenishMode] = useState(false);
+    
+    // Reposição State
+    const [replenishData, setReplenishData] = useState({
+        quantityToAdd: 1,
+        purchasePrice: '',
+        accountId: '',
+        installments: 1,
+        paymentDate: new Date().toISOString().split('T')[0]
+    });
 
-  const [createFinance, setCreateFinance] = useState(false);
-  const [financeAccountId, setFinanceAccountId] = useState('');
-  const [financeDate, setFinanceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [financeStatus, setFinanceStatus] = useState('pending');
-  const [financePaymentMethod, setFinancePaymentMethod] = useState('pix');
-  const [financeInstallments, setFinanceInstallments] = useState(1);
-  const [accounts, setAccounts] = useState([]);
-  const [existingGroups, setExistingGroups] = useState([]);
-  const [categoriesList, setCategoriesList] = useState([]);
-  
-  // Stock Replenishment specific
-  const [replenishMode, setReplenishMode] = useState(false);
-  const [replenishQty, setReplenishQty] = useState('');
-  const [replenishBuyUnit, setReplenishBuyUnit] = useState('un');
-  const [replenishYield, setReplenishYield] = useState('');
-  const [replenishTotalCost, setReplenishTotalCost] = useState('');
-  
-  const [showLinked, setShowLinked] = useState(false);
+    // Form State
+    const [formData, setFormData] = useState({
+        name: '',
+        category: '',
+        type: defaultType,
+        quantity: 1,
+        minStock: 0,
+        unit: 'un',
+        cost: '', // Treat as Average Cost in UI
+        location: '',
+        brand: '',
+        model: '',
+        serial: '',
+        purchaseDate: new Date().toISOString().split('T')[0],
+        status: 'Ativo',
+        description: '',
+        family: '', // Master Group / Family for grouping
+        paymentMethod: 'cash',
+        installments: 1,
+        firstPaymentDate: new Date().toISOString().split('T')[0],
+        accountId: '',
+        consolidateFinance: true,
+        image: ''
+    });
 
-  useEffect(() => {
-      if (isOpen) {
-          if (itemToEdit) {
-              setFormData({
-                  name: itemToEdit.name || '',
-                  type: itemToEdit.type || defaultType,
-                  cost: itemToEdit.cost || '',
-                  purchaseDate: itemToEdit.purchaseDate || '',
-                  serial: itemToEdit.serial || '',
-                  value: itemToEdit.value || '',
-                  quantity: itemToEdit.quantity || '',
-                  unit: itemToEdit.unit || 'un',
-                  minStock: itemToEdit.minStock || '',
-                  description: itemToEdit.description || '',
-                  model: itemToEdit.model || '',
-                  color: itemToEdit.color || '',
-                  manufacturer: itemToEdit.manufacturer || '',
-                  image: itemToEdit.image || '',
-                  category: itemToEdit.category || itemToEdit.materialGroup || ''
-              });
-          } else {
-              setFormData({
-                 name: '',
-                 type: defaultType,
-                 cost: '',
-                 purchaseDate: new Date().toISOString().split('T')[0],
-                 serial: '',
-                 value: '',
-                 quantity: '',
-                 unit: 'un',
-                 minStock: '',
-                 description: '',
-                 model: '',
-                 color: '',
-                 manufacturer: '',
-                 image: '',
-                 category: ''
-              });
-          }
-          db.getAll('accounts').then(res => setAccounts(res || []));
-          db.getAll('categories').then(res => setCategoriesList(res || []));
-          db.getAll('inventory').then(res => {
-              if (res && res.length > 0) {
-                  const groups = [...new Set(res.filter(i => i.category || i.materialGroup).map(i => i.category || i.materialGroup))];
-                  setExistingGroups(groups.sort());
-              }
-          });
-          setCreateFinance(false);
-          setFinanceAccountId('');
-          setFinanceDate(new Date().toISOString().split('T')[0]);
-          setFinanceStatus('pending');
-          setFinancePaymentMethod('pix');
-          setFinanceInstallments(1);
-          setReplenishMode(false);
-          setReplenishQty('');
-          setReplenishTotalCost('');
-          setReplenishBuyUnit(itemToEdit?.unit || 'un');
-          setReplenishYield('');
-          setShowLinked(false);
-      }
-  }, [isOpen, itemToEdit, defaultType]);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.name) return;
-
-    let finalCost = parseFloat(formData.cost) || 0;
-    let finalQty = formData.type === 'material' ? (parseFloat(formData.quantity) || 0) : null;
-    let historyEntry = null;
-    let transactionAmount = 0;
-
-    // Se é Reposição de Estoque Existente
-    if (itemToEdit && formData.type === 'material' && replenishMode && parseFloat(replenishQty) > 0) {
-        const baseQty = parseFloat(replenishQty) || 0;
-        const multiplier = (replenishBuyUnit !== formData.unit) ? (parseFloat(replenishYield) || 1) : 1;
-        const rQty = baseQty * multiplier;
-        const addTotal = parseFloat(replenishTotalCost) || 0;
-        const rCost = rQty > 0 ? (addTotal / rQty) : 0;
-        
-        const currentTotal = finalQty * finalCost;
-        
-        finalQty = finalQty + rQty;
-        // Média ponderada
-        finalCost = finalQty > 0 ? ((currentTotal + addTotal) / finalQty) : finalCost;
-        transactionAmount = addTotal;
-        
-        historyEntry = {
-            id: Date.now().toString(),
-            date: new Date().toISOString(),
-            type: 'in',
-            qty: rQty,
-            unitCost: rCost,
-            totalCost: addTotal,
-            note: 'Reposição de Estoque'
-        };
-    } else if (!itemToEdit) {
-        // Se for NOVO item
-        transactionAmount = formData.type === 'equipment' 
-            ? (parseFloat(formData.cost) || 0) 
-            : (parseFloat(formData.cost) || 0) * (parseFloat(formData.quantity) || 0);
-
-        if (formData.type === 'material' && parseFloat(formData.quantity) > 0) {
-            historyEntry = {
-                id: Date.now().toString(),
-                date: new Date().toISOString(),
-                type: 'in',
-                qty: parseFloat(formData.quantity),
-                unitCost: parseFloat(formData.cost) || 0,
-                totalCost: transactionAmount,
-                note: 'Estoque Inicial'
-            };
-        }
-    }
-
-    const itemData = {
-      name: formData.name,
-      type: formData.type,
-      cost: finalCost,
-      status: 'active',
-      // Equipment
-      serial: formData.type === 'equipment' ? formData.serial : null,
-      purchaseDate: formData.type === 'equipment' ? formData.purchaseDate : null,
-      value: formData.type === 'equipment' ? (parseFloat(formData.value) || finalCost || 0) : null,
-      // Material
-      quantity: finalQty,
-      unit: formData.type === 'material' ? formData.unit : null,
-      minStock: formData.type === 'material' ? (parseFloat(formData.minStock) || 0) : null,
-      
-      description: formData.description,
-      model: formData.model,
-      color: formData.color,
-      manufacturer: formData.manufacturer,
-      image: formData.image,
-      category: formData.category, // Map everything generically to category instead of conditional materialGroup
-
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentUser?.email || 'Sistema',
-      history: itemToEdit 
-          ? (historyEntry ? [...(itemToEdit.history || []), historyEntry] : (itemToEdit.history || []))
-          : (historyEntry ? [historyEntry] : [])
-    };
-
-    let savedItemId = null;
-
-    if (itemToEdit) {
-        await db.update('inventory', itemToEdit.id, itemData);
-        savedItemId = itemToEdit.id;
-        AuditService.log(currentUser, 'UPDATE', 'Inventory', itemToEdit.id, `Atualizou item: ${formData.name}`);
-        if (historyEntry) {
-            AuditService.log(currentUser, 'RESTOCK', 'Inventory', itemToEdit.id, `Mercadoria reposta: +${historyEntry.qty} (R$ ${historyEntry.unitCost} / un)`);
-        }
-    } else {
-        const newItem = await db.create('inventory', { ...itemData, createdAt: new Date().toISOString() });
-        savedItemId = newItem.id;
-        AuditService.log(currentUser, 'CREATE', 'Inventory', newItem.id, `Criou item: ${formData.name}`);
-    }
-
-    // --- Integração Financeira Automática (Nova Entrada ou Reposição) ---
-    if (createFinance && transactionAmount > 0 && financeAccountId) {
-        const category = formData.type === 'equipment' ? 'Equipamentos & Ativos' : 'Materiais & Insumos';
-        const installments = parseInt(financeInstallments) || 1;
-        const isCredit = financePaymentMethod === 'credit';
-        
-        if (installments > 1) {
-            const instAmt = transactionAmount / installments;
-            for (let i = 0; i < installments; i++) {
-                const nd = new Date(financeDate);
-                nd.setMonth(nd.getMonth() + i);
-                await db.create('transactions', {
-                    description: `Compra: ${formData.name} (${i+1}/${installments})`,
-                    amount: instAmt,
-                    type: 'expense',
-                    category: category,
-                    accountId: financeAccountId,
-                    referenceId: savedItemId,
-                    referenceType: 'Inventory',
-                    date: nd.toISOString().split('T')[0],
-                    status: isCredit ? 'paid' : 'pending',
-                    paymentMethod: financePaymentMethod || 'pix',
-                    installments: 1, // for backward compatibility in some models, or put total
-                    installmentNumber: i + 1,
-                    installmentsTotal: installments,
-                    isRecurring: false,
-                    createdAt: new Date().toISOString()
-                });
+    useEffect(() => {
+        const fetchAccounts = async () => {
+            const accs = await db.getAll('accounts');
+            setAccounts(accs || []);
+            if (accs?.length > 0 && !formData.accountId) {
+                setFormData(prev => ({ ...prev, accountId: accs[0].id }));
+                setReplenishData(prev => ({ ...prev, accountId: accs[0].id }));
             }
-        } else {
-            const tStatus = isCredit ? 'paid' : financeStatus;
-            await db.create('transactions', {
-                description: `Compra de ${formData.type === 'equipment' ? 'Equipamento' : 'Estoque'}: ${formData.name}`,
-                amount: transactionAmount,
-                type: 'expense',
-                category: category,
-                accountId: financeAccountId,
-                referenceId: savedItemId,
-                referenceType: 'Inventory',
-                date: financeDate,
-                status: tStatus,
-                paymentMethod: financePaymentMethod || 'pix',
-                installments: 1,
-                isRecurring: false,
-                createdAt: new Date().toISOString()
-            });
-            // Update balance if paid and not credit
-            if (tStatus === 'paid' && !isCredit) {
-                const targetAcc = accounts.find(a => a.id === financeAccountId);
-                if (targetAcc) {
-                    await db.update('accounts', targetAcc.id, { balance: parseFloat(targetAcc.balance) - transactionAmount });
+        };
+        fetchAccounts();
+    }, []);
+
+    useEffect(() => {
+        if (isOpen) {
+            if (itemToEdit) {
+                setFormData({
+                    ...itemToEdit,
+                    cost: itemToEdit.cost || itemToEdit.purchasePrice || '',
+                    serial: itemToEdit.serial || itemToEdit.patrimonyId || '',
+                    image: itemToEdit.image || itemToEdit.photoUrl || '',
+                    category: itemToEdit.category || itemToEdit.equipmentGroup || itemToEdit.materialGroup || '',
+                    type: itemToEdit.type || (targetTable === 'equipments' ? 'equipment' : 'material')
+                });
+                setReplenishData(prev => ({
+                    ...prev,
+                    purchasePrice: itemToEdit.cost || ''
+                }));
+            } else {
+                setFormData(prev => ({
+                    ...prev,
+                    type: defaultType,
+                    purchaseDate: new Date().toISOString().split('T')[0]
+                }));
+            }
+            setActiveTab('geral');
+            setIsReplenishMode(false);
+        }
+    }, [isOpen, itemToEdit, defaultType, targetTable]);
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setIsSaving(true);
+        const currentUser = "Operador";
+
+        try {
+            const payload = {
+                ...formData,
+                updatedAt: new Date().toISOString(),
+                cost: parseFloat(formData.cost) || 0,
+                quantity: parseFloat(formData.quantity) || 0,
+                minStock: parseFloat(formData.minStock) || 0
+            };
+
+            if (itemToEdit) {
+                await db.update(targetTable, itemToEdit.id, payload);
+                AuditService.log(currentUser, 'UPDATE', targetTable, itemToEdit.id, `Atualizou dados: ${payload.name}`);
+            } else {
+                const id = await db.add(targetTable, { ...payload, createdAt: new Date().toISOString() });
+                AuditService.log(currentUser, 'CREATE', targetTable, id, `Cadastrou novo recurso: ${payload.name}`);
+
+                // Financial Integration for Initial Stock
+                if (payload.consolidateFinance && payload.cost > 0 && payload.accountId) {
+                    const totalValue = payload.cost * (payload.type === 'material' ? 1 : payload.quantity);
+                    await createTransactions(id, payload.name, totalValue, payload.installments, payload.firstPaymentDate, payload.accountId);
                 }
             }
+            onItemSaved();
+            onClose();
+        } catch (error) {
+            console.error('Error saving item:', error);
+            alert('Erro ao salvar. Verifique se todos os campos financeiros estão preenchidos.');
+        } finally {
+            setIsSaving(false);
         }
-    }
-    
-    if (onItemSaved) onItemSaved();
-    onClose();
-  };
+    };
 
-  const handleDelete = async () => {
-      if (itemToEdit && window.confirm('Tem certeza que deseja excluir este item? Isso removerá o seu histórico deste estoque.')) {
-          await db.delete('inventory', itemToEdit.id);
-          AuditService.log(currentUser, 'DELETE', 'Inventory', itemToEdit.id, `Excluiu item: ${formData.name}`);
-          if (onItemSaved) onItemSaved();
-          onClose();
-      }
-  };
+    const handleReplenish = async () => {
+        if (!replenishData.purchasePrice || !replenishData.accountId) {
+            alert('Por favor, preencha o preço de compra e a conta de pagamento.');
+            return;
+        }
+        setIsSaving(true);
+        try {
+            const currentQty = parseFloat(formData.quantity) || 0;
+            const currentCost = parseFloat(formData.cost) || 0;
+            const addedQty = parseFloat(replenishData.quantityToAdd) || 0;
+            const purchasePrice = parseFloat(replenishData.purchasePrice) || 0;
 
-  const handleClone = async () => {
-      if (!window.confirm('Deseja extrair as informações da tela e criar um item (clone) totalmente novo no estoque com elas?')) return;
-      const cloneData = {
-          ...formData,
-          name: formData.name + ' (Cópia)'
-      };
-      
-      const itemDataForDB = {
-          name: cloneData.name,
-          type: cloneData.type,
-          cost: parseFloat(cloneData.cost) || 0,
-          status: 'active',
-          serial: cloneData.type === 'equipment' ? cloneData.serial : null,
-          purchaseDate: cloneData.type === 'equipment' ? cloneData.purchaseDate : null,
-          value: cloneData.type === 'equipment' ? (parseFloat(cloneData.value) || parseFloat(cloneData.cost) || 0) : null,
-          quantity: cloneData.type === 'material' ? (parseFloat(cloneData.quantity) || 0) : null,
-          unit: cloneData.type === 'material' ? cloneData.unit : null,
-          minStock: cloneData.type === 'material' ? (parseFloat(cloneData.minStock) || 0) : null,
-          description: cloneData.description,
-          model: cloneData.model,
-          color: cloneData.color,
-          manufacturer: cloneData.manufacturer,
-          image: cloneData.image,
-          category: cloneData.category,
-          updatedAt: new Date().toISOString(),
-          updatedBy: currentUser?.email || 'Sistema',
-          createdAt: new Date().toISOString()
-      };
+            // Average Cost Calculation: (Old Value + New Value) / Total Qty
+            const newQty = currentQty + addedQty;
+            const newAvgCost = ((currentQty * currentCost) + (addedQty * purchasePrice)) / newQty;
 
-      const newItem = await db.create('inventory', itemDataForDB);
-      AuditService.log(currentUser, 'CREATE', 'Inventory', newItem.id, `Clonou item: ${cloneData.name}`);
-      
-      if (onItemCloned) {
-          onItemCloned({ id: newItem.id, ...itemDataForDB });
-      } else {
-          if (onItemSaved) onItemSaved();
-          onClose();
-      }
-  };
+            const updatedPayload = {
+                ...formData,
+                quantity: newQty,
+                cost: newAvgCost,
+                updatedAt: new Date().toISOString()
+            };
 
-  const handleImageUpload = (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-          if (ev.target.result.length > 800000) {
-              alert("A imagem é muito grande. Escolha uma imagem menor.");
-              return;
-          }
-          setFormData(prev => ({ ...prev, image: ev.target.result }));
-      };
-      reader.readAsDataURL(file);
-  };
-
-  const sOverlay = {
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1050, padding: '1rem'
-  };
-
-  const sModal = {
-      backgroundColor: 'var(--surface)',
-      width: '100%', maxWidth: '700px', maxHeight: '90vh',
-      borderRadius: 'var(--radius-lg)',
-      boxShadow: 'var(--shadow-lg)',
-      display: 'flex', flexDirection: 'column',
-      border: '1px solid var(--border)',
-      overflow: 'hidden',
-      color: 'var(--text-main)',
-      animation: 'slideUp 0.3s ease-out'
-  };
-
-  const sHeader = {
-      padding: '1.5rem',
-      borderBottom: '1px solid var(--border)',
-      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-      backgroundColor: 'var(--background)'
-  };
-
-  const sBody = {
-      padding: '1.5rem',
-      overflowY: 'auto',
-      display: 'flex', flexDirection: 'column', gap: '1.5rem'
-  };
-
-  const sFooter = {
-      padding: '1rem 1.5rem',
-      borderTop: '1px solid var(--border)',
-      backgroundColor: 'var(--background)',
-      display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'space-between', alignItems: 'center'
-  };
-
-  return (
-    <div style={sOverlay}>
-      <div style={sModal} onClick={e => e.stopPropagation()}>
-        <div style={sHeader}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {itemToEdit ? 'Editar Item' : 'Novo Item de Inventário'}
-              </h2>
-              {itemToEdit && (
-                  <button type="button" onClick={() => setShowLinked(true)} style={{ background: '#ecfdf5', color: '#10b981', border: '1px solid #d1fae5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', transition: 'all 0.2s' }}>
-                      <DollarSign size={14} /> Histórico Financeiro Original (Acertos)
-                  </button>
-              )}
-          </div>
-          <button className="btn btn-icon" onClick={onClose} type="button" style={{ margin: '-0.5rem' }}>
-            <X size={20} />
-          </button>
-        </div>
-        
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={sBody}>
+            await db.update(targetTable, itemToEdit.id, updatedPayload);
             
-            {!itemToEdit && (
-                <div className="flex gap-md mb-4" style={{ marginBottom: 'var(--space-lg)' }}>
-                    <button
-                        type="button"
-                        className={`btn ${formData.type === 'equipment' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setFormData({...formData, type: 'equipment'})}
-                        style={{ flex: 1 }}
-                    >
-                        <Hammer size={16} /> Equipamento
-                    </button>
-                    <button
-                        type="button"
-                        className={`btn ${formData.type === 'material' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setFormData({...formData, type: 'material'})}
-                        style={{ flex: 1 }}
-                    >
-                        <Package size={16} /> Material
-                    </button>
-                </div>
-            )}
+            // Financial Trace
+            const totalValue = addedQty * purchasePrice;
+            await createTransactions(itemToEdit.id, `Reposição: ${formData.name}`, totalValue, replenishData.installments, replenishData.paymentDate, replenishData.accountId);
 
-            <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
-                {/* Image Upload Area */}
-                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label className="form-label">Imagem</label>
-                    <div 
-                        style={{ 
-                            width: '120px', height: '120px', 
-                            borderRadius: 'var(--radius-md)', 
-                            border: '2px dashed var(--border)', 
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                            backgroundColor: 'var(--surface-hover)',
-                            overflow: 'hidden', cursor: 'pointer', position: 'relative'
-                        }}
-                    >
-                        {formData.image ? (
-                            <>
-                                <img src={formData.image} alt="Produto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                <button
-                                    type="button"
-                                    onClick={(e) => { e.preventDefault(); setFormData(prev => ({ ...prev, image: '' })); }}
-                                    style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', padding: '4px', cursor: 'pointer' }}
-                                    title="Remover Imagem"
-                                >
-                                    <X size={12} />
-                                </button>
-                            </>
-                        ) : (
-                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', cursor: 'pointer', padding: '10px', textAlign: 'center' }}>
-                                <Package size={24} />
-                                <span style={{ fontSize: '10px' }}>Upload</span>
-                                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                            </label>
+            AuditService.log("Operador", 'REPLENISH', targetTable, itemToEdit.id, `Expansão de estoque: +${addedQty} ${formData.unit}`);
+            
+            onItemSaved();
+            onClose();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const createTransactions = async (originId, name, totalAmount, installments, date, accountId) => {
+        const valPerInst = totalAmount / installments;
+        for (let i = 0; i < installments; i++) {
+            const d = new Date(date);
+            d.setMonth(d.getMonth() + i);
+            await db.add('transactions', {
+                description: `${name} (${i + 1}/${installments})`,
+                amount: -valPerInst,
+                date: d.toISOString().split('T')[0],
+                category: 'Investimento/Estoque',
+                accountId: accountId,
+                type: 'expense',
+                status: 'pending',
+                originId,
+                originTable: targetTable,
+                createdAt: new Date().toISOString()
+            });
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content modal-lg" onClick={e => e.stopPropagation()} style={{ borderRadius: '24px', overflow: 'hidden' }}>
+                
+                {/* Tactical Header */}
+                <div className="modal-header" style={{ padding: '24px 32px', background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+                    <div className="flex items-center gap-md">
+                        <div style={{ padding: '12px', background: 'var(--primary)', color: 'white', borderRadius: '16px', shadow: 'var(--shadow-sm)' }}>
+                            {formData.type === 'equipment' ? <Hammer size={24} /> : <Package size={24} />}
+                        </div>
+                        <div>
+                            <h2 className="modal-title" style={{ fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>
+                                {itemToEdit ? (isReplenishMode ? 'Reposição de Estoque' : 'Gestão de Ativo') : 'Nova Incorporação'}
+                            </h2>
+                            <p className="text-[10px] text-muted uppercase font-black tracking-widest mt-1">
+                                {itemToEdit ? `ID: ${itemToEdit.id} • ${formData.name.toUpperCase()}` : 'INICIALIZAÇÃO DE CADASTRO TÁTICO'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-md">
+                        {itemToEdit && !isReplenishMode && (
+                            <button className="btn btn-secondary" style={{ padding: '0 16px', color: 'var(--primary)', fontWeight: 700 }} onClick={() => setIsReplenishMode(true)}>
+                                <RefreshCw size={16} /> Repor Estoque
+                            </button>
                         )}
+                        <button onClick={onClose} className="btn-icon">
+                            <X size={24} />
+                        </button>
                     </div>
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                    <div className="input-group">
-                      <label className="form-label">Nome do Item *</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        placeholder={formData.type === 'equipment' ? "Ex: Notebook Dell" : "Ex: Papel Offset 90g"}
-                        value={formData.name}
-                        onChange={e => setFormData({...formData, name: e.target.value})}
-                        required
-                        autoFocus={!itemToEdit}
-                      />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-                        <div className="input-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Categoria do {formData.type === 'equipment' ? 'Equipamento' : 'Insumo'} *</label>
-                            {categoriesList.length > 0 ? (
-                                <select 
-                                    className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" 
-                                    value={formData.category} 
-                                    onChange={e => setFormData({...formData, category: e.target.value})}
-                                    required
-                                >
-                                    <option value="">Selecione um grupo...</option>
-                                    {/* Render Hierarchical Categories */}
-                                    {categoriesList.filter(c => !c.parentId)
-                                        .sort((a,b) => a.name.localeCompare(b.name))
-                                        .map(main => {
-                                            const subs = categoriesList.filter(c => c.parentId === main.id).sort((a,b) => a.name.localeCompare(b.name));
-                                            if (subs.length > 0) {
-                                                return (
-                                                    <optgroup key={main.id} label={main.name}>
-                                                        {subs.map(sub => (
-                                                            <option key={sub.id} value={sub.name}>{sub.name}</option>
-                                                        ))}
-                                                    </optgroup>
-                                                );
-                                            } else {
-                                                return <option key={main.id} value={main.name}>{main.name}</option>;
-                                            }
-                                        })
-                                    }
-                                    {/* Catch any orphaned categories */}
-                                    {categoriesList.filter(c => c.parentId && !categoriesList.find(m => m.id === c.parentId)).map(orphan => (
-                                        <option key={orphan.id} value={orphan.name}>{orphan.name} (Sem Grupo)</option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <input 
-                                    type="text" 
-                                    className="form-input border-orange-200 focus:border-orange-500 focus:ring-orange-500" 
-                                    placeholder="Nenhuma cadastrada. Digite..."
-                                    value={formData.category}
-                                    onChange={e => setFormData({...formData, category: e.target.value})}
-                                    required
-                                />
-                            )}
-                        </div>
-
-                        <div className="input-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Descrição (Opcional)</label>
-                            <textarea 
-                                className="form-input" 
-                                placeholder="..."
-                                value={formData.description}
-                                onChange={e => setFormData({...formData, description: e.target.value})}
-                                rows={1}
-                            />
+                {/* Tabs (Main Mode) */}
+                {!isReplenishMode && (
+                    <div style={{ padding: '0 32px', background: 'var(--surface)' }}>
+                        <div className="tabs" style={{ marginBottom: 0 }}>
+                            <button className={`tab-item ${activeTab === 'geral' ? 'active' : ''}`} onClick={() => setActiveTab('geral')}>Propriedades</button>
+                            <button className={`tab-item ${activeTab === 'operacao' ? 'active' : ''}`} onClick={() => setActiveTab('operacao')}>Operacional</button>
+                            <button className={`tab-item ${activeTab === 'financeiro' ? 'active' : ''}`} onClick={() => setActiveTab('financeiro')}>Financeiro</button>
                         </div>
                     </div>
-                </div>
-            </div>
+                )}
 
-            {/* Conditional Fields based on Type */}
-            {formData.type === 'equipment' ? (
-                <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-                        <div className="input-group">
-                            <label className="form-label">Data Aquisição</label>
-                            <input 
-                                type="date"
-                                className="form-input" 
-                                value={formData.purchaseDate}
-                                onChange={e => setFormData({...formData, purchaseDate: e.target.value})}
-                            />
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">Valor Pago (R$)</label>
-                            <input 
-                                type="number" 
-                                step="0.01"
-                                className="form-input" 
-                                placeholder="0,00"
-                                value={formData.cost}
-                                onChange={e => setFormData({...formData, cost: e.target.value})}
-                            />
-                        </div>
-                    </div>
+                <div className="modal-body" style={{ padding: '32px', background: isReplenishMode ? 'var(--background)' : 'var(--surface)' }}>
+                    {isReplenishMode ? (
+                        /* REPLENISH MODE (Entrada Inteligente) */
+                        <div className="animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
+                           <div style={{ backgroundColor: 'var(--surface)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border)', shadow: 'var(--shadow-lg)' }}>
+                                <div className="flex items-center gap-md mb-xl">
+                                    <div style={{ padding: '10px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '12px' }}>
+                                        <TrendingUp size={20} />
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-700">A reposição atualizará o **Custo Médio** do produto e gerará lançamentos financeiros auditáveis.</p>
+                                </div>
 
-                    <div className="input-group">
-                        <label className="form-label">Número de Série / Patrimônio</label>
-                        <input 
-                            type="text" 
-                            className="form-input" 
-                            placeholder="Opcional"
-                            value={formData.serial}
-                            onChange={e => setFormData({...formData, serial: e.target.value})}
-                        />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-                        <div className="input-group">
-                            <label className="form-label">Modelo</label>
-                            <input 
-                                type="text" 
-                                className="form-input" 
-                                placeholder="Opcional"
-                                value={formData.model}
-                                onChange={e => setFormData({...formData, model: e.target.value})}
-                            />
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">Fabricante</label>
-                            <input 
-                                type="text" 
-                                className="form-input" 
-                                placeholder="Opcional"
-                                value={formData.manufacturer}
-                                onChange={e => setFormData({...formData, manufacturer: e.target.value})}
-                            />
-                        </div>
-                    </div>
-                </>
-            ) : (
-                <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-                       <div className="input-group">
-                            <label className="form-label">Unidade de Medida</label>
-                            <select 
-                                className="form-input"
-                                value={formData.unit}
-                                onChange={e => setFormData({...formData, unit: e.target.value})}
-                            >
-                                <option value="un">Unidade (un)</option>
-                                <option value="kg">Quilos (kg)</option>
-                                <option value="m">Metros (m)</option>
-                                <option value="m²">Metro Quadrado (m²)</option>
-                                <option value="l">Litros (l)</option>
-                                <option value="cx">Caixa (cx)</option>
-                                <option value="pct">Pacote (pct)</option>
-                            </select>
-                        </div>
-                         <div className="input-group">
-                            <label className="form-label">Custo Base da Unidade (R$)</label>
-                            <input 
-                                type="number" 
-                                step="0.01"
-                                className="form-input" 
-                                placeholder="0,00"
-                                value={formData.cost}
-                                onChange={e => setFormData({...formData, cost: e.target.value})}
-                            />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-                        <div className="input-group">
-                            <label className="form-label">{itemToEdit && !replenishMode ? "Quantidade Atual" : "Quantidade Inicial"}</label>
-                            <input 
-                                type="number" 
-                                step="any"
-                                className="form-input" 
-                                placeholder="0"
-                                value={formData.quantity}
-                                onChange={e => setFormData({...formData, quantity: e.target.value})}
-                                required
-                                disabled={itemToEdit && formData.type === 'material' ? true : false}
-                                title={itemToEdit ? "Para registrar mais entrada, use Lançar Reposição" : ""}
-                            />
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">Estoque Mínimo</label>
-                            <input 
-                                type="number" 
-                                step="any"
-                                className="form-input" 
-                                placeholder="Avisar quando atingir..."
-                                value={formData.minStock}
-                                onChange={e => setFormData({...formData, minStock: e.target.value})}
-                            />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
-                        {/* Material specific fields can go here in the future if needed */}
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-md)' }}>
-                        <div className="input-group">
-                            <label className="form-label">Modelo</label>
-                            <input 
-                                type="text" 
-                                className="form-input" 
-                                placeholder="Opcional"
-                                value={formData.model}
-                                onChange={e => setFormData({...formData, model: e.target.value})}
-                            />
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">Cor</label>
-                            <input 
-                                type="text" 
-                                className="form-input" 
-                                placeholder="Opcional"
-                                value={formData.color}
-                                onChange={e => setFormData({...formData, color: e.target.value})}
-                            />
-                        </div>
-                        <div className="input-group">
-                            <label className="form-label">Fabricante</label>
-                            <input 
-                                type="text" 
-                                className="form-input" 
-                                placeholder="Opcional"
-                                value={formData.manufacturer}
-                                onChange={e => setFormData({...formData, manufacturer: e.target.value})}
-                            />
-                        </div>
-                    </div>
-                </>
-            )}
-
-                <>
-                    {/* Replenishment Component for Material */}
-                    {itemToEdit && formData.type === 'material' && (
-                        <div className="mt-6 pt-4 border-t border-gray-100">
-                             <label className="flex items-center gap-2 cursor-pointer mb-2">
-                                <input 
-                                    type="checkbox" 
-                                    checked={replenishMode} 
-                                    onChange={e => setReplenishMode(e.target.checked)} 
-                                    className="rounded text-green-500 w-4 h-4" 
-                                />
-                                <span className="text-sm font-bold text-green-800">Nova Entrada / Reposição de Estoque</span>
-                            </label>
-                            
-                            {replenishMode && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-5 space-y-4 animate-fade-in mt-2 shadow-inner">
-                                     <h4 className="text-sm font-bold text-green-800 border-b border-green-200 pb-2 mb-3">Registrar Nota / Fatura de Compra</h4>
-                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                         <div className="input-group">
-                                             <label className="form-label text-xs">Valor Total (R$) *</label>
-                                             <input 
-                                                 type="number" 
-                                                 step="0.01"
-                                                 className="form-input form-input-sm font-bold text-green-700" 
-                                                 placeholder="0,00"
-                                                 value={replenishTotalCost}
-                                                 onChange={e => setReplenishTotalCost(e.target.value)}
-                                                 required={replenishMode}
-                                             />
-                                         </div>
-                                         <div className="input-group">
-                                             <label className="form-label text-xs">Qtd. Adquirida *</label>
-                                             <input 
-                                                 type="number" 
-                                                 step="any"
-                                                 className="form-input form-input-sm" 
-                                                 placeholder="Ex: 1, 10, 50"
-                                                 value={replenishQty}
-                                                 onChange={e => setReplenishQty(e.target.value)}
-                                                 required={replenishMode}
-                                             />
-                                         </div>
-                                         <div className="input-group">
-                                             <label className="form-label text-xs">Unidade da Compra</label>
-                                             <select 
-                                                 className="form-input form-input-sm"
-                                                 value={replenishBuyUnit}
-                                                 onChange={e => setReplenishBuyUnit(e.target.value)}
-                                             >
-                                                 <option value="un">Unidade (un)</option>
-                                                 <option value="cx">Caixa (cx)</option>
-                                                 <option value="pct">Pacote (pct)</option>
-                                                 <option value="kg">Quilo (kg)</option>
-                                                 <option value="m">Metro (m)</option>
-                                                 <option value="m²">Metro Quadrado (m²)</option>
-                                                 <option value="l">Litro (l)</option>
-                                             </select>
-                                         </div>
-                                     </div>
-                                     
-                                     {replenishBuyUnit !== formData.unit && (
-                                         <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-3 animate-fade-in flex flex-col sm:flex-row sm:items-center gap-3">
-                                             <div className="flex-1">
-                                                 <label className="form-label text-xs text-yellow-800 font-bold mb-0 flex items-center gap-1">
-                                                     Conversão de Fracionamento de Compra
-                                                 </label>
-                                                 <p className="text-[10px] text-yellow-700 mt-1">1 {replenishBuyUnit} dessa nota fiscal rende quantas {formData.unit} no estoque?</p>
-                                             </div>
-                                             <input 
-                                                 type="number" 
-                                                 step="any"
-                                                 className="form-input form-input-sm border-yellow-400 focus:border-yellow-600 w-32 font-bold text-center" 
-                                                 placeholder={`Rende (Qtd)`}
-                                                 value={replenishYield}
-                                                 onChange={e => setReplenishYield(e.target.value)}
-                                                 required={replenishMode && replenishBuyUnit !== formData.unit}
-                                             />
-                                         </div>
-                                     )}
-
-                                     <div className="bg-white rounded border border-green-200 p-3 mt-3 flex justify-between items-center shadow-sm">
-                                         <span className="text-xs text-gray-500 font-medium tracking-wide">RESULTADO PARA O ESTOQUE:</span>
-                                         <span className="text-sm font-bold text-green-700">
-                                             + {((parseFloat(replenishQty) || 0) * (replenishBuyUnit !== formData.unit ? (parseFloat(replenishYield) || 1) : 1)).toFixed(2)} {formData.unit}
-                                             <span className="text-[11px] text-gray-400 font-normal ml-2 bg-gray-50 p-1 rounded border border-gray-100">
-                                                 ≅ R$ {(((parseFloat(replenishTotalCost) || 0) / (((parseFloat(replenishQty) || 0) * (replenishBuyUnit !== formData.unit ? (parseFloat(replenishYield) || 1) : 1)) || 1)).toLocaleString('pt-BR', {minimumFractionDigits: 4, maximumFractionDigits: 4}))} / {formData.unit}
-                                             </span>
-                                         </span>
-                                     </div>
-                                 </div>
-                             )}
-
-                             {/* History Mini-viewing */}
-                             {itemToEdit.history && itemToEdit.history.length > 0 && (
-                                 <div className="mt-4">
-                                     <span className="text-xs font-semibold text-gray-500 mb-2 block">Últimas 5 movimentações de Entrada:</span>
-                                     <div className="max-h-32 overflow-y-auto border border-gray-100 rounded bg-gray-50 p-2 text-xs">
-                                         {itemToEdit.history.slice().reverse().slice(0,5).map(h => (
-                                             <div key={h.id} className="flex justify-between border-b border-gray-200 py-1 last:border-0 text-gray-700">
-                                                 <span>{new Date(h.date).toLocaleDateString()}</span>
-                                                 <span className="font-semibold text-green-600">+{h.qty}</span>
-                                                 <span>@ R$ {h.unitCost.toFixed(2)}</span>
-                                                 <span className="font-bold">Total: R$ {h.totalCost.toFixed(2)}</span>
-                                             </div>
-                                         ))}
-                                     </div>
-                                 </div>
-                             )}
-                        </div>
-                    )}
-
-                    {/* Finance Integration (Show if New OR Replenishing) */}
-                    {(!itemToEdit && parseFloat(formData.cost) > 0) || (itemToEdit && replenishMode && parseFloat(replenishTotalCost) > 0) ? (
-                        <div className="mt-6 pt-4 border-t border-gray-100">
-                            <label className="flex items-center gap-2 cursor-pointer mb-4">
-                                <input 
-                                    type="checkbox" 
-                                    checked={createFinance} 
-                                    onChange={e => setCreateFinance(e.target.checked)} 
-                                    className="rounded text-blue-500 w-4 h-4" 
-                                />
-                                <span className="text-sm font-bold text-gray-800">Lançar no Financeiro (Gerar Despesa)</span>
-                            </label>
-
-                            {createFinance && (
-                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4 animate-fade-in">
-                                    <div className="flex items-center justify-between text-sm bg-white p-2 rounded border border-gray-100 mb-2">
-                                        <span className="text-gray-500 font-medium">Valor Total da Saída:</span>
-                                        <span className="font-bold text-red-500">
-                                            R$ {
-                                                (!itemToEdit 
-                                                    ? (formData.type === 'equipment' ? (parseFloat(formData.cost) || 0) : ((parseFloat(formData.cost) || 0) * (parseFloat(formData.quantity) || 0)))
-                                                    : (parseFloat(replenishTotalCost) || 0)
-                                                ).toLocaleString('pt-BR', {minimumFractionDigits: 2})
-                                            }
-                                        </span>
+                                <div className="grid gap-lg">
+                                    <div className="input-group">
+                                        <label className="form-label">Quantidade para Adicionar ({formData.unit})</label>
+                                        <input type="number" className="form-input" style={{ fontSize: '1.25rem', fontWeight: 800 }} value={replenishData.quantityToAdd} onChange={e => setReplenishData({...replenishData, quantityToAdd: e.target.value})} />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="input-group">
-                                            <label className="form-label text-xs">Vínculo de Conta *</label>
-                                            <select className="form-input text-sm" value={financeAccountId} onChange={e => setFinanceAccountId(e.target.value)} required={createFinance}>
-                                                <option value="">Selecione uma conta...</option>
-                                                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                            </select>
+                                    <div className="input-group">
+                                        <label className="form-label">Preço de Compra (Atual desta Lote)</label>
+                                        <div style={{ position: 'relative' }}>
+                                            <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)' }}>R$</span>
+                                            <input type="number" className="form-input" style={{ paddingLeft: '44px', fontWeight: 700 }} value={replenishData.purchasePrice} onChange={e => setReplenishData({...replenishData, purchasePrice: e.target.value})} />
                                         </div>
-                                        <div className="input-group">
-                                            <label className="form-label text-xs">Data Receb./Competência</label>
-                                            <input type="date" className="form-input text-sm" value={financeDate} onChange={e => setFinanceDate(e.target.value)} required={createFinance} />
-                                        </div>
-                                        <div className="input-group">
-                                            <label className="form-label text-xs">Meio de Pagamento *</label>
-                                            <select className="form-input text-sm" required={createFinance} value={financePaymentMethod} onChange={e => { setFinancePaymentMethod(e.target.value); setFinanceInstallments(1); }}>
-                                                <option value="pix">PIX</option>
-                                                <option value="credit">Cartão de Crédito</option>
-                                                <option value="debit">Cartão de Débito</option>
-                                                <option value="boleto">Boleto / A Prazo</option>
-                                            </select>
-                                        </div>
-                                        {(financePaymentMethod === 'credit' || financePaymentMethod === 'boleto') ? (
+                                        <p className="text-[10px] text-muted mt-2 font-bold uppercase">Custo Médio Atual: R$ {parseFloat(formData.cost || 0).toFixed(2)}</p>
+                                    </div>
+
+                                    <div style={{ padding: '24px', background: 'var(--background)', borderRadius: '18px', border: '1px solid var(--border)' }}>
+                                        <h4 className="text-[10px] font-black text-primary uppercase tracking-widest mb-4">Liquidação Financeira</h4>
+                                        <div className="grid gap-md">
                                             <div className="input-group">
-                                                <label className="form-label text-xs">Parcelamento</label>
-                                                <select className="form-input text-sm" value={financeInstallments} onChange={e => setFinanceInstallments(parseInt(e.target.value))}>
-                                                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}
+                                                <label className="form-label">Conta para Débito</label>
+                                                <select className="form-input" value={replenishData.accountId} onChange={e => setReplenishData({...replenishData, accountId: e.target.value})}>
+                                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} (Saldo: R$ {parseFloat(acc.balance || 0).toFixed(2)})</option>)}
                                                 </select>
                                             </div>
-                                        ) : (
-                                            <div className="input-group">
-                                                <label className="form-label text-xs">Situação do Pagamento</label>
-                                                <select className="form-input text-sm" value={financeStatus} onChange={e => setFinanceStatus(e.target.value)}>
-                                                    <option value="pending">A Pagar (Provisionado)</option>
-                                                    <option value="paid">Já Pago (Debita Imediatamente)</option>
-                                                </select>
+                                            <div className="flex gap-md">
+                                                 <div className="input-group flex-1">
+                                                    <label className="form-label">Parcelas</label>
+                                                    <input type="number" className="form-input" value={replenishData.installments} onChange={e => setReplenishData({...replenishData, installments: e.target.value})} />
+                                                </div>
+                                                <div className="input-group flex-1">
+                                                    <label className="form-label">Data Pagamento</label>
+                                                    <input type="date" className="form-input" value={replenishData.paymentDate} onChange={e => setReplenishData({...replenishData, paymentDate: e.target.value})} />
+                                                </div>
                                             </div>
-                                        )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-md mt-xl">
+                                    <button className="btn btn-secondary flex-1" style={{ height: '3.5rem' }} onClick={() => setIsReplenishMode(false)}>Voltar</button>
+                                    <button className="btn btn-primary flex-1" style={{ height: '3.5rem', fontWeight: 800 }} onClick={handleReplenish} disabled={isSaving}>
+                                        Confirmar Entrada
+                                    </button>
+                                </div>
+                           </div>
+                        </div>
+                    ) : (
+                        /* STANDARD MODE */
+                        <form id="item-form" onSubmit={handleSave}>
+                            {activeTab === 'geral' && (
+                                <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '40px' }}>
+                                    <div>
+                                        <div style={{ width: '100%', height: '240px', background: 'var(--background)', borderRadius: '24px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+                                            {formData.image ? (
+                                                <img src={formData.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div className="text-center p-8">
+                                                    <Package size={48} style={{ opacity: 0.1, margin: '0 auto 16px' }} />
+                                                    <p className="text-[10px] text-muted font-black uppercase">Nenhuma mídia anexada</p>
+                                                </div>
+                                            )}
+                                            <div style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px' }}>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="URL da Imagem..." 
+                                                    className="form-input" 
+                                                    style={{ fontSize: '0.7rem', backgroundColor: 'var(--surface)', opacity: 0.9 }} 
+                                                    value={formData.image} 
+                                                    onChange={e => setFormData({...formData, image: e.target.value})}
+                                                />
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="input-group" style={{ marginTop: '24px' }}>
+                                            <label className="form-label">Status do Registro</label>
+                                            <select className="form-input" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                                                <option value="Ativo">✅ OPERACIONAL</option>
+                                                <option value="Manutenção">⚠️ MANUTENÇÃO</option>
+                                                <option value="Inativo">🔴 DESATIVADO</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-md">
+                                        <div className="input-group">
+                                            <label className="form-label">Nome de Identificação</label>
+                                            <input type="text" className="form-input" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ fontSize: '1rem', fontWeight: 700 }} />
+                                        </div>
+                                        
+                                        <div className="flex gap-md">
+                                            <div className="input-group flex-1">
+                                                <label className="form-label">Família Equivalente (Master)</label>
+                                                <input type="text" className="form-input" value={formData.family} onChange={e => setFormData({...formData, family: e.target.value})} placeholder="Ex: Caneca Porcelana 325ml" />
+                                                <p className="text-[9px] text-primary mt-1 font-bold uppercase flex items-center gap-1"><Info size={10} /> Agrupa custos de fornecedores diferentes</p>
+                                            </div>
+                                            <div className="input-group flex-1">
+                                                <label className="form-label">ID Patrimonial / Tag</label>
+                                                <input type="text" className="form-input" value={formData.serial} onChange={e => setFormData({...formData, serial: e.target.value})} placeholder="TAG-1234" />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-md">
+                                            <div className="input-group">
+                                                <label className="form-label">Categoria Sistema</label>
+                                                <input type="text" className="form-input" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
+                                            </div>
+                                            <div className="input-group">
+                                                <label className="form-label">Unidade de Medida</label>
+                                                <input type="text" className="form-input" value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} placeholder="un, m, kg..." />
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="input-group">
+                                            <label className="form-label">Notas Adicionais</label>
+                                            <textarea className="form-input" rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Especificações técnicas ou limitações de uso..."></textarea>
+                                        </div>
                                     </div>
                                 </div>
                             )}
+
+                            {activeTab === 'operacao' && (
+                                <div className="animate-fade-in space-y-lg">
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+                                        <div style={{ background: 'var(--background)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border)' }}>
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Controle de Inventário</h4>
+                                            <div className="grid gap-md">
+                                                <div className="input-group">
+                                                    <label className="form-label">Quantidade em Mãos</label>
+                                                    <input type="number" className="form-input" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} disabled={itemToEdit} />
+                                                    {itemToEdit && <p className="text-[10px] text-primary mt-1 font-bold uppercase">Use "Repor Estoque" para ajustar o saldo e custo médio</p>}
+                                                </div>
+                                                <div className="input-group">
+                                                    <label className="form-label">Ponto de Ressuprimento (Mínimo)</label>
+                                                    <input type="number" className="form-input" value={formData.minStock} onChange={e => setFormData({...formData, minStock: e.target.value})} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style={{ background: 'var(--background)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border)' }}>
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Especificações do Fabricante</h4>
+                                            <div className="grid gap-md">
+                                                 <div className="input-group">
+                                                    <label className="form-label">Marca / Brand</label>
+                                                    <input type="text" className="form-input" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} />
+                                                </div>
+                                                <div className="input-group">
+                                                    <label className="form-label">Modelo / Referência</label>
+                                                    <input type="text" className="form-input" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'financeiro' && (
+                                <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '40px' }}>
+                                    <div className="space-y-xl">
+                                        <div className="input-group">
+                                            <label className="form-label">Custo Médio Unitário</label>
+                                            <div style={{ position: 'relative' }}>
+                                                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)' }}>R$</span>
+                                                <input type="number" className="form-input" style={{ paddingLeft: '44px', fontSize: '1.25rem', fontWeight: 800 }} value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} />
+                                            </div>
+                                        </div>
+
+                                        <div className="input-group">
+                                            <label className="form-label">Início de Atividade / Aquisição</label>
+                                            <input type="date" className="form-input" value={formData.purchaseDate} onChange={e => setFormData({...formData, purchaseDate: e.target.value})} />
+                                        </div>
+
+                                        <div style={{ padding: '24px', background: 'var(--background)', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-bold text-slate-800">Sincronizar com Financeiro</span>
+                                                <input type="checkbox" checked={formData.consolidateFinance} onChange={e => setFormData({...formData, consolidateFinance: e.target.checked})} disabled={itemToEdit} />
+                                            </div>
+                                            <p className="text-[10px] text-muted font-bold uppercase">Ao salvar, cria os débitos correspondentes nas contas indicadas.</p>
+                                        </div>
+                                    </div>
+
+                                    {formData.consolidateFinance && !itemToEdit && (
+                                        <div className="animate-fade-in" style={{ background: 'var(--surface-hover)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border)' }}>
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Configuração de Liquidação</h4>
+                                            
+                                            <div className="grid gap-md">
+                                                <div className="input-group">
+                                                    <label className="form-label">Conta Origem</label>
+                                                    <select className="form-input" value={formData.accountId} onChange={e => setFormData({...formData, accountId: e.target.value})}>
+                                                        {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                                                    </select>
+                                                </div>
+
+                                                <div className="flex gap-md">
+                                                    <div className="input-group flex-1">
+                                                        <label className="form-label">Parcelas</label>
+                                                        <input type="number" className="form-input" min="1" value={formData.installments} onChange={e => setFormData({...formData, installments: e.target.value})} />
+                                                    </div>
+                                                    <div className="input-group flex-1">
+                                                        <label className="form-label">1º Vencimento</label>
+                                                        <input type="date" className="form-input" value={formData.firstPaymentDate} onChange={e => setFormData({...formData, firstPaymentDate: e.target.value})} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </form>
+                    )}
+                </div>
+
+                {/* Tactical Footer */}
+                {!isReplenishMode && (
+                    <div className="modal-footer" style={{ padding: '24px 32px' }}>
+                        <div className="flex gap-md">
+                            <button type="button" onClick={onClose} className="btn btn-secondary" style={{ padding: '0 32px' }}>Cancelar</button>
+                            <button type="submit" form="item-form" className="btn btn-primary" style={{ padding: '0 48px', fontWeight: 700 }} disabled={isSaving}>
+                                <Save size={18} /> {isSaving ? 'Gravando...' : itemToEdit ? 'Atualizar Registro' : 'Lançar no Sistema'}
+                            </button>
                         </div>
-                    ) : null}
-                </>
-
-          </div>
-
-          <div style={sFooter}>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-               {itemToEdit && (
-                   <>
-                       <button type="button" className="btn btn-danger" onClick={handleDelete} title="Excluir Permanentemente">
-                           <Trash2 size={16} /> Excluir
-                       </button>
-                       <button type="button" className="btn btn-secondary" onClick={handleClone} title="Criar Cópia Deste Item">
-                           <Copy size={16} /> Clonar Linha
-                       </button>
-                   </>
-               )}
+                    </div>
+                )}
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={onClose}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <Save size={16} />
-                  {itemToEdit ? 'Salvar Alterações' : 'Salvar Item'}
-                </button>
-            </div>
-          </div>
-        </form>
-      </div>
-      
-      {showLinked && itemToEdit && (
-         <LinkedTransactionsModal 
-            isOpen={showLinked}
-            onClose={() => setShowLinked(false)}
-            entityId={itemToEdit.id}
-            entityName={itemToEdit.name}
-            entityType="Inventory"
-         />
-      )}
-    </div>
-  );
+        </div>
+    );
 }

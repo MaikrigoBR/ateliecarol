@@ -15,4 +15,13 @@ export class CatalogController {
       courses: await this.catalogService.getCoursesForTenant(slug)
     };
   }
+
+  @Get('plans')
+  async listPlans(@TenantContext() tenantContext?: TenantContextValue) {
+    const slug = tenantContext?.tenant.slug ?? 'emmaus';
+    return {
+      tenant: tenantContext?.tenant,
+      plans: await this.catalogService.getPlansForTenant(slug)
+    };
+  }
 }
