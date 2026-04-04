@@ -234,8 +234,14 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                 } else {
                     await db.create('transactions', {
                         accountId: selectedAccountId, amount: t.amount, type: t.type, category: t.category || 'Geral', description: t.description,
-                        installment: t.installment || null, date: t.date, status: 'paid', bankReferenceId: t.rawId,
-                        linkedItemId: t.suggestedLink?.id || null, linkedItemType: t.suggestedLink?.type || null
+                        installment: t.installment || null,
+                        date: t.date,
+                        status: 'paid',
+                        bankReferenceId: t.rawId,
+                        linkedItemId: t.suggestedLink?.id || null,
+                        linkedItemType: t.suggestedLink?.type || null,
+                        createdAt: new Date().toISOString(),
+                        source: 'bank_import'
                     });
                 }
 
@@ -512,6 +518,7 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Status / Auditoria</th>
                                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Data</th>
                                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Descrição Expandida</th>
+                                    <th style={{ padding: '16px', textAlign: 'center', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Parcela</th>
                                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Categorização</th>
                                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Transferir Para (Destino)</th>
                                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Vínculo Ativo</th>
@@ -593,6 +600,19 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                                     )}
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                            <input 
+                                                type="text"
+                                                placeholder="ex: 1/12"
+                                                value={t.installment || ''}
+                                                onChange={(e) => updateStagedRow(t.id, { installment: e.target.value })}
+                                                style={{ 
+                                                    width: '60px', border: '1px solid #e2e8f0', background: t.installment ? '#f5f3ff' : 'transparent', 
+                                                    textAlign: 'center', fontWeight: 900, color: '#7c3aed', fontSize: '0.8rem',
+                                                    padding: '4px 0', borderRadius: '6px'
+                                                }}
+                                            />
                                         </td>
                                         <td style={{ padding: '12px 16px' }}>
                                             <select 
