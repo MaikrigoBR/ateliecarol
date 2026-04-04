@@ -11,6 +11,8 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
     const [rawTextInput, setRawTextInput] = useState('');
     const [importStats, setImportStats] = useState({ total: 0, duplicates: 0, totalAmount: 0 });
     const [selectedAccountId, setSelectedAccountId] = useState(accounts.find(a => a.type !== 'credit')?.id || '');
+    const [catalogPicker, setCatalogPicker] = useState({ isOpen: false, rowId: null, search: '' });
+    const [expandedGroups, setExpandedGroups] = useState(new Set());
     const fileInputRef = useRef(null);
 
     const getHistoricalCategory = (description) => {
@@ -38,12 +40,10 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
 
         const selectedAcc = accounts.find(a => String(a.id) === String(selectedAccountId));
 
-        // Detect duplicates & matches
         const localParsedSeen = new Set();
         const withMeta = parsed.map(nt => {
             const fingerprint = nt.rawId || `${nt.date}-${nt.amount}-${nt.description.toLowerCase().trim()}`;
             
-            // 1. Check against DB
             const isInDB = existingTransactions.some(et => 
                 (et.bankReferenceId === nt.rawId && nt.rawId) || 
                 (et.date === nt.date && 
@@ -53,13 +53,11 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                 (et.installment === nt.installment && et.description === nt.description && String(et.accountId) === String(selectedAccountId))
             );
 
-            // 2. Check against this same batch
             const isLocalDuplicate = localParsedSeen.has(fingerprint);
             localParsedSeen.add(fingerprint);
 
             const isDuplicate = isInDB || isLocalDuplicate;
 
-            // Suggested Match (Pending transactions or Orders)
             let suggestedMatch = null;
             if (!isDuplicate) {
                 const transMatch = existingTransactions.find(et => 
@@ -78,12 +76,10 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                 }
             }
 
-            // --- AUTO-VINCULO COM ATIVOS/INSUMOS (FUZZY MULTI-MATCH) ---
             let detectedItems = [];
             const desc = (nt.description || '').toLowerCase();
             const descParts = desc.split(/[* \-\/]/).filter(p => p.length > 3);
 
-            // Scan Equipments
             equipments.forEach(e => {
                 const name = e.name.toLowerCase();
                 const brand = (e.brand || '').toLowerCase();
@@ -94,7 +90,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                 }
             });
 
-            // Scan Materials
             materials.forEach(m => {
                 const name = m.name.toLowerCase();
                 const cat = (m.category || '').toLowerCase();
@@ -108,7 +103,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
             let suggestedLink = detectedItems.length === 1 ? detectedItems[0] : null;
             let isCompound = detectedItems.length > 1;
 
-            // --- AUTO-CONCILIÇÃO DE TRANSFERÊNCIA/CARTÃO ---
             let targetAccountId = null;
             let finalCategory = nt.category;
             let isAISuggested = !!nt.isAISuggested;
@@ -131,54 +125,20 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
             return { ...nt, category: finalCategory, isAISuggested, isDuplicate, suggestedMatch, suggestedLink, detectedItems, isCompound, targetAccountId };
         });
 
-        // --- EXPANSÃO PROATIVA DE PARCELAS E COMPOSIÇÕES ---
+        // --- EXPANSÃO PROATIVA DE PARCELAS (DENTRO DO TERMINAL) ---
         const expanded = [];
         withMeta.forEach(main => {
-            if (main.isCompound && !main.isDuplicate) {
-                // Sugerir desmembramento automático por itens detectados
-                let totalCostDetected = main.detectedItems.reduce((s, it) => s + it.cost, 0);
-                let residual = main.amount - totalCostDetected;
-
-                main.detectedItems.forEach((it, idx) => {
-                    expanded.push({
-                        ...main,
-                        id: `${main.id}-comp-${idx}`,
-                        amount: it.cost || (main.amount / (main.detectedItems.length + (residual > 0 ? 1 : 0))).toFixed(2),
-                        description: `${main.description} / ${it.name}`,
-                        suggestedLink: { type: it.type, id: it.id, name: it.name },
-                        category: it.type === 'equipment' ? 'Equipamentos & Ativos' : 'Materiais & Insumos',
-                        isSplit: true,
-                        splitGroup: main.id,
-                        parentAmount: main.amount,
-                        selected: true
-                    });
-                });
-
-                if (residual > 0.01) {
-                    expanded.push({
-                        ...main,
-                        id: `${main.id}-residual`,
-                        amount: parseFloat(residual.toFixed(2)),
-                        description: `${main.description} (Resíduo/Taxas)`,
-                        category: 'Impostos & Taxas',
-                        isSplit: true,
-                        splitGroup: main.id,
-                        parentAmount: main.amount,
-                        selected: true
-                    });
-                }
-            } else {
-                expanded.push({ ...main, selected: !main.isDuplicate });
-            }
+            // Adicionar a linha mestre original
+            expanded.push({ ...main, selected: !main.isDuplicate, isMaster: true });
             
-            // ... (rest of the installment expansion logic)
-            // Se detectarmos parcelamento (ex: 3/10)
+            // Se detectarmos parcelamento (ex: 3/10) e não for duplicidade total
             if (main.installmentNumber && main.installmentsTotal > 1 && !main.isDuplicate) {
                 for (let i = 1; i <= main.installmentsTotal; i++) {
-                    if (i === main.installmentNumber) continue; // Pular a atual
+                    if (i === main.installmentNumber) continue; // Pula a mestre (já está na lista)
 
-                    const parcelKey = `${i}/${main.installmentsTotal}`;
-                    // Verificar se essa parcela específica já existe no DB
+                    const parcelKey = `${i.toString().padStart(2, '0')}/${main.installmentsTotal.toString().padStart(2, '0')}`;
+                    
+                    // Verificação rigorosa contra duplicatas no DB para essa parcela específica
                     const alreadyExists = existingTransactions.some(et => 
                         et.description === main.description && 
                         et.installment === parcelKey &&
@@ -192,6 +152,7 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                         expanded.push({
                             ...main,
                             id: `${main.id}-proj-${i}`,
+                            parentRowId: main.id, // Vínculo hierárquico
                             date: dateObj.toISOString().split('T')[0],
                             installment: parcelKey,
                             installmentNumber: i,
@@ -199,9 +160,43 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                             isProjected: true,
                             source: 'projection',
                             status: i < main.installmentNumber ? 'paid' : 'pending',
-                            selected: true // Por padrão, selecionamos para criar o histórico/futuro
+                            selected: true // Habilitado por padrão
                         });
                     }
+                }
+            }
+            
+            // --- EXPANSÃO DE TRANSAÇÕES COMPOSTAS (VÍNCULOS) ---
+            if (main.isCompound && !main.isDuplicate) {
+                let totalCostDetected = main.detectedItems.reduce((s, it) => s + it.cost, 0);
+                let residual = main.amount - totalCostDetected;
+
+                main.detectedItems.forEach((it, idx) => {
+                    expanded.push({
+                        ...main,
+                        id: `${main.id}-comp-${idx}`,
+                        parentRowId: main.id,
+                        amount: it.cost || (main.amount / (main.detectedItems.length + (residual > 0 ? 1 : 0))).toFixed(2),
+                        description: `${main.description} / ${it.name}`,
+                        suggestedLink: { type: it.type, id: it.id, name: it.name },
+                        category: it.type === 'equipment' ? 'Equipamentos & Ativos' : 'Materiais & Insumos',
+                        isSplit: true,
+                        isProjected: true, // Marcar como secundário para bloquear edição
+                        selected: true
+                    });
+                });
+
+                if (residual > 0.01) {
+                    expanded.push({
+                        ...main,
+                        id: `${main.id}-residual`,
+                        parentRowId: main.id,
+                        amount: parseFloat(residual.toFixed(2)),
+                        description: `${main.description} (Resíduo/Taxas)`,
+                        category: 'Impostos & Taxas',
+                        isSplit: true,
+                        selected: true
+                    });
                 }
             }
         });
@@ -257,7 +252,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
             if (!confirm(`Atenção: Você selecionou ${duplicatesCount} lançamentos marcados como duplicados. Deseja realmente prosseguir?`)) return;
         }
 
-        // --- VALIDAÇÃO DE INTEGRIDADE MATEMÁTICA (SPLIT AUDITOR) ---
         const splitRows = stagedTransactions.filter(t => t.selected && t.isSplit);
         if (splitRows.length > 0) {
             const grouped = {};
@@ -282,36 +276,86 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
 
             const promises = toProcess.map(async (t) => {
                 const isMatch = !!t.suggestedMatch;
+                
+                // --- 1. LANÇAMENTO ORIGINAL (ESTRATO) ---
+                if (!t.isDuplicate || t.selected) {
+                    let mainTransId = null;
+                    
+                    if (isMatch && t.suggestedMatch.type === 'transaction') {
+                        await db.update('transactions', t.suggestedMatch.item.id, {
+                            status: 'paid', paidDate: t.date, bankReferenceId: t.rawId, updatedAt: new Date().toISOString()
+                        });
+                        mainTransId = t.suggestedMatch.item.id;
+                    } else if (isMatch && t.suggestedMatch.type === 'order') {
+                        await db.update('orders', t.suggestedMatch.item.id, {
+                            paymentStatus: 'paid', paymentDate: t.date, updatedAt: new Date().toISOString()
+                        });
+                        const newT = await db.create('transactions', {
+                            accountId: selectedAccountId, amount: t.amount, type: 'income', category: 'Vendas de Produtos',
+                            description: `Liquidação Pedido #${t.suggestedMatch.item.id.slice(-4)} - ${t.suggestedMatch.item.clientName || 'Cliente'}`,
+                            date: t.date, status: 'paid', bankReferenceId: t.rawId
+                        });
+                        mainTransId = newT.id;
+                    } else {
+                        const newT = await db.create('transactions', {
+                            accountId: selectedAccountId, amount: t.amount, type: t.type, category: t.category || 'Geral', description: t.description,
+                            installment: t.installment || null,
+                            date: t.date,
+                            status: t.status || 'paid',
+                            bankReferenceId: t.rawId,
+                            linkedItemId: t.suggestedLink?.id || null,
+                            linkedItemType: t.suggestedLink?.type || null,
+                            createdAt: new Date().toISOString(),
+                            source: t.source || 'bank_import'
+                        });
+                        mainTransId = newT.id;
+                    }
 
-                // --- 1. LANÇAMENTO NA CONTA DE ORIGEM (EXTRATO) ---
-                if (isMatch && t.suggestedMatch.type === 'transaction') {
-                    await db.update('transactions', t.suggestedMatch.item.id, {
-                        status: 'paid', paidDate: t.date, bankReferenceId: t.rawId, updatedAt: new Date().toISOString()
-                    });
-                } else if (isMatch && t.suggestedMatch.type === 'order') {
-                    await db.update('orders', t.suggestedMatch.item.id, {
-                        paymentStatus: 'paid', paymentDate: t.date, updatedAt: new Date().toISOString()
-                    });
-                    await db.create('transactions', {
-                        accountId: selectedAccountId, amount: t.amount, type: 'income', category: 'Vendas de Produtos',
-                        description: `Liquidação Pedido #${t.suggestedMatch.item.id.slice(-4)} - ${t.suggestedMatch.item.clientName || 'Cliente'}`,
-                        date: t.date, status: 'paid', bankReferenceId: t.rawId
-                    });
-                } else {
-                    await db.create('transactions', {
-                        accountId: selectedAccountId, amount: t.amount, type: t.type, category: t.category || 'Geral', description: t.description,
-                        installment: t.installment || null,
-                        date: t.date,
-                        status: t.status || 'paid',
-                        bankReferenceId: t.rawId,
-                        linkedItemId: t.suggestedLink?.id || null,
-                        linkedItemType: t.suggestedLink?.type || null,
-                        createdAt: new Date().toISOString(),
-                        source: t.source || 'bank_import'
-                    });
+                    // --- 🧠 PROJEÇÃO EM SEGUNDO PLANO (GHOST PROJECTION) ---
+                    // Se o operador confirmou uma parcela, criamos as "irmãs" dela em silêncio
+                    if (t.installment && t.installment.includes('/') && !t.isProjected) {
+                        const [currStr, totalStr] = t.installment.split('/');
+                        const curr = parseInt(currStr);
+                        const total = parseInt(totalStr);
+
+                        if (total > 1) {
+                            for (let i = 1; i <= total; i++) {
+                                if (i === curr) continue; // Pula a que acabamos de salvar
+
+                                const parcelKey = `${i.toString().padStart(2, '0')}/${total.toString().padStart(2, '0')}`;
+                                
+                                // Anti-duplicação: Não projeta se já existir essa parcela específica no banco
+                                const exists = existingTransactions.some(et => 
+                                    et.description === t.description && 
+                                    et.installment === parcelKey &&
+                                    String(et.accountId) === String(selectedAccountId)
+                                );
+
+                                if (!exists) {
+                                    const dateObj = new Date(t.date + 'T12:00:00');
+                                    dateObj.setMonth(dateObj.getMonth() + (i - curr));
+                                    
+                                    await db.create('transactions', {
+                                        accountId: selectedAccountId, 
+                                        amount: t.amount, 
+                                        type: t.type, 
+                                        category: t.category || 'Geral', 
+                                        description: t.description,
+                                        installment: parcelKey,
+                                        date: dateObj.toISOString().split('T')[0],
+                                        status: i < curr ? 'paid' : 'pending',
+                                        bankReferenceId: `PROJ-${t.rawId || t.id}-${i}`,
+                                        linkedItemId: t.suggestedLink?.id || null,
+                                        linkedItemType: t.suggestedLink?.type || null,
+                                        createdAt: new Date().toISOString(),
+                                        source: 'projection'
+                                    });
+                                }
+                            }
+                        }
+                    }
                 }
 
-                // --- 2. LANÇAMENTO ESPELHADO (CONTA DE DESTINO) ---
                 if (t.targetAccountId) {
                     const targetAcc = accounts.find(a => String(a.id) === String(t.targetAccountId));
                     await db.create('transactions', {
@@ -334,7 +378,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                     }
                 }
 
-                // --- 3. AUTO-QUITAÇÃO (CONTA ATUAL) ---
                 if (isCreditCard && t.type === 'income' && (t.category === 'Pagamento de Fatura' || t.description.toLowerCase().includes('pagamento fatura'))) {
                     const processedCloseDay = Number(selectedAcc.closeDay || 3);
                     let invoiceMonth = getInvoiceMonth(t.date, processedCloseDay);
@@ -351,7 +394,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
 
             await Promise.all(promises);
 
-            // Se houve quitação, salvar no registro da conta
             if (isCreditCard && accountHasChanged) {
                 await db.update('accounts', selectedAccountId, {
                     paidInvoices: updatedPaidInvoices,
@@ -370,79 +412,96 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
         }
     };
 
-    const removeStagedRow = (id) => {
-        setStagedTransactions(stagedTransactions.filter(t => t.id !== id));
-    };
-
-    const splitTransaction = (id) => {
-        setStagedTransactions(prev => {
-            const original = prev.find(t => t.id === id);
-            if (!original) return prev;
-            
-            const halfAmount = (parseFloat(original.amount) / 2).toFixed(2);
-            const parentId = original.splitGroup || original.id;
-            
-            const sub1 = { 
-                ...original, 
-                id: `${id}-1`, 
-                amount: parseFloat(halfAmount), 
-                isSplit: true, 
-                splitGroup: parentId, 
-                parentAmount: original.parentAmount || original.amount,
-                selected: true 
-            };
-            const sub2 = { 
-                ...original, 
-                id: `${id}-2`, 
-                amount: parseFloat(halfAmount), 
-                isSplit: true, 
-                splitGroup: parentId, 
-                parentAmount: original.parentAmount || original.amount,
-                selected: true 
-            };
-            
-            return prev.filter(t => t.id !== id).concat([sub1, sub2]);
-        });
-    };
-
-    const getSplitBalance = (splitGroupId) => {
-        const group = stagedTransactions.filter(t => t.splitGroup === splitGroupId && t.selected);
-        if (group.length === 0) return 0;
-        const parentAmount = group[0].parentAmount;
-        const currentTotal = group.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-        return (parentAmount - currentTotal).toFixed(2);
-    };
-
     const updateStagedRow = (id, updates) => {
-        setStagedTransactions(prev => {
-            const current = prev.find(t => t.id === id);
-            const newList = prev.map(t => t.id === id ? { ...t, ...updates } : t);
-            
-            // Se o usuário alterou a categoria manualmente, oferecer para propagar para descrições idênticas
-            if (updates.category && current && !updates._bulkPropagated) {
-                const standardizedDesc = current.description.toLowerCase().trim();
-                const similarCount = newList.filter(t => 
-                    t.id !== id && 
-                    t.description.toLowerCase().trim() === standardizedDesc && 
-                    t.category !== updates.category
-                ).length;
+        setStagedTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    };
 
-                if (similarCount > 0) {
-                    if (confirm(`Encontramos mais ${similarCount} lançamentos idênticos. Aplicar "${updates.category}" para todos eles?`)) {
-                        return newList.map(t => 
-                            t.description.toLowerCase().trim() === standardizedDesc 
-                            ? { ...t, category: updates.category, isAISuggested: false } 
-                            : t
-                        );
-                    }
-                }
-            }
-            return newList;
-        });
+    const CatalogPickerModal = () => {
+        if (!catalogPicker.isOpen) return null;
+        
+        const filteredCatalog = [
+            ...equipments.map(e => ({ ...e, type: 'equipment', icon: <Hammer size={16} /> })),
+            ...materials.map(m => ({ ...m, type: 'material', icon: <Package size={16} /> }))
+        ].filter(item => 
+            item.name.toLowerCase().includes(catalogPicker.search.toLowerCase()) ||
+            (item.category && item.category.toLowerCase().includes(catalogPicker.search.toLowerCase()))
+        );
+
+        return (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1100]">
+                <div className="bg-white w-full max-w-[500px] rounded-2xl shadow-2xl overflow-hidden">
+                    <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 className="font-black text-slate-800 flex items-center gap-2">
+                            <Library size={20} className="text-blue-600" /> Vincular ao Catálogo
+                        </h3>
+                        <button onClick={() => setCatalogPicker({ isOpen: false, rowId: null, search: '' })} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                    </div>
+                    
+                    <div style={{ padding: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+                        <div style={{ position: 'relative' }}>
+                            <Search size={18} className="absolute left-3 top-3 text-slate-400" />
+                            <input 
+                                type="text"
+                                autoFocus
+                                placeholder="Pesquisar equipamento ou material..."
+                                className="form-input w-full"
+                                style={{ paddingLeft: '40px' }}
+                                value={catalogPicker.search}
+                                onChange={(e) => setCatalogPicker({ ...catalogPicker, search: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '0.5rem' }}>
+                        {filteredCatalog.length > 0 ? filteredCatalog.map(item => (
+                            <div 
+                                key={`${item.type}-${item.id}`}
+                                onClick={() => {
+                                    const row = stagedTransactions.find(r => r.id === catalogPicker.rowId);
+                                    if (row) {
+                                        const cost = parseFloat(item.cost || item.purchasePrice || item.price || 0);
+                                        updateStagedRow(row.id, {
+                                            description: `${row.description.split(' / ')[0]} / ${item.name}`,
+                                            suggestedLink: { type: item.type, id: item.id, name: item.name },
+                                            category: item.type === 'equipment' ? 'Equipamentos & Ativos' : 'Materiais & Insumos',
+                                            amount: cost > 0 ? cost : row.amount,
+                                            isAISuggested: true
+                                        });
+                                    }
+                                    setCatalogPicker({ isOpen: false, rowId: null, search: '' });
+                                }}
+                                style={{ 
+                                    padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', borderRadius: '8px',
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                }}
+                                className="hover:bg-slate-50 transition-colors group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div style={{ padding: '8px', background: '#f1f5f9', borderRadius: '8px', color: item.type === 'equipment' ? '#6366f1' : '#f59e0b' }}>
+                                        {item.icon}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-slate-800 text-sm group-hover:text-blue-600">{item.name}</div>
+                                        <div className="text-[10px] text-slate-400 font-bold uppercase">{item.category || 'Sem Categoria'}</div>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="font-black text-slate-700 text-sm">R$ {formatCurrency(item.cost || item.purchasePrice || item.price || 0)}</div>
+                                    <div className="text-[9px] text-emerald-600 font-bold">VINCULAR AGORA →</div>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="p-8 text-center text-slate-400 text-sm">Nenhum item encontrado no catálogo.</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     return (
         <div className="section-container animate-fade-in" style={{ backgroundColor: 'white', borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <CatalogPickerModal />
             <div style={{ padding: '2rem', textAlign: 'center', borderBottom: '1px solid var(--border)', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '2px', marginBottom: '1.5rem', backgroundColor: '#e2e8f0', padding: '4px', borderRadius: '12px', width: 'fit-content', margin: '0 auto' }}>
                     <button 
@@ -546,7 +605,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                     )}
                 </div>
             </div>
-            {/* Content: Audit & Review */}
             {stagedTransactions.length > 0 ? (
                 <div style={{ padding: '1.5rem' }}>
                     <div className="flex justify-between items-end mb-6">
@@ -586,7 +644,7 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                             style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#10b981' }}
                                         />
                                     </th>
-                                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Status / Auditoria</th>
+                                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Status</th>
                                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Data</th>
                                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Descrição Expandida</th>
                                     <th style={{ padding: '16px', textAlign: 'center', fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 900 }}>Parcela</th>
@@ -598,62 +656,6 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                 </tr>
                             </thead>
                             <tbody>
-                                {stagedTransactions.map(t => (
-                                    <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9', opacity: t.isDuplicate && !t.selected ? 0.5 : 1, backgroundColor: t.isDuplicate ? '#fff7ed' : (t.selected ? '#f0fdf4' : 'transparent') }}>
-                                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={t.selected} 
-                                                onChange={(e) => updateStagedRow(t.id, { selected: e.target.checked })}
-                                                style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#10b981' }}
-                                            />
-                                        </td>
-                                        <td style={{ padding: '12px 16px' }}>
-                                            {t.isProjected ? (
-                                                <div className="flex items-center gap-1.5 text-indigo-600 font-bold text-[10px] uppercase">
-                                                    <Zap size={12} fill="#6366f1" /> Projeção Inteligente
-                                                </div>
-                                            ) : t.isDuplicate ? (
-                                                <div className="flex items-center gap-1.5 text-orange-600 font-bold text-[10px] uppercase">
-                                                    <AlertTriangle size={12} /> Bloquear Duplicidade
-                                                </div>
-                                            ) : t.suggestedMatch ? (
-                                                <div className={`flex items-center gap-1.5 ${t.suggestedMatch.type === 'order' ? 'text-blue-600' : 'text-purple-600'} font-bold text-[10px] uppercase`}>
-                                                    <ArrowRightLeft size={12} /> {t.suggestedMatch.type === 'order' ? 'Liquidar Pedido' : 'Sugerir Conciliação'}
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-[10px] uppercase">
-                                                    <CheckCircle size={12} /> Novo Lançamento
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '16px', fontWeight: 600, fontSize: '0.8rem', color: '#64748b' }}>
-                                            {new Date(t.date).toLocaleDateString('pt-BR')}
-                                        </td>
-                                        <td style={{ padding: '12px 16px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                <div className="flex items-center gap-2">
-                                                    {t.isProjected && <span style={{ padding: '2px 6px', backgroundColor: '#eef2ff', color: '#6366f1', borderRadius: '4px', fontSize: '9px', fontWeight: 900 }}>PROJEÇÃO</span>}
-                                                    {t.isCompound && <span style={{ padding: '2px 6px', backgroundColor: '#fdf2f2', color: '#ef4444', borderRadius: '4px', fontSize: '9px', fontWeight: 900 }}>COMPOSIÇÃO</span>}
-                                                    <input 
-                                                        type="text"
-                                                        value={t.description}
-                                                        onChange={(e) => updateStagedRow(t.id, { description: e.target.value })}
-                                                        style={{ 
-                                                            width: '100%', border: 'none', background: 'transparent', 
-                                                            fontWeight: 900, color: t.isProjected ? '#6366f1' : (t.isCompound ? '#ef4444' : '#0f172a'), fontSize: '1rem',
-                                                            padding: '4px 8px', borderRadius: '4px',
-                                                            borderBottom: '1px dashed #e2e8f0'
-                                                        }}
-                                                        className="hover:bg-slate-50 focus:bg-white focus:ring-0 focus:border-primary"
-                                                    />
-                                                </div>
-                                                <div className="flex flex-wrap gap-2 items-center px-2">
-                                                    {t.splitGroup && (
-                                                        <div style={{ 
-                                                            padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 900,
-                                                            backgroundColor: parseFloat(getSplitBalance(t.splitGroup)) === 0 ? '#ecfdf5' : '#fff7ed',
-                                                            color: parseFloat(getSplitBalance(t.splitGroup)) === 0 ? '#059669' : '#d97706',
                                                             border: `1px solid ${parseFloat(getSplitBalance(t.splitGroup)) === 0 ? '#10b981' : '#f59e0b'}`
                                                         }}>
                                                             {parseFloat(getSplitBalance(t.splitGroup)) === 0 
@@ -750,31 +752,13 @@ export function FinanceBankImport({ accounts, existingTransactions, orders, onIm
                                                     </optgroup>
                                                 </select>
                                                 <button 
-                                                    onClick={() => {
-                                                        const term = prompt('Buscar item no catálogo (Equipamento ou Material):');
-                                                        if (term) {
-                                                            const eq = equipments.find(e => e.name.toLowerCase().includes(term.toLowerCase()));
-                                                            const mt = materials.find(m => m.name.toLowerCase().includes(term.toLowerCase()));
-                                                            const found = eq || mt;
-                                                            if (found) {
-                                                                const itemPrice = parseFloat(found.cost || found.price || found.purchasePrice || 0);
-                                                                updateStagedRow(t.id, { 
-                                                                    description: `${t.description.split(' / ')[0]} / ${found.name}`,
-                                                                    suggestedLink: { type: eq ? 'equipment' : 'material', id: found.id, name: found.name },
-                                                                    category: eq ? 'Equipamentos & Ativos' : 'Materiais & Insumos',
-                                                                    amount: itemPrice > 0 ? itemPrice : t.amount
-                                                                });
-                                                            } else {
-                                                                alert('Item não encontrado no catálogo.');
-                                                            }
-                                                        }
-                                                    }}
+                                                    onClick={() => setCatalogPicker({ isOpen: true, rowId: t.id, search: t.description.split(' ')[0] })}
                                                     style={{ 
                                                         fontSize: '10px', background: '#f1f5f9', color: '#475569', padding: '2px 8px', 
                                                         borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 900, cursor: 'pointer'
                                                     }}
                                                 >
-                                                    + VINCULAR ITEM
+                                                    + VINCULAR AO CATÁLOGO
                                                 </button>
                                             </div>
                                         </td>
