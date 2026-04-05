@@ -69,14 +69,33 @@ export const BankFileParserService = {
                 const year = dtPosted.substring(0, 4);
                 const month = dtPosted.substring(4, 6);
                 const day = dtPosted.substring(6, 8);
-                const amount = parseFloat(trnAmt.replace(',', '.')); // Normalize potential comma in amount
+                const amount = parseFloat(trnAmt.replace(',', '.'));
+                
+                // --- INTELIGÊNCIA DE EXTRAÇÃO DE PARCELAS V9.4 ---
+                const installmentRegex = /(?:\s*[-/|:]\s*(?:Parcela|Parc\.?|P:?|PT?)\s*|\s+)?\(?(\d{1,3})\s*(?:de|\/|of)\s*(\d{1,3})\)?/i;
+                const iMatch = memo.match(installmentRegex);
+                
+                let installment = null;
+                let installmentNumber = null;
+                let installmentsTotal = null;
+                let cleanDescription = memo;
+
+                if (iMatch) {
+                    installmentNumber = parseInt(iMatch[1]);
+                    installmentsTotal = parseInt(iMatch[2]);
+                    installment = `${iMatch[1].padStart(2, '0')}/${iMatch[2].padStart(2, '0')}`;
+                    cleanDescription = memo.replace(iMatch[0], '').trim();
+                }
                 
                 transactions.push({
                     date: `${year}-${month}-${day}`,
                     amount: Math.abs(amount),
-                    description: memo,
+                    description: cleanDescription,
                     type: amount >= 0 ? 'income' : 'expense',
-                    rawId: fitId ? `ofx-${accountId}-${fitId}` : `ofx-gen-${accountId}-${Math.abs(amount).toFixed(2)}-${year}-${month}-${day}`
+                    rawId: fitId ? `ofx-${accountId}-${fitId}` : `ofx-gen-${accountId}-${Math.abs(amount).toFixed(2)}-${year}-${month}-${day}`,
+                    installment,
+                    installmentNumber,
+                    installmentsTotal
                 });
             }
         });
@@ -241,18 +260,21 @@ export const BankFileParserService = {
 
             const desc = t.description || '';
             
-            // --- DETECÇÃO UNIVERSAL DE PARCELAS ---
-            // Suporta: (Parcela 02 de 10), - Parcela 3/10, (02/10), (Parc 1/5), (P: 01/12), 2/12, etc.
-            // Regex melhorado para capturar padrões NuBank (ex: IFOOD - 01/10) e variações com hífens ou espaços
-            const instRegex = /(?:[(-]\s*|\s-\s)?(?:Parcela|Parc\.?|P:?)?\s*(\d{1,2})\s*(?:de|\/)\s*(\d{1,2})\)?/i;
+            // --- DETECÇÃO E PODA AGRESSIVA DE PARCELAS (V9.4) ---
+            const instRegex = /(?:\s*[-/|:]\s*(?:Parcela|Parc\.?|P:?|PT?)\s*|\s+)?\(?(\d{1,3})\s*(?:de|\/|of)\s*(\d{1,3})\)?/i;
             const instMatch = desc.match(instRegex);
             
             let installment = null;
+            let finalDescription = desc;
+
             if (instMatch) {
                 installmentNumber = parseInt(instMatch[1]);
                 installmentsTotal = parseInt(instMatch[2]);
                 installment = `${instMatch[1].padStart(2, '0')}/${instMatch[2].padStart(2, '0')}`;
                 isAISuggested = true;
+                
+                // Poda DEFINITIVA: limpa a descrição principal para a interface
+                finalDescription = desc.replace(instMatch[0], '').replace(/\s*[-/|]\s*$/, '').trim();
             }
 
             // --- EXTRAÇÃO DE ID DE OPERAÇÃO ---
@@ -271,6 +293,7 @@ export const BankFileParserService = {
             return {
                 ...t,
                 id: Math.random().toString(36).substring(7),
+                description: finalDescription,
                 category,
                 isAISuggested,
                 installment,
@@ -394,23 +417,18 @@ export const BankFileParserService = {
                  if (stdMatch) rawDescription = rawDescription.replace(stdMatch[0], '');
                  rawDescription = rawDescription.replace(amountStr, '').replace(/R\$/g, '').replace(/ - /g, ' ').replace(/[ ]+/g, ' ').trim();
 
-                 // --- LOGICA DE DETECÇÃO DE PARCELA ---
-                 // Suporta: (Parcela 02 de 10), - Parcela 3/10, (02/10), (Parc 1/5), (P: 01/12), etc.
-                 const installmentRegex = /([(-]\s*)?(Parcela|Parc\.?|P:?)?\s*(\d{1,2})\s*(de|\/)\s*(\d{1,2})\)?|(\s+(\d{1,2})\/(\d{1,2})\s*)$/i;
-                 const instMatch = rawDescription.match(installmentRegex);
+                 // --- LOGICA DE DETECÇÃO E LIMPEZA AGRESSIVA DE PARCELA (V9.4) ---
+                 const instRegex = /(?:\s*[-/|:]\s*(?:Parcela|Parc\.?|P:?|PT?)\s*|\s+)?\(?(\d{1,3})\s*(?:de|\/|of)\s*(\d{1,3})\)?/i;
+                 const instMatch = rawDescription.match(instRegex);
                  
                  let installment = null;
                  let cleanedDescription = rawDescription;
                  
                  if (instMatch) {
-                     // instMatch[2] ou instMatch[6] para a parcela atual
-                     // instMatch[4] ou instMatch[7] para o total
-                     const current = instMatch[2] || instMatch[6];
-                     const total = instMatch[4] || instMatch[7];
-                     if (current && total) {
-                        installment = `${current.padStart(2, '0')}/${total.padStart(2, '0')}`;
-                        cleanedDescription = rawDescription.replace(instMatch[0], '').replace(/\s+/g, ' ').trim();
-                     }
+                     const current = instMatch[1];
+                     const total = instMatch[2];
+                     installment = `${current.padStart(2, '0')}/${total.padStart(2, '0')}`;
+                     cleanedDescription = rawDescription.replace(instMatch[0], '').replace(/\s*[-/|]\s*$/, '').trim();
                  }
                  
                  if (cleanedDescription.length < 2) cleanedDescription = "Lançamento via Texto";

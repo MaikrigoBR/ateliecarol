@@ -42,23 +42,39 @@ export function FinanceBankImport({ accounts = [], existingTransactions = [], or
         const selectedAcc = accounts.find(a => String(a.id) === String(selectedAccountId));
         const localSeen = new Set();
         
+        // --- MOTOR DE NORMALIZAÇÃO V9.4 (Poda Avançada e Global) ---
+        const instRegex = /(?:\s*[-/|:]\s*(?:Parcela|Parc\.?|P:?|PT?)\s*|\s+)?\(?(\d{1,3})\s*(?:de|\/|of)\s*(\d{1,3})\)?/gi;
+        const getFuzzy = (txt) => (txt || '').replace(instRegex, '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+        const normalizedMatch = (d1, d2) => {
+            const f1 = getFuzzy(d1);
+            const f2 = getFuzzy(d2);
+            if (!f1 || !f2) return false;
+            // Match parcial (8 chars) ou total
+            return f1.startsWith(f2.substring(0, 8)) || f2.startsWith(f1.substring(0, 8)) || f1 === f2;
+        };
+        
+        console.log(`🏦 Auditoria Anti-Duplicidade: Comparando contra ${existingTransactions.length} registros no banco.`);
+        
         const withMeta = parsed.map(nt => {
             const fingerprint = nt.rawId || `${nt.date}-${nt.amount}-${nt.description.trim()}`;
-            
-            // --- BLINDAGEM REFORÇADA ---
+            const ntAmount = Math.abs(Number(nt.amount)).toFixed(2);
+
+            // --- HUB DE INTELIGÊNCIA V8.0 (FINGERPRINT DIGITAL) ---
             const isInDB = existingTransactions.some(et => {
-                // 1. Match por ID de Transação Real (OFX/CSV)
+                // 1. Match por ID de Transação Real
                 if (et.bankReferenceId === nt.rawId && nt.rawId) return true;
                 
-                // 2. Match por Parcela Específica (02/10, etc)
-                // Se temos a mesma descrição e o mesmo identificador de parcela na mesma conta, é duplicidade.
-                if (nt.installment && et.installment === nt.installment && et.description.trim() === nt.description.trim() && String(et.accountId) === String(selectedAccountId)) return true;
+                // 2. Match por Impressão Digital (Conta + Valor + Parcela)
+                if (nt.installment && et.installment === nt.installment && 
+                    Math.abs(Number(et.amount)).toFixed(2) === ntAmount && 
+                    String(et.accountId) === String(selectedAccountId)) return true;
 
-                // 3. Match por Atributos (Caso não tenha ID ou Parcela)
-                return et.date === nt.date && 
-                       Math.abs(et.amount) === Math.abs(nt.amount) && 
-                       String(et.accountId) === String(selectedAccountId) && 
-                       et.description.trim() === nt.description.trim();
+                // 3. Match por Fuzzy Matching (Descrição "Limpa" + Valor)
+                if (Math.abs(Number(et.amount)).toFixed(2) === ntAmount && 
+                    String(et.accountId) === String(selectedAccountId) &&
+                    normalizedMatch(et.description, nt.description)) return true;
+
+                return false;
             });
 
             const isLocalDuplicate = localSeen.has(fingerprint);
@@ -72,17 +88,29 @@ export function FinanceBankImport({ accounts = [], existingTransactions = [], or
                 if (historyCat) { finalCategory = historyCat; isAISuggested = true; }
             }
 
-            return { ...nt, category: finalCategory, isAISuggested, isDuplicate };
+            return { ...nt, category: finalCategory, isAISuggested, isDuplicate, fuzzyId: getFuzzy(nt.description) };
         });
 
         const expanded = [];
         withMeta.forEach(main => {
             expanded.push({ ...main, selected: !main.isDuplicate, isMaster: true });
             
+            const ntAmount = Math.abs(Number(main.amount)).toFixed(2);
             if (main.installmentNumber && main.installmentsTotal > 1 && !main.isDuplicate) {
                 for (let i = 1; i <= main.installmentsTotal; i++) {
                     if (i === main.installmentNumber) continue;
                     const parcelKey = `${i.toString().padStart(2, '0')}/${main.installmentsTotal.toString().padStart(2, '0')}`;
+                    
+                    // --- BLINDAGEM DE PROJEÇÃO (V8.0) ---
+                    const alreadyPresent = existingTransactions.some(et => 
+                        et.installment === parcelKey && 
+                        Math.abs(Number(et.amount)).toFixed(2) === ntAmount &&
+                        normalizedMatch(et.description, main.description) &&
+                        String(et.accountId) === String(selectedAccountId)
+                    );
+
+                    if (alreadyPresent) continue; // Pula a criação do "fantasma" se o dado real já está lá
+
                     const dateObj = new Date(main.date + 'T12:00:00');
                     dateObj.setMonth(dateObj.getMonth() + (i - main.installmentNumber));
                     
@@ -95,7 +123,8 @@ export function FinanceBankImport({ accounts = [], existingTransactions = [], or
                         isProjected: true,
                         source: 'projection',
                         status: i < main.installmentNumber ? 'paid' : 'pending',
-                        selected: true
+                        selected: true,
+                        fuzzyId: getFuzzy(main.description)
                     });
                 }
             }
@@ -225,6 +254,7 @@ export function FinanceBankImport({ accounts = [], existingTransactions = [], or
                                     <th style={{ padding: '12px', width: '40px' }}><input type="checkbox" onChange={e => setStagedTransactions(stagedTransactions.map(t=>({...t, selected: e.target.checked})))} /></th>
                                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '10px', color: '#64748b' }}>STATUS / DATA</th>
                                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '10px', color: '#64748b' }}>DESCRIÇÃO</th>
+                                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '10px', color: '#94a3b8' }}>ID DIGITAL (AUDIT)</th>
                                     <th style={{ padding: '12px', textAlign: 'right', fontSize: '10px', color: '#64748b' }}>VALOR</th>
                                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '10px', color: '#64748b' }}>CATEGORIA</th>
                                 </tr>
@@ -264,6 +294,11 @@ export function FinanceBankImport({ accounts = [], existingTransactions = [], or
                                                         )}
                                                         <input type="text" value={t.description} readOnly={t.isProjected} style={{ border: 'none', background: 'transparent', fontWeight: isChild ? 500 : 800, width: '100%' }} />
                                                     </div>
+                                                </td>
+                                                <td style={{ padding: '10px' }}>
+                                                    <span style={{ fontSize: '9px', fontFamily: 'monospace', color: '#94a3b8', background: '#f8fafc', padding: '2px 4px', borderRadius: '4px' }}>
+                                                        {t.fuzzyId || '-'}
+                                                    </span>
                                                 </td>
                                                 <td style={{ padding: '10px', textAlign: 'right', fontWeight: 950, color: t.type === 'expense' ? '#ef4444' : '#10b981' }}>R$ {formatCurrency(t.amount)}</td>
                                                 <td style={{ padding: '10px' }}>
