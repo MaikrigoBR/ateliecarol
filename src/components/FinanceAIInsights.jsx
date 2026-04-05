@@ -94,24 +94,72 @@ export function SimpleDRETable({ stats }) {
         receita: false,
         cmv: false,
         fixas: false,
+        taxa: false,
+        invest: false
     });
 
-    const toggle = (section) => setExpanded(prev => ({ ...prev, [section]: !prev[section] }));
+    const dre = stats.dreGroups || {
+        variable: { total: 0, categories: {} },
+        fixed: { total: 0, categories: {} },
+        tax: { total: 0, categories: {} },
+        investment: { total: 0, categories: {} },
+        other: { total: 0, categories: {} }
+    };
 
     const netIncome = Math.max(0, stats.monthIncome || 0);
-    const expMap = stats.expenseMap || {};
     
-    // CMV
-    const materiais = expMap['Materiais & Insumos'] || 0;
-    const frete = expMap['Logística & Frete'] || 0;
-    const cmvTotal = materiais + frete;
-    const margem = netIncome - cmvTotal;
+    // 1. Margem de Contribuição (Faturamento - Variáveis)
+    const variableTotal = dre.variable.total;
+    const contributionMargin = netIncome - variableTotal;
     
-    // Fixas
-    const fixasKeys = Object.keys(expMap).filter(k => k !== 'Materiais & Insumos' && k !== 'Logística & Frete' && k !== 'Taxas Gateway (M.P.)');
-    const fixasTotal = fixasKeys.reduce((acc, k) => acc + (expMap[k] || 0), 0);
+    // 2. Despesas Fixas
+    const fixedTotal = dre.fixed.total;
+    
+    // 3. Outras Deduções e Desembolsos
+    const taxTotal = dre.tax.total;
+    const investTotal = dre.investment.total;
+    const otherTotal = dre.other.total;
     const depre = stats.monthlyDepreciation || 0;
-    const netProfit = margem - fixasTotal - depre;
+
+    // 4. Resultado Líquido
+    const netProfit = contributionMargin - fixedTotal - taxTotal - investTotal - otherTotal - depre;
+
+    // --- INDICADORES ESTRATÉGICOS (KPIs) ---
+    // 1. Margem de Contribuição Média (%)
+    const contributionMarginPct = netIncome > 0 ? (contributionMargin / netIncome) * 100 : 0;
+    
+    // 2. Ponto de Equilíbrio (R$) -> Gastos Fixos / Margem de Contribuição %
+    // Indica quanto o negócio precisa faturar para cobrir custos e ficar no ZERO a ZERO.
+    const breakEvenPoint = contributionMarginPct > 0 ? (fixedTotal + depre) / (contributionMarginPct / 100) : 0;
+    
+    // 3. Margem de Segurança (%) -> (Faturamento Atual - Ponto de Equilíbrio) / Faturamento Atual
+    const safetyMargin = netIncome > 0 ? ((netIncome - breakEvenPoint) / netIncome) * 100 : 0;
+
+    const kpiSummary = [
+        { 
+            label: 'Margem de Contribuição', 
+            value: `${contributionMarginPct.toFixed(1)}%`, 
+            sub: 'Eficiência p/ Produto', 
+            color: contributionMarginPct > 35 ? '#10b981' : '#f59e0b',
+            info: 'Quanto sobra de cada venda após pagar os custos variáveis.'
+        },
+        { 
+            label: 'Ponto de Equilíbrio', 
+            value: `R$ ${breakEvenPoint.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`, 
+            sub: 'Meta Mínima / Mês', 
+            color: '#6366f1',
+            info: 'Faturamento necessário para cobrir todos os custos fixos.'
+        },
+        { 
+            label: 'Margem de Segurança', 
+            value: `${safetyMargin.toFixed(1)}%`, 
+            sub: safetyMargin > 0 ? 'Ponto de Segurança' : 'Zona de Risco', 
+            color: safetyMargin > 0 ? '#10b981' : '#ef4444',
+            info: 'O quanto o faturamento pode cair antes de entrar no prejuízo.'
+        }
+    ];
+
+    const toggle = (section) => setExpanded(prev => ({ ...prev, [section]: !prev[section] }));
 
     const MainRow = ({ label, icon: Icon, value, color, section, currentExpanded, onToggle }) => {
         const isExpanded = currentExpanded[section];
@@ -130,6 +178,7 @@ export function SimpleDRETable({ stats }) {
                         <Icon size={18} color={color} strokeWidth={2.5} />
                     </div>
                     {label}
+                    {isExpanded ? <ChevronDown size={14} style={{ opacity: 0.3 }} /> : <ChevronRight size={14} style={{ opacity: 0.3 }} />}
                 </td>
                 <td style={{ padding: '18px 24px', textAlign: 'right', fontWeight: 900, color: '#0f172a' }}>R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
             </tr>
@@ -156,16 +205,27 @@ export function SimpleDRETable({ stats }) {
                 padding: '32px', 
                 background: 'linear-gradient(135deg, #1e293b, #334155)', 
                 color: 'white',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
+                borderBottom: '1px solid rgba(255,255,255,0.05)'
             }}>
-                <div>
-                    <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em' }}>DRE Analítico Profissional</h3>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Regime de Competência • Ateliê Carol</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em' }}>DRE Analítico Profissional</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Regime de Competência • Ateliê Carol</p>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '10px 20px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Visão Mensal
+                    </div>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,0.1)', padding: '10px 20px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Visão Mensal
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                    {kpiSummary.map(kpi => (
+                        <div key={kpi.label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '16px', position: 'relative' }}>
+                            <div title={kpi.info} style={{ position: 'absolute', top: '12px', right: '12px', cursor: 'help', opacity: 0.5 }}><Info size={14} /></div>
+                            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px' }}>{kpi.label}</span>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: kpi.color, marginBottom: '2px' }}>{kpi.value}</div>
+                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#64748b' }}>{kpi.sub}</span>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -181,22 +241,24 @@ export function SimpleDRETable({ stats }) {
                         <MainRow label="Receita Operacional Líquida" icon={TrendingUp} value={netIncome} color="#10b981" section="receita" currentExpanded={expanded} onToggle={toggle} />
                         {expanded.receita && <SubRow label="Faturamento Consolidado" value={netIncome} isLast={true} />}
 
-                        <MainRow label="Custos com Vendas (CMV)" icon={PieChart} value={cmvTotal} color="#f59e0b" section="cmv" currentExpanded={expanded} onToggle={toggle} />
-                        {expanded.cmv && (
-                            <>
-                                <SubRow label="Insumos e Matérias-primas" value={materiais} isLast={false} />
-                                <SubRow label="Fretes e Logística" value={frete} isLast={true} />
-                            </>
-                        )}
+                        <MainRow label="Custos Variáveis e CMV" icon={PieChart} value={variableTotal} color="#f59e0b" section="cmv" currentExpanded={expanded} onToggle={toggle} />
+                        {expanded.cmv && Object.entries(dre.variable.categories).map(([k, v], idx, arr) => (
+                            <SubRow key={k} label={k} value={v} isLast={idx === arr.length - 1} />
+                        ))}
 
                         <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                             <td style={{ padding: '24px', fontWeight: 900, color: '#334155' }}>MARGEM DE CONTRIBUIÇÃO OPERACIONAL</td>
-                            <td style={{ padding: '24px', textAlign: 'right', fontWeight: 900, color: '#3b82f6' }}>R$ {margem.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '24px', textAlign: 'right', fontWeight: 900, color: '#3b82f6' }}>R$ {contributionMargin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                         </tr>
 
-                        <MainRow label="Despesas Fixas e Adm." icon={Briefcase} value={fixasTotal} color="#6366f1" section="fixas" currentExpanded={expanded} onToggle={toggle} />
-                        {expanded.fixas && fixasKeys.map((k, idx) => (
-                            <SubRow key={k} label={k} value={expMap[k]} isLast={idx === fixasKeys.length - 1} />
+                        <MainRow label="Despesas Fixas e Gastos Adm." icon={Briefcase} value={fixedTotal} color="#6366f1" section="fixas" currentExpanded={expanded} onToggle={toggle} />
+                        {expanded.fixas && Object.entries(dre.fixed.categories).map(([k, v], idx, arr) => (
+                            <SubRow key={k} label={k} value={v} isLast={idx === arr.length - 1} />
+                        ))}
+
+                        <MainRow label="Provisão de Impostos e Taxas" icon={Calculator} value={taxTotal} color="#ef4444" section="taxa" currentExpanded={expanded} onToggle={toggle} />
+                        {expanded.taxa && Object.entries(dre.tax.categories).map(([k, v], idx, arr) => (
+                            <SubRow key={k} label={k} value={v} isLast={idx === arr.length - 1} />
                         ))}
 
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -204,10 +266,17 @@ export function SimpleDRETable({ stats }) {
                                 <div style={{ background: `#94a3b815`, padding: '8px', borderRadius: '12px' }}>
                                     <Hammer size={18} color="#94a3b8" strokeWidth={2.5} />
                                 </div>
-                                (-) Depreciação e Amortização (D&A)
+                                (-) Depreciação (D&A)
                             </td>
                             <td style={{ padding: '20px 24px', textAlign: 'right', fontWeight: 700, color: '#64748b' }}>- R$ {depre.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                         </tr>
+
+                        {investTotal > 0 && (
+                            <MainRow label="Reinvestimentos e Ativos" icon={Plus} value={investTotal} color="#8b5cf6" section="invest" currentExpanded={expanded} onToggle={toggle} />
+                        )}
+                        {expanded.invest && Object.entries(dre.investment.categories).map(([k, v], idx, arr) => (
+                            <SubRow key={k} label={k} value={v} isLast={idx === arr.length - 1} />
+                        ))}
 
                         <tr style={{ background: netProfit >= 0 ? 'linear-gradient(90deg, #10b981, #059669)' : 'linear-gradient(90deg, #ef4444, #dc2626)' }}>
                             <td style={{ padding: '32px 24px', fontWeight: 900, color: '#ffffff', fontSize: '1.2rem', textTransform: 'uppercase', display: 'flex', flexDirection: 'column' }}>

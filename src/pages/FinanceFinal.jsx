@@ -383,7 +383,8 @@ export function FinanceFinal() {
 
     // Global Filtered Data
     const filteredAccounts = useMemo(() => {
-        return globalAccFilter ? accounts.filter(a => a.id === globalAccFilter) : accounts;
+        const activeOnly = accounts.filter(a => !a.deleted);
+        return globalAccFilter ? activeOnly.filter(a => a.id === globalAccFilter) : activeOnly;
     }, [accounts, globalAccFilter]);
 
     const filteredTrans = useMemo(() => {
@@ -397,7 +398,7 @@ export function FinanceFinal() {
         const total = allTransactions.length;
         if (total === 0) return { percent: 0, count: 0, total: 0 };
         const reconciled = allTransactions.filter(t => 
-            t.linkedItemId || t.orderId || t.status === 'reconciled' || t.suggestedMatch || t.bankReferenceId
+            t.reconciled || t.status === 'reconciled' || t.bankReferenceId
         ).length;
         return {
             percent: Math.round((reconciled / total) * 100),
@@ -459,11 +460,27 @@ export function FinanceFinal() {
                 return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear;
             }).reduce((sum, o) => sum + Number(o.total || 0), 0);
 
-            const directIncomes = currentMonthTrans.filter(t => t.type === 'income' && !t.orderId)
-                .reduce((sum, t) => sum + Number(t.amount), 0);
+            const directIncomes = currentMonthTrans.reduce((sum, t) => {
+                const amount = Number(t.amount);
+                const catGroup = (rawCategories.find(c => c.name === t.category)?.group) || 'expense';
+                
+                if (t.type === 'income' && !t.orderId) return sum + amount;
+                // Se for uma despesa em categoria de RECEITA (estorno de venda), abate do faturamento
+                if (t.type === 'expense' && catGroup === 'income') return sum - amount;
+                return sum;
+            }, 0);
 
             const accrualIncome = monthOrderRevenue + directIncomes;
-            const expense = currentMonthTrans.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
+            
+            const expense = currentMonthTrans.reduce((sum, t) => {
+                const amount = Number(t.amount);
+                const catGroup = (rawCategories.find(c => c.name === t.category)?.group) || 'expense';
+
+                if (t.type === 'expense') return sum + amount;
+                // Se for uma receita em categoria de DESPESA (reembolso), abate do total de gastos
+                if (t.type === 'income' && catGroup === 'expense') return sum - amount;
+                return sum;
+            }, 0);
             
             // Accounts Payable Calculation
             const pendingExpenses = filteredTrans.filter(t => t.type === 'expense' && t.status === 'pending');
@@ -488,24 +505,60 @@ export function FinanceFinal() {
             // Credit Used (only if looking globally or specifically at a credit card)
             const creditUsed = filteredAccounts.filter(a => a.type === 'credit').reduce((sum, a) => sum + Number(a.balance || 0), 0);
 
-            // 3. Cost Center DRE (Current Month Expenses)
+            // 3. Cost Center DRE (Current Month Expenses & Advanced Classification)
             const expenseMap = {};
+            const dreGroups = {
+                variable: { total: 0, categories: {} },
+                fixed: { total: 0, categories: {} },
+                tax: { total: 0, categories: {} },
+                investment: { total: 0, categories: {} },
+                other: { total: 0, categories: {} }
+            };
+
             let totalGatewayTaxes = 0;
             
-            currentMonthTrans.filter(t => t.type === 'expense').forEach(t => {
-                const cat = t.category || 'Outros';
-                expenseMap[cat] = (expenseMap[cat] || 0) + Number(t.amount);
+            // Build a quick lookup for category technical types and nature
+            const catMetaLookup = {};
+            rawCategories.forEach(c => {
+                catMetaLookup[c.name] = { type: c.type || 'fixed', group: c.group || 'expense' };
+            });
+            
+            currentMonthTrans.forEach(t => {
+                const amount = Number(t.amount);
+                const catName = t.category || 'Outros';
+                const meta = catMetaLookup[catName] || { type: 'fixed', group: (t.type === 'income' ? 'income' : 'expense') };
+
+                // Lógica de Compensação (Reversal):
+                // Se o tipo da transação for diferente da natureza da categoria, estamos lidando com um Estorno.
+                const isReversal = t.type !== meta.group;
+                const multiplier = isReversal ? -1 : 1;
+                const finalAmt = amount * multiplier;
+
+                if (meta.group === 'expense') {
+                    // Map results for simple charts - ensure we don't show negative in pie charts (clamping to 0 for visual safety)
+                    expenseMap[catName] = (expenseMap[catName] || 0) + finalAmt;
+
+                    // Map results for Professional DRE
+                    const groupKey = ['variable', 'fixed', 'tax', 'investment'].includes(meta.type) ? meta.type : 'other';
+                    dreGroups[groupKey].total += finalAmt;
+                    dreGroups[groupKey].categories[catName] = (dreGroups[groupKey].categories[catName] || 0) + finalAmt;
+                }
             });
             
             // Extrair as taxas de Gateway que vieram de vendas (incomes) para o DRE Oficial
             currentMonthTrans.filter(t => t.type === 'income').forEach(t => {
                 if (t.auditData && t.auditData.tax > 0) {
-                    totalGatewayTaxes += Number(t.auditData.tax);
+                    const taxAmt = Number(t.auditData.tax);
+                    totalGatewayTaxes += taxAmt;
+                    
+                    // Gateway taxes are always Variable Costs (Tax/Deduction)
+                    dreGroups.variable.total += taxAmt;
+                    dreGroups.variable.categories['Taxas Gateway (M.P.)'] = (dreGroups.variable.categories['Taxas Gateway (M.P.)'] || 0) + taxAmt;
                 }
             });
             
             if (totalGatewayTaxes > 0) {
-                // Adicionamos a Taxa M.P. silenciosamente ao DRE
+                // Adicionamos a Taxa M.P. silenciosamente ao mapa de despesas para compatibilidade com o gráfico de pizza
                 expenseMap['Taxas Gateway (M.P.)'] = (expenseMap['Taxas Gateway (M.P.)'] || 0) + totalGatewayTaxes;
                 if (!categoryColors['Taxas Gateway (M.P.)']) categoryColors['Taxas Gateway (M.P.)'] = '#fb923c'; 
             }
@@ -553,6 +606,7 @@ export function FinanceFinal() {
                 creditDebt: creditUsed,
                 gatewayTaxes: totalGatewayTaxes,
                 expenseMap: expenseMap,
+                dreGroups: dreGroups,
                 payableToday,
                 payableMonth,
                 upcomingPayables,
@@ -564,6 +618,20 @@ export function FinanceFinal() {
         }
     }, [transactions, orders, accounts, loading, globalAccFilter, chartMode, transDateFilter]);
 
+    const toggleReconciliation = async (trans) => {
+        const newStatus = trans.reconciled ? false : true;
+        try {
+            await db.update('transactions', trans.id, { 
+                reconciled: newStatus,
+                status: newStatus ? 'reconciled' : 'pending' 
+            });
+            fetchData();
+        } catch (err) {
+            console.error(err);
+            alert("Erro ao atualizar status de conciliação.");
+        }
+    };
+
     // Auto-clear selection when filters change (Safety First)
     React.useEffect(() => {
         setSelectedTransIds([]);
@@ -571,7 +639,8 @@ export function FinanceFinal() {
 
     const fetchData = async () => {
         setLoading(true);
-        const originalAccs = await db.getAll('accounts') || [];
+        const allAccounts = await db.getAll('accounts') || [];
+        const originalAccs = allAccounts.filter(a => !a.deleted); // Vision only for non-deleted
         const trans = await db.getAll('transactions') || [];
         const allOrders = await db.getAll('orders') || [];
         const allEquips = await db.getAll('equipments') || [];
@@ -608,9 +677,10 @@ export function FinanceFinal() {
         const pendingOrders = allOrders.filter(o => o.status !== 'completed' && o.status !== 'Concluído' && o.status !== 'cancelled');
         
         // Recalculate robust balances dynamically for accuracy
-        const recalculatedAccs = originalAccs.map(acc => {
+        // Note: Calculations are based on ALL accounts for history, but UI will filter active ones.
+        const recalculatedAccs = allAccounts.map(acc => {
             const initial = Number(acc.initialBalance || 0);
-            const accountTrans = trans.filter(t => t.accountId === acc.id && t.status === 'paid');
+            const accountTrans = trans.filter(t => t.accountId === acc.id && t.status === 'paid' && !t.deleted);
             const income = accountTrans.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
             const expense = accountTrans.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
             return {
@@ -1834,6 +1904,7 @@ export function FinanceFinal() {
                         <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontWeight: 800 }}>Fonte/Banco</th>
                         <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 800 }}>Impacto (R$)</th>
                         <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 800 }}>Saldo Atualizado</th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'center', width: '80px', fontWeight: 800 }}>Auditoria</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1846,7 +1917,7 @@ export function FinanceFinal() {
                             const isToday = t.status === 'pending' && new Date(t.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
 
                         return (
-                            <tr key={t.id} onClick={() => setSelectedDetailTrans(t)} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group">
+                            <tr key={t.id} onClick={() => setSelectedDetailTrans(t)} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', backgroundColor: t.reconciled ? 'rgba(16, 185, 129, 0.03)' : 'inherit' }} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group">
                                 <td style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                                     <input 
                                         type="checkbox" 
@@ -1909,6 +1980,11 @@ export function FinanceFinal() {
                                     ) : (
                                         <span title="Filtre uma conta específica para visualizar o extrato progressivo" style={{ opacity: 0.3 }}>-</span>
                                     )}
+                                </td>
+                                <td style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }} onClick={(e) => { e.stopPropagation(); toggleReconciliation(t); }}>
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${t.reconciled ? 'bg-emerald-100 text-emerald-600 shadow-sm' : 'bg-slate-100 text-slate-300 hover:text-slate-500'}`} title={t.reconciled ? "Auditado e Conciliado" : "Pendente de Conferência"}>
+                                        <ShieldCheck size={18} fill={t.reconciled ? "currentColor" : "none"} />
+                                    </div>
                                 </td>
                             </tr>
                         );

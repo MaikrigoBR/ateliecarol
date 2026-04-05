@@ -113,32 +113,34 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
 
   const sOverlay = {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
+      backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1050, padding: '1rem'
+      zIndex: 1050, padding: '1rem',
+      animation: 'fadeIn 0.4s ease-out'
   };
 
   const sModal = {
-      backgroundColor: 'var(--surface)', 
-      width: '100%', maxWidth: '640px', maxHeight: '90vh',
-      borderRadius: 'var(--radius-lg)',
-      boxShadow: 'var(--shadow-lg)',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+      backdropFilter: 'blur(30px)',
+      width: '100%', maxWidth: '680px', maxHeight: '90vh',
+      borderRadius: '32px',
+      boxShadow: '0 40px 100px -20px rgba(0,0,0,0.25)',
       display: 'flex', flexDirection: 'column',
-      border: '1px solid var(--border)',
+      border: '1.5px solid rgba(255, 255, 255, 0.5)',
       overflow: 'hidden',
-      color: 'var(--text-main)',
-      animation: 'slideUp 0.3s ease-out'
+      color: '#1e293b',
+      animation: 'zoomIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
   };
 
   const sHeader = {
-      padding: '1.25rem 1.5rem',
-      borderBottom: '1px solid var(--border)',
+      padding: '2rem 2.5rem',
+      borderBottom: '1px solid rgba(0,0,0,0.05)',
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      backgroundColor: 'var(--background)'
+      background: 'linear-gradient(to bottom, rgba(99, 102, 241, 0.05), transparent)'
   };
 
   const sBody = {
-      padding: '1.5rem',
+      padding: '2rem 2.5rem',
       overflowY: 'auto',
       display: 'flex', flexDirection: 'column', gap: '1rem'
   };
@@ -151,12 +153,13 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
   };
 
   const sCardLinear = {
-      backgroundColor: 'var(--surface-hover)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md)',
-      padding: '1rem',
-      display: 'flex', flexDirection: 'column', gap: '0.75rem',
-      position: 'relative'
+      backgroundColor: 'rgba(255, 255, 255, 0.5)',
+      border: '1.5px solid rgba(0,0,0,0.05)',
+      borderRadius: '24px',
+      padding: '1.5rem',
+      display: 'flex', flexDirection: 'column', gap: '1rem',
+      position: 'relative',
+      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
   };
 
   const sInput = {
@@ -179,15 +182,15 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
         </div>
         
         <div style={sBody} className="hide-scrollbar">
-            <div style={{ ...sCardLinear, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderLeft: '3px solid var(--primary)' }}>
+            <div style={{ ...sCardLinear, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderLeft: '4px solid #6366f1', background: 'rgba(99, 102, 241, 0.03)' }}>
                 <div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total do Pedido</span>
-                    <strong style={{ fontSize: '1.25rem', color: 'var(--text-main)' }}>R$ {totalOrderValue.toFixed(2).replace('.', ',')}</strong>
+                    <span style={{ fontSize: '0.65rem', color: '#6366f1', textTransform: 'uppercase', fontWeight: 900, letterSpacing: '0.1em', display: 'block', marginBottom: '4px' }}>Total do Pedido</span>
+                    <strong style={{ fontSize: '1.75rem', color: '#1e293b', letterSpacing: '-0.04em' }}>R$ {totalOrderValue.toFixed(2).replace('.', ',')}</strong>
                 </div>
                 {amountPaidSoFar > 0 && (
                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Pago Anteriormente</span>
-                        <span style={{ fontSize: '1.125rem', color: 'var(--success)', fontWeight: 700 }}>R$ {amountPaidSoFar.toFixed(2).replace('.', ',')}</span>
+                        <span style={{ fontSize: '0.65rem', color: '#10b981', textTransform: 'uppercase', fontWeight: 900, letterSpacing: '0.1em', display: 'block', marginBottom: '4px' }}>Pago Anteriormente</span>
+                        <span style={{ fontSize: '1.5rem', color: '#10b981', fontWeight: 900, letterSpacing: '-0.04em' }}>- R$ {amountPaidSoFar.toFixed(2).replace('.', ',')}</span>
                     </div>
                 )}
             </div>
@@ -300,19 +303,20 @@ export function ConfirmOrderPaymentModal({ isOpen, onClose, onConfirm, order }) 
                  )}
                  
                  {balanceRemaining > 0.05 ? (
-                     <div style={{ ...sCardLinear, backgroundColor: 'transparent', border: '1px solid var(--warning)', borderLeft: '4px solid var(--warning)', marginTop: '0.5rem' }}>
+                     <div style={{ ...sCardLinear, backgroundColor: 'rgba(245, 158, 11, 0.05)', border: '1.5px solid rgba(245, 158, 11, 0.2)', borderLeft: '6px solid #f59e0b', marginTop: '1rem' }}>
                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <span style={{ color: 'var(--warning)', fontWeight: 700, fontSize: '0.875rem' }}>Dívida Restante Gerada</span>
-                            <span style={{ color: 'var(--warning)', fontWeight: 800, fontSize: '1.125rem' }}>R$ {balanceRemaining.toFixed(2).replace('.', ',')}</span>
+                            <span style={{ color: '#d97706', fontWeight: 900, fontSize: '0.875rem', textTransform: 'uppercase' }}>Dívida Restante Gerada</span>
+                            <span style={{ color: '#d97706', fontWeight: 950, fontSize: '1.25rem' }}>R$ {balanceRemaining.toFixed(2).replace('.', ',')}</span>
                          </div>
                          <div>
-                             <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--warning)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Vencimento do Saldo Devedor</label>
-                             <input type="date" style={{ ...sInput, borderColor: 'var(--warning)' }} value={nextDueDate} onChange={e => setNextDueDate(e.target.value)} required />
+                             <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Vencimento do Saldo Devedor</label>
+                             <input type="date" style={{ ...sInput, borderColor: 'rgba(245, 158, 11, 0.3)', borderRadius: '12px' }} value={nextDueDate} onChange={e => setNextDueDate(e.target.value)} required />
                          </div>
                      </div>
                  ) : (
-                     <div style={{ textAlign: 'center', color: '#fff', backgroundColor: 'var(--success)', padding: '0.5rem', borderRadius: 'var(--radius-md)', marginTop: '1rem', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                         <Check size={16} /> Contabilidade Fechada — Pagamento Quitado.
+                     <div style={{ textAlign: 'center', color: '#fff', background: 'linear-gradient(135deg, #10b981, #059669)', padding: '1rem', borderRadius: '20px', marginTop: '1.5rem', fontSize: '0.9rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 10px 20px -5px rgba(16, 185, 129, 0.3)' }}>
+                         <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '50%', padding: '4px' }}><Check size={18} strokeWidth={3} /></div>
+                         CONTABILIDADE FECHADA — PEDIDO QUITADO
                      </div>
                  )}
             </div>

@@ -110,9 +110,9 @@ export function CreditCards() {
         const accs = await db.getAll('accounts');
         const trans = await db.getAll('transactions');
         const dbCategories = await db.getAll('categories') || [];
-        setExpenseCategories(dbCategories.filter(c => c.type === 'expense').map(c => c.name));
-        setIncomeCategories(dbCategories.filter(c => c.type === 'income').map(c => c.name));
-        const cards = accs.filter(a => a.type === 'credit');
+        setExpenseCategories(dbCategories.filter(c => (c.group === 'expense' || !c.group) && !c.deleted));
+        setIncomeCategories(dbCategories.filter(c => c.group === 'income' && !c.deleted));
+        const cards = accs.filter(a => a.type === 'credit' && !a.deleted);
         setAllAccounts(accs);
         setAccounts(cards);
         setTransactions(trans);
@@ -196,23 +196,15 @@ export function CreditCards() {
         return accounts.find(a => a.id === selectedCardId);
     }, [accounts, selectedCardId]);
 
-    // Calcula os meses (Timelines)
-    const timelineMonths = useMemo(() => {
-        const months = [];
-        const base = new Date();
-        base.setDate(1); 
-        
-        for (let i = -2; i <= 6; i++) {
-            const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
-            months.push({
-                date: d,
-                offset: i,
-                label: d.toLocaleDateString('pt-BR', { month: 'short' }),
-                year: d.getFullYear()
-            });
-        }
-        return months;
-    }, []);
+    // Cálculo dinâmico do mês selecionado para evitar limitação de lista fixa
+    const selectedMonthDate = useMemo(() => {
+        const d = new Date();
+        d.setDate(1); // Evitar bug de 31 de Março -> 31 de Abril
+        return new Date(d.getFullYear(), d.getMonth() + selectedMonthOffset, 1);
+    }, [selectedMonthOffset]);
+
+    const selectedMonthLabel = selectedMonthDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).toUpperCase();
+    const monthKey = `${selectedMonthDate.getFullYear()}-${String(selectedMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
     const isSameMonth = (d1, d2) => {
         return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth();
@@ -223,19 +215,24 @@ export function CreditCards() {
         return groupByInvoiceCycle(transactions, selectedCard);
     }, [transactions, selectedCard]);
 
-    // Fatura do cartão e mês selecionados
+    // Fatura do cartão e mês selecionados (Processamento Consolidado)
     const currentInvoiceData = useMemo(() => {
-        if (!selectedCard || invoiceGroups.length === 0) return { transactions: [], total: 0 };
+        if (!selectedCard || !invoiceGroups || invoiceGroups.length === 0) {
+            return { transactions: [], total: 0 };
+        }
         
-        const base = new Date();
-        const targetDate = new Date(base.getFullYear(), base.getMonth() + selectedMonthOffset, 1);
-        const key = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+        const group = invoiceGroups.find(g => g.key === monthKey) || { transactions: [], total: 0 };
         
-        return invoiceGroups.find(g => g.key === key) || { transactions: [], total: 0 };
-    }, [invoiceGroups, selectedMonthOffset, selectedCard]);
+        // Retornamos ordendado aqui para evitar mutação indesejada no render
+        return {
+            ...group,
+            transactions: [...(group.transactions || [])].sort((a, b) => new Date(b.date) - new Date(a.date))
+        };
+    }, [invoiceGroups, monthKey, selectedCard]);
 
-    const currentInvoiceTrans = currentInvoiceData.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
+    const currentInvoiceTrans = currentInvoiceData.transactions;
     const invoiceTotal = currentInvoiceData.total;
+    const invoicePaid = currentInvoiceData.paidAmount || 0;
 
     useEffect(() => {
         if (invoiceTotal > 0) {
@@ -247,7 +244,7 @@ export function CreditCards() {
 
     // Pagamento da fatura parcial (se houver pagamentos avulsos que ainda não foram agrupados ou para controle visual)
     // Nota:groupByInvoiceCycle já desconta incomes (pagamentos) do total.
-    const invoiceBalance = Math.max(0, invoiceTotal);
+    const invoiceBalance = Math.max(0, Number(invoiceTotal || 0));
 
     const openInvoicePayment = () => {
         setPaymentAccId('');
@@ -324,41 +321,55 @@ export function CreditCards() {
         }
     };
 
-    // Gerar dados do Gráfico futuro
+    // Gerar dados do Gráfico: Histórico Real de Faturas (Dinâmico conforme navegação)
     const chartData = useMemo(() => {
-        if (!selectedCard) return [];
-        const base = new Date();
+        if (!selectedCard || !invoiceGroups) return [];
         const data = [];
 
-        for (let i = 0; i < 6; i++) {
-            const targetDate = new Date(base.getFullYear(), base.getMonth() + i, 1);
+        // Buscamos 6 meses de histórico relativo ao mês que o usuário está visualizando
+        // Isso permite ver a evolução de faturas em qualquer ponto do tempo
+        for (let i = selectedMonthOffset - 5; i <= selectedMonthOffset; i++) {
+            const d = new Date();
+            d.setDate(1); // Blindagem contra bug de 31 dias
+            const targetDate = new Date(d.getFullYear(), d.getMonth() + i, 1);
             
-            const monthTotal = transactions.filter(t => {
-                if (t.accountId !== selectedCard.id) return false;
-                if (t.type !== 'expense') return false;
-                
-                const [y, m, d] = t.date.split('-');
-                const transDate = new Date(y, m - 1, d);
-                return isSameMonth(transDate, targetDate);
-            }).reduce((acc, t) => acc + Number(t.amount), 0);
+            // Chave idêntica ao financeUtils.js (YYYY-MM)
+            const key = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+            
+            const groupMatch = invoiceGroups.find(g => g.key === key);
+            const total = groupMatch ? Math.max(0, groupMatch.total) : 0;
 
             data.push({
-                name: targetDate.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase(),
-                Fatura: monthTotal,
-                offset: i
+                name: targetDate.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase().replace('.', '') + '/' + String(targetDate.getFullYear()).slice(-2),
+                Fatura: total,
+                isCurrent: i === selectedMonthOffset,
+                isProjection: groupMatch?.isProjection || false,
+                isPaid: groupMatch ? (groupMatch.paidAmount >= groupMatch.total * 0.98 && groupMatch.total > 0) : false,
+                key: key
             });
         }
         return data;
-    }, [transactions, selectedCard]);
+    }, [invoiceGroups, selectedCard, selectedMonthOffset]);
 
-    const monthKey = `${timelineMonths.find(m => m.offset === selectedMonthOffset)?.year}-${String(timelineMonths.find(m => m.offset === selectedMonthOffset)?.date.getMonth() + 1).padStart(2, '0')}`;
-    const isPaid = selectedCard?.paidInvoices?.includes(monthKey);
+    const isPaid = useMemo(() => {
+        if (!selectedCard || !invoiceGroups) return false;
+        
+        const groupMatch = invoiceGroups.find(g => g.key === monthKey);
+        const manualPaid = selectedCard.paidInvoices?.includes(monthKey);
+        
+        // Regra Automática: Se houver um valor pago identificado no extrato que cubra pelo menos 98% da fatura (margem para centavos)
+        const autoPaid = groupMatch && 
+                        groupMatch.total > 0 && 
+                        groupMatch.paidAmount >= (groupMatch.total * 0.98);
+
+        return !!(manualPaid || autoPaid);
+    }, [selectedCard, monthKey, invoiceGroups]);
 
     let statusText = 'Em Aberto';
     let statusColor = '#3b82f6';
 
     if (isPaid) {
-        statusText = 'Paga';
+        statusText = currentInvoiceTrans.length > 0 && invoiceTotal <= 0 ? 'Liquidada (Importada)' : 'Paga';
         statusColor = '#10b981';
     } else if (selectedMonthOffset < 0) {
         statusText = 'Fechada / Pendente';
@@ -373,10 +384,10 @@ export function CreditCards() {
         const balances = {};
         allAccounts.forEach(a => balances[a.id] = Number(a.initialBalance || 0));
         transactions.forEach(t => {
-            if (t.status === 'paid') {
+            if (t.status === 'paid' && !t.deleted) {
                 const amt = Number(t.amount || 0);
-                if (t.type === 'income') balances[t.accountId] += amt;
-                else balances[t.accountId] -= amt;
+                if (t.type === 'income') balances[t.accountId] = (balances[t.accountId] || 0) + amt;
+                else balances[t.accountId] = (balances[t.accountId] || 0) - amt;
             }
         });
         return balances;
@@ -586,10 +597,10 @@ export function CreditCards() {
             {/* Layout de Gráficos (Flex estilo Dashboard) */}
             <div className="charts-layout">
                 
-                {/* 1. Projeção de Faturas (Bar Chart) */}
+                {/* 1. Histórico de Faturas (Bar Chart) */}
                 <div className="chart-card">
                     <div className="chart-header">
-                        <BarChart2 size={20} color="var(--primary)" /> Projeção de Faturas (6 Meses)
+                        <BarChart2 size={20} color="var(--primary)" /> Histórico de Faturas (6 Meses)
                     </div>
                     <div style={{ width: '100%', minHeight: '280px' }}>
                         <ResponsiveContainer width="100%" height={280}>
@@ -604,16 +615,28 @@ export function CreditCards() {
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
                                 <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `R$${value}`} tick={{fill: '#6b7280', fontSize: 12}} />
                                 <Tooltip 
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                                    formatter={(value) => [`R$ ${value.toFixed(2)}`, 'Fatura Projetada']}
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: 'var(--shadow-lg)', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)' }}
+                                    formatter={(value, name, props) => [
+                                        `R$ ${value.toFixed(2)} ${props.payload.isProjection ? '(Projetado)' : ''}`, 
+                                        props.payload.isProjection ? 'Dívida de Parcelas' : 'Fatura Consolidada'
+                                    ]}
                                 />
                                 <Bar 
                                     dataKey="Fatura" 
-                                    fill="url(#colorFatura)" 
-                                    radius={[4, 4, 0, 0]} 
+                                    radius={[6, 6, 0, 0]} 
                                     barSize={40}
                                     animationDuration={1500}
-                                />
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell 
+                                            key={`cell-${index}`} 
+                                            fill={entry.isPaid ? '#10b981' : (entry.isCurrent ? 'var(--primary)' : 'var(--primary-light, #c4b5fd)')} 
+                                            fillOpacity={entry.isProjection ? 0.3 : (entry.isCurrent || entry.isPaid ? 1 : 0.7)}
+                                            stroke={entry.isPaid ? '#059669' : (entry.isProjection ? 'var(--primary)' : 'none')}
+                                            strokeDasharray={entry.isProjection ? "4 4" : "0"}
+                                        />
+                                    ))}
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -644,11 +667,11 @@ export function CreditCards() {
                                 fontWeight: 700,
                                 textTransform: 'uppercase',
                                 color: statusColor,
-                                minWidth: '140px',
+                                minWidth: '150px',
                                 textAlign: 'center',
                                 border: `1px solid ${statusColor}33`
                             }}>
-                                {timelineMonths.find(m => m.offset === selectedMonthOffset)?.label} {timelineMonths.find(m => m.offset === selectedMonthOffset)?.year}
+                                {selectedMonthLabel}
                             </div>
 
                             <button 
@@ -660,10 +683,15 @@ export function CreditCards() {
                         </div>
 
                         {/* Fatura Value */}
-                             <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)', margin: '0.5rem 0', lineHeight: 1, textDecoration: isPaid && invoiceTotal > 0 ? 'line-through' : 'none' }}>
-                                 R$ {formatCurrency(invoiceTotal)}
+                             <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)', margin: '0.5rem 0', lineHeight: 1 }}>
+                                 R$ {formatCurrency(invoiceTotal < 0 ? 0 : invoiceTotal)}
                              </h2>
-                             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                             {invoiceTotal < 0 && (
+                                 <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 800, background: '#ecfdf5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #d1fadf' }}>
+                                     CRÉDITO DISPONÍVEL: R$ {formatCurrency(Math.abs(invoiceTotal))}
+                                 </span>
+                             )}
+                             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                                  Vencimento dia {selectedCard.dueDay}
                              </p>
 
@@ -734,7 +762,7 @@ export function CreditCards() {
             <div className="chart-card" style={{ padding: 0, overflow: 'hidden', backgroundColor: 'var(--surface)' }}>
                 <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface-hover)' }}>
                     <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                        Lançamentos ({timelineMonths.find(m => m.offset === selectedMonthOffset)?.label})
+                        Lançamentos ({selectedMonthLabel})
                     </h3>
                 </div>
                 

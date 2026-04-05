@@ -59,20 +59,51 @@ const FinanceAuditService = {
             }
         }
 
-        // 3. Identify Potential Duplicates in DB
-        const seen = new Set();
-        transactions.forEach(t => {
-            const key = `${t.date}|${parseFloat(t.amount).toFixed(2)}|${t.description?.toLowerCase().trim()}|${t.accountId}`;
-            if (seen.has(key)) {
-                reports.push({
-                    type: 'duplicate_transaction',
-                    severity: 'low',
-                    transaction: t,
-                    message: `Possível lançamento duplicado: ${t.description} (R$ ${t.amount}) em ${t.date}.`
-                });
+        // 3. Identify Potential Duplicates in DB (V6 - FUZZY MATCH)
+        // We use a temporal window and normalized descriptions to find 'ghost' duplicates
+        const normalizedTrans = transactions.map(t => ({
+            ...t,
+            normDesc: (t.description || '').toLowerCase()
+                .replace(/\d+\/\d+/g, '') // Remove 01/10
+                .replace(/parc\w*/g, '')   // Remove Parc.
+                .replace(/\s+/g, ' ')
+                .trim(),
+            normDate: new Date(t.date).getTime()
+        })).sort((a,b) => a.normDate - b.normDate);
+
+        for (let i = 0; i < normalizedTrans.length; i++) {
+            for (let j = i + 1; j < normalizedTrans.length; j++) {
+                const a = normalizedTrans[i];
+                const b = normalizedTrans[j];
+                
+                // Only compare within same account
+                if (a.accountId !== b.accountId) continue;
+                
+                // Temporal Window: +/- 3 days (259200000 ms)
+                const dayDiff = Math.abs(a.normDate - b.normDate);
+                const isWithinWindow = dayDiff <= 259200000;
+                
+                // Financial Tolerance: +/- 0.05
+                const amtDiff = Math.abs(Number(a.amount) - Number(b.amount));
+                const isSameAmount = amtDiff <= 0.05;
+
+                // Simple Description Match (at least 70% similar or normalized equality)
+                const isSameDesc = a.normDesc === b.normDesc;
+
+                if (isWithinWindow && isSameAmount && isSameDesc && a.id !== b.id) {
+                    reports.push({
+                        type: 'duplicate_transaction',
+                        severity: 'low',
+                        transaction: b,
+                        originalTransaction: a,
+                        message: `Possível duplicidade inteligente detectada: "${a.description}" em ${a.date} vs "${b.description}" em ${b.date}.`
+                    });
+                }
+
+                // If dates are too far apart in sorted list, break inner loop to save performance
+                if (dayDiff > 300000000) break; 
             }
-            seen.add(key);
-        });
+        }
 
         // 4. Identify Orphaned Transactions (No valid account)
         const accountIds = new Set(accounts.map(a => a.id));
@@ -178,6 +209,34 @@ const FinanceAuditService = {
             // Fallback to basic link trigger if writeFile fails in some environments
             alert("Erro ao formatar Excel. Verifique o console.");
         }
+    },
+    /**
+     * Reassign orphaned transactions to a system 'Adjustment Account'
+     */
+    repairOrphanedTransactions: async (transactionIds) => {
+        let adjustmentAcc = (await db.getAll('accounts')).find(a => a.name === 'Ajuste de Auditoria');
+        
+        if (!adjustmentAcc) {
+            adjustmentAcc = await db.create('accounts', {
+                name: 'Ajuste de Auditoria',
+                type: 'adjustment',
+                initialBalance: 0,
+                color: '#9ca3af',
+                description: 'Conta automática para resgate de lançamentos órfãos.'
+            });
+        }
+
+        for (const id of transactionIds) {
+            const t = await db.getById('transactions', id);
+            if (t) {
+                await db.update('transactions', id, {
+                    ...t,
+                    accountId: adjustmentAcc.id,
+                    auditNote: 'Resgatado por Auto-Reparo de Auditoria V10.5'
+                });
+            }
+        }
+        return adjustmentAcc.id;
     }
 };
 

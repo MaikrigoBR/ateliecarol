@@ -69,15 +69,15 @@ export const BankFileParserService = {
                 const year = dtPosted.substring(0, 4);
                 const month = dtPosted.substring(4, 6);
                 const day = dtPosted.substring(6, 8);
-                const amount = parseFloat(trnAmt.replace(',', '.'));
+                const rawAmount = parseFloat(trnAmt.replace(',', '.'));
                 
                 // --- INTELIGÊNCIA DE EXTRAÇÃO DE PARCELAS V9.4 ---
                 const installmentRegex = /(?:\s*[-/|:]\s*(?:Parcela|Parc\.?|P:?|PT?)\s*|\s+)?\(?(\d{1,3})\s*(?:de|\/|of)\s*(\d{1,3})\)?/i;
                 const iMatch = memo.match(installmentRegex);
                 
                 let installment = null;
-                let installmentNumber = null;
-                let installmentsTotal = null;
+                let installmentNumber = 1;
+                let installmentsTotal = 1;
                 let cleanDescription = memo;
 
                 if (iMatch) {
@@ -86,16 +86,26 @@ export const BankFileParserService = {
                     installment = `${iMatch[1].padStart(2, '0')}/${iMatch[2].padStart(2, '0')}`;
                     cleanDescription = memo.replace(iMatch[0], '').trim();
                 }
+
+                // Lógica de Polaridade: No cartão, quanto menor (negativo) o valor do OFX, maior a despesa.
+                const isCreditCard = account?.type === 'credit';
+                let type = rawAmount >= 0 ? 'income' : 'expense';
+
+                if (isCreditCard) {
+                    // No extrato do cartão: compras são negativas (debit/expense), pagamentos positivas (credit/income)
+                    type = rawAmount < 0 ? 'expense' : 'income';
+                }
                 
                 transactions.push({
                     date: `${year}-${month}-${day}`,
-                    amount: Math.abs(amount),
+                    amount: Math.abs(rawAmount),
                     description: cleanDescription,
-                    type: amount >= 0 ? 'income' : 'expense',
-                    rawId: fitId ? `ofx-${accountId}-${fitId}` : `ofx-gen-${accountId}-${Math.abs(amount).toFixed(2)}-${year}-${month}-${day}`,
-                    installment,
-                    installmentNumber,
-                    installmentsTotal
+                    type: type,
+                    rawId: fitId ? `ofx-${accountId}-${fitId}` : `ofx-gen-${accountId}-${Math.abs(rawAmount).toFixed(2)}-${year}-${month}-${day}`,
+                    installment: installment,
+                    installmentNumber: installmentNumber,
+                    installmentsTotal: installmentsTotal,
+                    status: 'paid'
                 });
             }
         });

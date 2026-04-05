@@ -99,13 +99,13 @@ export function Orders() {
                 // 1. Arquiva a Origem (Soft Delete)
                 await db.update('orders', order.id, { deleted: true, status: 'Arquivado' });
                 
-                // 2. Localiza e Arquiva as Transações Ligadas (Soft Delete)
+                // 2. Localiza e Arquiva as Transações Ligadas (Soft Delete com Auditoria)
                 const allTrans = await db.getAll('transactions');
                 let count = 0;
                 for (const t of allTrans) {
-                    // Matchs per ID or by description parser for legacy orphaned transactions
                     if (String(t.orderId) === String(order.id) || (t.description && t.description.includes(String(order.id).substring(0,8)))) {
-                        await db.update('transactions', t.id, { deleted: true, status: 'cancelled', amount: 0 });
+                        // Preservamos o valor original para extrato fiel, apenas mudamos status e ocultamos das somas ativas
+                        await db.update('transactions', t.id, { deleted: true, status: 'reversed' });
                         count++;
                     }
                 }
@@ -220,20 +220,10 @@ export function Orders() {
           const amtReceived = parseFloat(t.amount) || 0;
           const gatewayFee = parseFloat(t.gatewayFeeAmount) || 0;
 
-          // 2. Update Account Balance
-          if (t.targetAccountId) {
-              try {
-                  const account = await db.getById('accounts', t.targetAccountId);
-                  if (account) {
-                      const netAmountToDeposit = amtReceived - gatewayFee;
-                      await db.update('accounts', account.id, {
-                          balance: (parseFloat(account.balance) || 0) + netAmountToDeposit
-                      });
-                  }
-              } catch (error) {
-                  console.error("Error updating account balance:", error);
-              }
-          }
+          // 2. Update Account Balance - REDUNDANT (NOW HANDLED BY FINANCIAL RECALCULATION)
+          // We no longer manually update account.balance here to avoid 'Source of Truth' conflicts.
+          // The FinanceFinal module will dynamically sum transactions to show the accurate balance.
+          // If needed for legacy sync, we could call recalculateAllBalances() but creating the transaction below is enough.
 
           // 3. Create Finance Transaction
           await db.create('transactions', {
